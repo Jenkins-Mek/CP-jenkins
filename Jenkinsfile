@@ -4,10 +4,28 @@ properties([
     parameters([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'localhost:9092', description: 'Kafka bootstrap server'),
-        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Topic name to describe (leave empty to describe all topics)'),
-        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], defaultValue: 'SASL_PLAINTEXT', description: 'Kafka security protocol')
+        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], defaultValue: 'SASL_PLAINTEXT', description: 'Kafka security protocol'),
+        [$class: 'CascadeChoiceParameter',
+            choiceType: 'PT_SINGLE_SELECT',
+            description: 'Select topic to describe (leave blank to list all)',
+            filterLength: 1,
+            filterable: true,
+            name: 'TOPIC_NAME',
+            referencedParameters: 'KAFKA_BOOTSTRAP_SERVER,SECURITY_PROTOCOL',
+            script: [
+                $class: 'GroovyScript',
+                fallbackScript: [classpath: [], sandbox: true, script: 'return ["<error listing topics>"]'],
+                script: [classpath: [], sandbox: true, script: '''
+                    def kafka = com.mycompany.ConfluentOps.getInstance()
+                    def topics = kafka.listKafkaTopics()
+                    return topics ?: ["<no topics found>"]
+                ''']
+            ]
+        ],
+        booleanParam(name: 'INCLUDE_INTERNAL', defaultValue: false, description: 'Include internal topics')
     ])
 ])
+
 
 pipeline {
     agent any
@@ -43,9 +61,13 @@ pipeline {
 
                     def topicsToDescribe = []
 
-                    if (params.TOPIC_NAME?.trim()) {
-                        topicsToDescribe = [params.TOPIC_NAME.trim()]
-                        echo "🎯 Attempting to describe specific topic: ${params.TOPIC_NAME}"
+                    if (!params.TOPIC_NAME?.trim()) {
+                        echo "⚠️ No topic name provided. Listing all available topics for manual selection..."
+
+                        def allTopics = confluentOps.listKafkaTopics()
+                        def listText = "# No topic selected.\n# Available topics:\n" + allTopics.join("\n")
+                        writeFile file: env.TOPICS_DESCRIBE_FILE, text: listText
+                        error("Please re-run the job and select a topic from the dropdown list.")
                     }
 
                     if (topicsToDescribe.size() > 0) {
