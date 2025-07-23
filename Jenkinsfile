@@ -1,5 +1,3 @@
-@Library('kafka-ops-shared-lib') _
-
 properties([
     parameters([
         [$class: 'ChoiceParameter',
