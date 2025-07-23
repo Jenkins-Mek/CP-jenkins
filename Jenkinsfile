@@ -38,8 +38,13 @@ pipeline {
                     if (!topics || topics.isEmpty()) {
                         error("❌ No Kafka topics found.")
                     }
+
                     echo "📋 Available topics (${topics.size()}):"
                     topics.eachWithIndex { topic, i -> echo "  ${i + 1}. ${topic}" }
+
+                    // Save to file for artifact
+                    writeFile file: env.TOPICS_DESCRIBE_FILE, text: topics.join("\n")
+
                     echo "\n💡 Re-run this job with a TOPIC_NAME to describe a topic."
                 }
             }
@@ -81,16 +86,15 @@ pipeline {
     }
 
     post {
-        success {
-            script {
-                if (params.TOPIC_NAME?.trim()) {
-                    archiveArtifacts artifacts: "${env.TOPICS_DESCRIBE_FILE}", fingerprint: true, allowEmptyArchive: true
-                }
-            }
-        }
         always {
             script {
                 confluentOps.cleanupClientConfig()
+            }
+        }
+        success {
+            script {
+                archiveArtifacts artifacts: "${env.TOPICS_DESCRIBE_FILE}", fingerprint: true, allowEmptyArchive: true
+                echo "📦 Artifact '${env.TOPICS_DESCRIBE_FILE}' archived successfully."
             }
         }
     }
