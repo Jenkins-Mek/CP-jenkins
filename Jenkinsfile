@@ -3,7 +3,7 @@ properties([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'localhost:9092', description: 'Kafka bootstrap server'),
         booleanParam(name: 'INCLUDE_INTERNAL', defaultValue: false, description: 'Include internal Kafka topics (starting with _)'),
-        choice(name: 'SECURITY_PROTOCOL', choices: ['PLAINTEXT', 'SASL_PLAINTEXT', 'SASL_SSL'], defaultValue: 'SASL_PLAINTEXT', description: 'Kafka security protocol')
+        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], defaultValue: 'SASL_PLAINTEXT', description: 'Kafka security protocol')
     ])
 ])
 
@@ -83,16 +83,17 @@ def createKafkaClientConfig(username, password) {
     switch(params.SECURITY_PROTOCOL) {
         case 'SASL_PLAINTEXT':
         case 'SASL_SSL':
-            securityConfig = '''
+            securityConfig = """
 security.protocol=${params.SECURITY_PROTOCOL}
 sasl.mechanism=PLAIN
 sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
-'''
+"""
             break
-        case 'PLAINTEXT':
         default:
             securityConfig = """
-security.protocol=PLAINTEXT
+security.protocol=${params.SECURITY_PROTOCOL}
+sasl.mechanism=PLAIN
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
 """
             break
     }
