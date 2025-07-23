@@ -213,7 +213,7 @@ pipeline {
                     switch(params.OPERATION) {
                         case 'LIST_TOPICS':
                             echo "==== Calling List Topics job ===="
-                            build job: 'GIT-org/jenkins1/list-topic',
+                            build job: 'org-cp-tools/CP-jenkins/list-topics',
                                 parameters: [
                                     string(name: 'ParamsAsENV', value: 'true'),
                                     string(name: 'ENVIRONMENT_PARAMS', value: "${env.COMPOSE_DIR},${env.CONNECTION_TYPE}")
