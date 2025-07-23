@@ -153,7 +153,7 @@ properties([
 
 pipeline {
     agent any
-    
+
     environment {
         COMPOSE_DIR = '/confluent/cp-mysetup/cp-all-in-one'
         CONNECTION_TYPE = 'local-confluent'
@@ -222,46 +222,25 @@ pipeline {
             }
         }
 
-        stage('Create Client Configuration') {
-            when {
-                expression { params.OPERATION == 'LIST_TOPICS' }
-            }
-            steps {
-                script {
-                    echo "🔧 Creating Kafka client configuration..."
-                    withCredentials([
-                        usernamePassword(
-                            credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9',
-                            usernameVariable: 'KAFKA_USERNAME',
-                            passwordVariable: 'KAFKA_PASSWORD'
-                        )
-                    ]) {
-                        createKafkaClientConfig(env.KAFKA_USERNAME, env.KAFKA_PASSWORD)
-                    }
-                    echo "✅ Client configuration created"
-                }
-            }
-        }
-
         stage('Execute Operation') {
             steps {
                 script {
                     switch(params.OPERATION) {
                         case 'LIST_TOPICS':
-                            echo "📋 Listing Kafka topics..."
-                            def topics = listKafkaTopics()
-                            
-                            if (topics.size() > 0) {
-                                echo "✅ Found ${topics.size()} topic(s):"
-                                topics.eachWithIndex { topic, index ->
-                                    echo "  ${index + 1}. ${topic}"
-                                }
-                                saveTopicsToFile(topics)
-                                echo "💾 Topics saved to ${env.TOPICS_LIST_FILE}"
-                            } else {
-                                echo "⚠️ No topics found"
-                                writeFile file: env.TOPICS_LIST_FILE, text: "# No topics found\n"
-                            }
+                            echo "==== Calling List Topic job ===="
+
+                            def envParams = "COMPOSE_DIR=${env.COMPOSE_DIR}," +
+                                            "KAFKA_BOOTSTRAP_SERVER=${env.KAFKA_BOOTSTRAP_SERVER}," +
+                                            "INCLUDE_INTERNAL=${env.INCLUDE_INTERNAL}," +
+                                            "SECURITY_PROTOCOL=${env.SECURITY_PROTOCOL}"
+
+                            build job: 'GIT-org/jenkins1/lists-topic',
+                                parameters: [
+                                        string(name: 'ParamsAsENV', value: 'true'),
+                                        string(name: 'ENVIRONMENT_PARAMS', value: envParams)
+                                ],
+                                propagate: false,
+                                wait: true
                             break
 
                         case 'CREATE_TOPIC':
@@ -302,7 +281,7 @@ pipeline {
                             echo "✅ Confirmation successful, proceeding with deletion..."
 
                             echo "==== Calling Delete Topic job ===="
-                            build job: 'GIT-org/jenkins1/delete-topic', 
+                            build job: 'GIT-org/jenkins1/delete-topic',
                                 parameters: [
                                     string(name: 'TopicName', value: "${env.TOPIC_NAME}"),
                                     string(name: 'ParamsAsENV', value: 'true'),
@@ -335,96 +314,6 @@ pipeline {
         failure {
             echo "❌ Kafka topic operation '${params.OPERATION}' failed - check logs for details"
         }
-        always {
-            script {
-                if (params.OPERATION == 'LIST_TOPICS') {
-                    cleanupClientConfig()
-                }
-                echo "🧹 Cleaning up temporary environment variables"
-            }
-        }
     }
 }
 
-
-def createKafkaClientConfig(username, password) {
-    def securityConfig = ""
-
-    switch(env.SECURITY_PROTOCOL) {
-        case 'SASL_PLAINTEXT':
-        case 'SASL_SSL':
-            securityConfig = """
-security.protocol=${env.SECURITY_PROTOCOL}
-sasl.mechanism=PLAIN
-sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
-"""
-            break
-        case 'PLAINTEXT':
-        default:
-            securityConfig = """
-security.protocol=PLAINTEXT
-"""
-            break
-    }
-
-    sh """
-        docker compose --project-directory ${env.COMPOSE_DIR} -f ${env.COMPOSE_DIR}/docker-compose.yml \\
-        exec -T broker bash -c 'cat > ${env.CLIENT_CONFIG_FILE} << "EOF"
-bootstrap.servers=${env.KAFKA_BOOTSTRAP_SERVER}
-${securityConfig}
-EOF'
-    """
-}
-
-def listKafkaTopics() {
-    def topicsOutput = sh(
-        script: """
-            docker compose --project-directory ${env.COMPOSE_DIR} -f ${env.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T broker bash -c "
-                export KAFKA_OPTS=''
-                export JMX_PORT=''
-                export KAFKA_JMX_OPTS=''
-                unset JMX_PORT
-                unset KAFKA_JMX_OPTS
-                unset KAFKA_OPTS
-                kafka-topics --list --bootstrap-server ${env.KAFKA_BOOTSTRAP_SERVER} --command-config ${env.CLIENT_CONFIG_FILE}
-            " 2>/dev/null
-        """,
-        returnStdout: true
-    ).trim()
-
-    def allTopics = topicsOutput.split('\n').findAll {
-        it.trim() != '' && !it.startsWith('WARNING') && !it.contains('FATAL')
-    }
-
-    def includeInternal = env.INCLUDE_INTERNAL == 'true'
-    return includeInternal ? allTopics : allTopics.findAll { !it.startsWith('_') }
-}
-
-def saveTopicsToFile(topics) {
-    def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
-    def textContent = """# Kafka Topics List
-# Generated: ${timestamp}
-# Total topics: ${topics.size()}
-# Include internal: ${env.INCLUDE_INTERNAL}
-# Bootstrap server: ${env.KAFKA_BOOTSTRAP_SERVER}
-# Security protocol: ${env.SECURITY_PROTOCOL}
-
-"""
-    topics.each { topic ->
-        textContent += "${topic}\n"
-    }
-
-    writeFile file: env.TOPICS_LIST_FILE, text: textContent
-}
-
-def cleanupClientConfig() {
-    try {
-        sh """
-            docker compose --project-directory ${env.COMPOSE_DIR} -f ${env.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T broker bash -c "rm -f ${env.CLIENT_CONFIG_FILE}" 2>/dev/null || true
-        """
-    } catch (Exception e) {
-        // Ignore cleanup errors
-    }
-}
