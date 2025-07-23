@@ -17,7 +17,7 @@ properties([
             $class: 'GroovyScript',
             fallbackScript: [classpath: [], sandbox: true, script: 'return ["<error reading topics>"]'],
             script: [classpath: [], sandbox: true, script: '''
-                def topicFilePath = "/var/jenkins_home/workspace/Refresh-Kafka-Topics-Cache/cached-kafka-topics.txt"
+                def topicFilePath = "/var/jenkins_home/workspace/org-cp-tools_CP-jenkins_Refresh-Kafka-Topics-Cache/cached-kafka-topics.txt"
                 def topics = []
                 try {
                     File f = new File(topicFilePath)
