@@ -247,9 +247,9 @@ pipeline {
                             echo "==== Calling Create Topic job ===="
                             build job: 'org-cp-tools/CP-jenkins/create-topic',
                                 parameters: [
-                                    string(name: 'TopicName', value: "${env.TOPIC_NAME}"),
-                                    string(name: 'Partitions', value: "${env.PARTITIONS}"),
-                                    string(name: 'ReplicationFactor', value: "${env.REPLICATION_FACTOR}"),
+                                    string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
+                                    string(name: 'PARTITIONS', value: "${env.PARTITIONS}"),
+                                    string(name: 'REPLICATION_FACTOR', value: "${env.REPLICATION_FACTOR}"),
                                     string(name: 'ParamsAsENV', value: 'true'),
                                     string(name: 'ENVIRONMENT_PARAMS', value: "${env.COMPOSE_DIR},${env.CONNECTION_TYPE}")
                                 ],
