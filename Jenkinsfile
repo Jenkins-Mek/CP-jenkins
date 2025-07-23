@@ -111,13 +111,19 @@ def listKafkaTopics() {
         script: """
             docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
             exec -T broker bash -c "
+                export KAFKA_OPTS=''
+                export JMX_PORT=''
+                export KAFKA_JMX_OPTS=''
+                unset JMX_PORT
+                unset KAFKA_JMX_OPTS
+                unset KAFKA_OPTS
                 kafka-topics --list --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} --command-config ${env.CLIENT_CONFIG_FILE}
             " 2>/dev/null
         """,
         returnStdout: true
     ).trim()
 
-    def allTopics = topicsOutput.split('\n').findAll { it.trim() != '' && !it.startsWith('WARNING') }
+    def allTopics = topicsOutput.split('\n').findAll { it.trim() != '' && !it.startsWith('WARNING') && !it.contains('FATAL') }
     return params.INCLUDE_INTERNAL ? allTopics : allTopics.findAll { !it.startsWith('_') }
 }
 
