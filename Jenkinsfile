@@ -1,10 +1,8 @@
-@Library('kafka-ops-shared-lib') _
-
 properties([
     parameters([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'localhost:9092', description: 'Kafka bootstrap server'),
-        booleanParam(name: 'INCLUDE_INTERNAL', defaultValue: false, description: 'Include internal Kafka topics (starting with _)'),
+        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Topic name to describe (leave empty to describe all topics)'),
         choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], defaultValue: 'SASL_PLAINTEXT', description: 'Kafka security protocol')
     ])
 ])
@@ -13,7 +11,7 @@ pipeline {
     agent any
 
     environment {
-        TOPICS_LIST_FILE = 'kafka-topics-list.txt'
+        TOPICS_DESCRIBE_FILE = 'kafka-topics-describe.txt'
         CLIENT_CONFIG_FILE = '/tmp/client.properties'
     }
 
@@ -29,28 +27,44 @@ pipeline {
                             passwordVariable: 'KAFKA_PASSWORD'
                         )
                     ]) {
-                        confluentOps.createKafkaClientConfig(env.KAFKA_USERNAME, env.KAFKA_PASSWORD)
+                        createKafkaClientConfig(env.KAFKA_USERNAME, env.KAFKA_PASSWORD)
                     }
                     echo "✅ Client configuration created"
                 }
             }
         }
 
-        stage('List Kafka Topics') {
+        stage('Describe Kafka Topics') {
             steps {
                 script {
-                    echo "📋 Retrieving Kafka topics..."
-                    def topics = confluentOps.listKafkaTopics()
-
-                    if (topics.size() > 0) {
-                        echo "✅ Found ${topics.size()} topic(s)"
-                        topics.eachWithIndex { topic, index ->
-                            echo "  ${index + 1}. ${topic}"
-                        }
-                        confluentOps.saveTopicsToFile(topics)
+                    echo "📋 Describing Kafka topics..."
+                    
+                    def topicsToDescribe = []
+                    
+                    if (params.TOPIC_NAME?.trim()) {
+                        // Describe specific topic
+                        topicsToDescribe = [params.TOPIC_NAME.trim()]
+                        echo "🎯 Describing specific topic: ${params.TOPIC_NAME}"
                     } else {
-                        echo "⚠️ No topics found"
-                        writeFile file: env.TOPICS_LIST_FILE, text: "# No topics found\n"
+                        // Get all topics and describe them
+                        topicsToDescribe = listKafkaTopics()
+                        echo "📋 Describing all topics (${topicsToDescribe.size()} found)"
+                    }
+                    
+                    if (topicsToDescribe.size() > 0) {
+                        def topicDescriptions = [:]
+                        
+                        topicsToDescribe.each { topic ->
+                            echo "🔍 Describing topic: ${topic}"
+                            def description = describeKafkaTopic(topic)
+                            topicDescriptions[topic] = description
+                        }
+                        
+                        saveTopicDescriptionsToFile(topicDescriptions)
+                        echo "✅ Successfully described ${topicsToDescribe.size()} topic(s)"
+                    } else {
+                        echo "⚠️ No topics found to describe"
+                        writeFile file: env.TOPICS_DESCRIBE_FILE, text: "# No topics found to describe\n"
                     }
                 }
             }
@@ -60,18 +74,18 @@ pipeline {
     post {
         success {
             script {
-                archiveArtifacts artifacts: "${env.TOPICS_LIST_FILE}",
+                archiveArtifacts artifacts: "${env.TOPICS_DESCRIBE_FILE}",
                                fingerprint: true,
                                allowEmptyArchive: true
-                echo "📦 Topics list archived"
+                echo "📦 Topic descriptions archived"
             }
         }
         failure {
-            echo "❌ Failed to list topics - check Kafka services and configuration"
+            echo "❌ Failed to describe topics - check Kafka services and configuration"
         }
         always {
             script {
-                confluentOps.cleanupClientConfig()
+                cleanupClientConfig()
             }
         }
     }
