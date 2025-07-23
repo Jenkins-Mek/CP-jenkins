@@ -86,7 +86,7 @@ def createKafkaClientConfig(username, password) {
             securityConfig = """
 security.protocol=${params.SECURITY_PROTOCOL}
 sasl.mechanism=PLAIN
-sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="\$username\"" password="\$password\"";
 """
             break
         case 'PLAINTEXT':
