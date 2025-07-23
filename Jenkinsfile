@@ -29,7 +29,7 @@ pipeline {
                             passwordVariable: 'KAFKA_PASSWORD'
                         )
                     ]) {
-                        createKafkaClientConfig(env.KAFKA_USERNAME, env.KAFKA_PASSWORD)
+                        confluentOps.createKafkaClientConfig(env.KAFKA_USERNAME, env.KAFKA_PASSWORD)
                     }
                     echo "✅ Client configuration created"
                 }
@@ -40,14 +40,14 @@ pipeline {
             steps {
                 script {
                     echo "📋 Retrieving Kafka topics..."
-                    def topics = listKafkaTopics()
+                    def topics = confluentOps.listKafkaTopics()
 
                     if (topics.size() > 0) {
                         echo "✅ Found ${topics.size()} topic(s)"
                         topics.eachWithIndex { topic, index ->
                             echo "  ${index + 1}. ${topic}"
                         }
-                        saveTopicsToFile(topics)
+                        confluentOps.saveTopicsToFile(topics)
                     } else {
                         echo "⚠️ No topics found"
                         writeFile file: env.TOPICS_LIST_FILE, text: "# No topics found\n"
@@ -71,7 +71,7 @@ pipeline {
         }
         always {
             script {
-                cleanupClientConfig()
+                confluentOps.cleanupClientConfig()
             }
         }
     }
