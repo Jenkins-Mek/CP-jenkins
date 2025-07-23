@@ -1,3 +1,5 @@
+@Library('kafka-ops-shared-lib') _
+
 properties([
     parameters([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
@@ -39,7 +41,7 @@ pipeline {
                 script {
                     echo "📋 Retrieving Kafka topics..."
                     def topics = listKafkaTopics()
-                    
+
                     if (topics.size() > 0) {
                         echo "✅ Found ${topics.size()} topic(s)"
                         topics.eachWithIndex { topic, index ->
