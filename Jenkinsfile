@@ -9,15 +9,24 @@ pipeline {
     }
 
     stages {
-        stage('Create Kafka Client Config') {
+        stage('Create Client Configuration') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', usernameVariable: 'KAFKA_USERNAME', passwordVariable: 'KAFKA_PASSWORD')]) {
+                    echo "🔧 Creating Kafka client configuration..."
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9',
+                            usernameVariable: 'KAFKA_USERNAME',
+                            passwordVariable: 'KAFKA_PASSWORD'
+                        )
+                    ]) {
                         confluentOps.createKafkaClientConfig(env.KAFKA_USERNAME, env.KAFKA_PASSWORD)
                     }
+                    echo "✅ Client configuration created"
                 }
             }
         }
+
         stage('Fetch Kafka Topics') {
             steps {
                 script {
