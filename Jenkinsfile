@@ -245,7 +245,7 @@ pipeline {
 
                         case 'CREATE_TOPIC':
                             echo "==== Calling Create Topic job ===="
-                            build job: 'GIT-org/jenkins1/create-topic',
+                            build job: 'org-cp-tools/CP-jenkins/create-topic',
                                 parameters: [
                                     string(name: 'TopicName', value: "${env.TOPIC_NAME}"),
                                     string(name: 'Partitions', value: "${env.PARTITIONS}"),
@@ -259,7 +259,7 @@ pipeline {
 
                         case 'DESCRIBE_TOPIC':
                             echo "==== Calling Describe Topic job ===="
-                            build job: 'GIT-org/jenkins1/describe-topic',
+                            build job: 'org-cp-tools/CP-jenkins/describe-topic',
                                 parameters: [
                                     string(name: 'TopicName', value: "${env.TOPIC_NAME}"),
                                     string(name: 'ParamsAsENV', value: 'true'),
