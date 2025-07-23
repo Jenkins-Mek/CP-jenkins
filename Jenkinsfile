@@ -234,7 +234,7 @@ pipeline {
                                             "INCLUDE_INTERNAL=${env.INCLUDE_INTERNAL}," +
                                             "SECURITY_PROTOCOL=${env.SECURITY_PROTOCOL}"
 
-                            build job: 'GIT-org/jenkins1/lists-topic',
+                            build job: 'org-cp-tools/CP-jenkins/list-topics',
                                 parameters: [
                                         string(name: 'ParamsAsENV', value: 'true'),
                                         string(name: 'ENVIRONMENT_PARAMS', value: envParams)
