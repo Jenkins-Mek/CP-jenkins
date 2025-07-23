@@ -44,36 +44,6 @@ pipeline {
                     def topicsToDescribe = []
 
                     if (params.TOPIC_NAME?.trim()) {
-                        // Describe specific topic
-                        topicsToDescribe = [params.TOPIC_NAME.trim()]
-                        echo "🎯 Describing specific topic: ${params.TOPIC_NAME}"
-                    }
-
-                    if (topicsToDescribe.size() > 0) {
-                        def topicDescriptions = [:]
-
-                        topicsToDescribe.each { topic ->
-                            echo "🔍 Describing topic: ${topic}"
-                            def description = confluentOps.describeKafkaTopic(topic)
-                            topicDescriptions[topic] = description
-                        }
-
-                        confluentOps.saveTopicDescriptionsToFile(topicDescriptions)
-                        echo "✅ Successfully described ${topicsToDescribe.size()} topic(s)"
-                    } else {
-                        echo "⚠️ No topics found to describe"
-                        writeFile file: env.TOPICS_DESCRIBE_FILE, text: "# No topics found to describe\n"
-                    }
-                }
-            }
-        }stage('Describe Kafka Topics') {
-            steps {
-                script {
-                    echo "📋 Describing Kafka topics..."
-
-                    def topicsToDescribe = []
-
-                    if (params.TOPIC_NAME?.trim()) {
                         topicsToDescribe = [params.TOPIC_NAME.trim()]
                         echo "🎯 Attempting to describe specific topic: ${params.TOPIC_NAME}"
                     }
