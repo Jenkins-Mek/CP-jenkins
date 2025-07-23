@@ -5,9 +5,12 @@ properties([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'localhost:9092', description: 'Kafka bootstrap server'),
         choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], defaultValue: 'SASL_PLAINTEXT', description: 'Kafka security protocol'),
-        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Name of the Kafka topic to create')
+        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Name of the Kafka topic to create'),
+        string(name: 'PARTITIONS', defaultValue: '3', description: 'Number of partitions'),
+        string(name: 'REPLICATION_FACTOR', defaultValue: '1', description: 'Replication factor')
     ])
 ])
+
 
 pipeline {
     agent any
@@ -41,12 +44,15 @@ pipeline {
             steps {
                 script {
                     def topicName = params.TOPIC_NAME.trim()
-                    echo "🆕 Creating Kafka topic: ${topicName}"
-                    confluentOps.createKafkaTopic(topicName)
-                    echo "✅ Topic '${topicName}' created successfully."
+                    def partitions = params.PARTITIONS.toInteger()
+                    def replicationFactor = params.REPLICATION_FACTOR.toInteger()
+                    echo "🆕 Creating Kafka topic: ${topicName} with partitions=${partitions} replicationFactor=${replicationFactor}"
+                    def result = confluentOps.createKafkaTopic(topicName, partitions, replicationFactor)
+                    echo result
                 }
             }
         }
+
     }
 
     post {
