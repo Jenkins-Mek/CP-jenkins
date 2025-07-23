@@ -46,6 +46,12 @@ properties([
                                 <div style="background-color: #e8f5e8; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
                                     <h4 style="margin: 0; color: #155724;">📋 List All Topics</h4>
                                     <p style="margin: 5px 0 0 0; color: #155724;">This operation will list all available Kafka topics with detailed information including count, names, partitions, and replication factors.</p>
+                                    <div style="margin-top: 10px;">
+                                        <label style="font-weight: bold; color: #155724;">
+                                            <input type="checkbox" name="value" value="include_internal" style="margin-right: 5px;">
+                                            Include internal topics (starting with _)
+                                        </label>
+                                    </div>
                                 </div>
                             """
                         } else if (OPERATION == 'CREATE_TOPIC') {
@@ -147,16 +153,21 @@ properties([
 
 pipeline {
     agent any
+    
     environment {
         COMPOSE_DIR = '/confluent/cp-mysetup/cp-all-in-one'
         CONNECTION_TYPE = 'local-confluent'
+        KAFKA_BOOTSTRAP_SERVER = 'localhost:9092'
+        SECURITY_PROTOCOL = 'SASL_PLAINTEXT'
+        TOPICS_LIST_FILE = 'kafka-topics-list.txt'
+        CLIENT_CONFIG_FILE = '/tmp/client.properties'
     }
 
     stages {
         stage('Initialize') {
             steps {
                 script {
-                    echo "Starting Kafka Topic Management"
+                    echo "🚀 Starting Kafka Topic Management"
                     echo "Operation: ${params.OPERATION}"
                 }
             }
@@ -181,7 +192,8 @@ pipeline {
                             echo "Topic: ${env.TOPIC_NAME}"
                             break
                         case 'LIST_TOPICS':
-                            echo "Listing all topics"
+                            env.INCLUDE_INTERNAL = values.contains('include_internal') ? 'true' : 'false'
+                            echo "Listing all topics (Include internal: ${env.INCLUDE_INTERNAL})"
                             break
                     }
                 }
@@ -195,14 +207,38 @@ pipeline {
                         case 'CREATE_TOPIC':
                             if (!env.TOPIC_NAME?.trim()) error "Topic name required"
                             if (!env.TOPIC_NAME.matches('^[a-zA-Z0-9._-]+$')) error "Invalid topic name format"
-                            echo "Validation passed"
+                            echo "✅ Validation passed"
                             break
                         case 'DESCRIBE_TOPIC':
                         case 'DELETE_TOPIC':
                             if (!env.TOPIC_NAME?.trim()) error "Topic name required"
-                            echo "Validation passed"
+                            echo "✅ Validation passed"
+                            break
+                        case 'LIST_TOPICS':
+                            echo "✅ Validation passed"
                             break
                     }
+                }
+            }
+        }
+
+        stage('Create Client Configuration') {
+            when {
+                expression { params.OPERATION == 'LIST_TOPICS' }
+            }
+            steps {
+                script {
+                    echo "🔧 Creating Kafka client configuration..."
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9',
+                            usernameVariable: 'KAFKA_USERNAME',
+                            passwordVariable: 'KAFKA_PASSWORD'
+                        )
+                    ]) {
+                        createKafkaClientConfig(env.KAFKA_USERNAME, env.KAFKA_PASSWORD)
+                    }
+                    echo "✅ Client configuration created"
                 }
             }
         }
@@ -212,14 +248,20 @@ pipeline {
                 script {
                     switch(params.OPERATION) {
                         case 'LIST_TOPICS':
-                            echo "==== Calling List Topics job ===="
-                            build job: 'org-cp-tools/CP-jenkins/list-topics',
-                                parameters: [
-                                    string(name: 'ParamsAsENV', value: 'true'),
-                                    string(name: 'ENVIRONMENT_PARAMS', value: "${env.COMPOSE_DIR},${env.CONNECTION_TYPE}")
-                                ],
-                                propagate: false,
-                                wait: true
+                            echo "📋 Listing Kafka topics..."
+                            def topics = listKafkaTopics()
+                            
+                            if (topics.size() > 0) {
+                                echo "✅ Found ${topics.size()} topic(s):"
+                                topics.eachWithIndex { topic, index ->
+                                    echo "  ${index + 1}. ${topic}"
+                                }
+                                saveTopicsToFile(topics)
+                                echo "💾 Topics saved to ${env.TOPICS_LIST_FILE}"
+                            } else {
+                                echo "⚠️ No topics found"
+                                writeFile file: env.TOPICS_LIST_FILE, text: "# No topics found\n"
+                            }
                             break
 
                         case 'CREATE_TOPIC':
@@ -249,15 +291,15 @@ pipeline {
                             break
 
                         case 'DELETE_TOPIC':
-                            echo "Requesting delete confirmation..."
+                            echo "⚠️ Requesting delete confirmation..."
                             def confirmName = input(
                                 message: "Delete topic '${env.TOPIC_NAME}'? This cannot be undone!",
                                 parameters: [string(name: 'CONFIRM_NAME', description: "Type topic name to confirm")]
                             )
                             if (confirmName != env.TOPIC_NAME) {
-                                error "Confirmation failed - typed '${confirmName}' but expected '${env.TOPIC_NAME}'"
+                                error "❌ Confirmation failed - typed '${confirmName}' but expected '${env.TOPIC_NAME}'"
                             }
-                            echo "Confirmation successful, proceeding with deletion..."
+                            echo "✅ Confirmation successful, proceeding with deletion..."
 
                             echo "==== Calling Delete Topic job ===="
                             build job: 'GIT-org/jenkins1/delete-topic', 
@@ -271,7 +313,7 @@ pipeline {
                             break
 
                         default:
-                            error "Unknown operation: ${params.OPERATION}"
+                            error "❌ Unknown operation: ${params.OPERATION}"
                     }
                 }
             }
@@ -280,13 +322,28 @@ pipeline {
 
     post {
         success {
-            echo "✅ Kafka topic operation '${params.OPERATION}' completed successfully"
+            script {
+                if (params.OPERATION == 'LIST_TOPICS') {
+                    archiveArtifacts artifacts: "${env.TOPICS_LIST_FILE}",
+                                   fingerprint: true,
+                                   allowEmptyArchive: true
+                    echo "📦 Topics list archived as artifact"
+                }
+                echo "✅ Kafka topic operation '${params.OPERATION}' completed successfully"
+            }
         }
         failure {
             echo "❌ Kafka topic operation '${params.OPERATION}' failed - check logs for details"
         }
         always {
-            echo "Cleaning up temporary environment variables"
+            script {
+                if (params.OPERATION == 'LIST_TOPICS') {
+                    cleanupClientConfig()
+                }
+                echo "🧹 Cleaning up temporary environment variables"
+            }
         }
     }
 }
+
+\\
