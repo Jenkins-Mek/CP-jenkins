@@ -75,7 +75,7 @@ sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule require
 ${getSchemaConfig()}
 EOF
 
-                # Consume messages and filter out error messages
+                # Consume messages and save to temp file
                 timeout 30s kafka-console-consumer \\
                     --bootstrap-server ${env.KAFKA_SERVER} \\
                     --topic "${params.TOPIC_NAME}" \\
@@ -84,8 +84,10 @@ EOF
                     --property print.key=true \\
                     --property print.timestamp=true \\
                     --property key.separator=" | " \\
-                    --timeout-ms 10000 2>/dev/null | \\
-                    grep -v "FATAL\\|ERROR\\|Native frames\\|libjvm\\|libjli\\|JavaMain\\|JNI_\\|jni_\\|Aborted\\|Threads::\\|JvmtiExport" || true
+                    --timeout-ms 10000 > /tmp/kafka_output.txt 2>/dev/null || true
+                
+                # Filter out only JVM error messages, keep actual message content
+                cat /tmp/kafka_output.txt | grep -v "^FATAL ERROR\\|^Native frames:\\|^V  \\[libjvm\\|^C  \\[libjli\\|processing of -javaagent failed" || cat /tmp/kafka_output.txt
             '
         """,
         returnStdout: true
