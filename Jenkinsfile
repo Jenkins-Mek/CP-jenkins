@@ -250,7 +250,7 @@ pipeline {
                                     string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
                                     string(name: 'PARTITIONS', value: "${env.PARTITIONS}"),
                                     string(name: 'REPLICATION_FACTOR', value: "${env.REPLICATION_FACTOR}"),
-                                    choice(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
+                                    string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
                                     string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
                                     string(name: 'KAFKA_BOOTSTRAP_SERVER', value: 'localhost:9092')
                                 ],
@@ -264,7 +264,7 @@ pipeline {
                                 parameters: [
                                     string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
                                     string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
-                                    choice(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
+                                    string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
                                     string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}")
                                 ],
                                 propagate: false,
