@@ -98,16 +98,6 @@ pipeline {
                 }
             }
         }
-
-        stage('Verify Message Production') {
-            steps {
-                script {
-                    echo "🔍 Verifying message production..."
-                    def verification = verifyMessageProduction(params.TOPIC_NAME.trim())
-                    echo verification
-                }
-            }
-        }
     }
 
     post {
@@ -289,37 +279,6 @@ def validateSchemaRegistry() {
         """
     } catch (Exception e) {
         error("❌ Schema Registry validation failed: ${e.getMessage()}")
-    }
-}
-
-def verifyMessageProduction(topicName) {
-    try {
-        def verification = sh(
-            script: """
-                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-                exec -T broker bash -c '
-                    echo "Verifying messages in topic ${topicName}..."
-                    
-                    # Get topic info
-                    kafka-topics --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
-                        --command-config ${env.CLIENT_CONFIG_FILE} \\
-                        --describe --topic ${topicName}
-                    
-                    echo ""
-                    echo "Recent messages (last 5):"
-                    timeout 10s kafka-console-consumer --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
-                        --consumer.config ${env.CLIENT_CONFIG_FILE} \\
-                        --topic ${topicName} \\
-                        --from-beginning \\
-                        --max-messages 5 2>/dev/null || echo "No messages found or timeout reached"
-                ' 2>/dev/null
-            """,
-            returnStdout: true
-        )
-        
-        return verification
-    } catch (Exception e) {
-        return "⚠️ Warning: Failed to verify message production - ${e.getMessage()}"
     }
 }
 
