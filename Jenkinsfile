@@ -283,7 +283,7 @@ pipeline {
                             echo "✅ Confirmation successful, proceeding with deletion..."
 
                             echo "==== Calling Delete Topic job ===="
-                            build job: 'GIT-org/jenkins1/delete-topic',
+                            build job: 'org-cp-tools/CP-jenkins/delete-topic',
                                 parameters: [
                                     string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
                                     string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER ?: 'localhost:9092'}"),
