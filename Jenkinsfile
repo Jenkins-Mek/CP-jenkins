@@ -5,14 +5,15 @@ properties([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory'),
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'localhost:9092', description: 'Kafka bootstrap server'),
         choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], defaultValue: 'SASL_PLAINTEXT', description: 'Security protocol'),
-        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Topic name to alter'),
+        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name'),
+        choice(name: 'INPUT_MODE', choices: ['Simple', 'Advanced'], defaultValue: 'Simple', description: 'Choose input method'),
 
-        // Example topic config parameters (add more as needed)
-        string(name: 'RETENTION_MS', defaultValue: '', description: 'retention.ms (e.g. 604800000)'),
-        string(name: 'CLEANUP_POLICY', defaultValue: '', description: 'cleanup.policy (e.g. delete, compact)'),
-        string(name: 'SEGMENT_BYTES', defaultValue: '', description: 'segment.bytes (e.g. 1073741824)'),
-        string(name: 'MIN_INSYNC_REPLICAS', defaultValue: '', description: 'min.insync.replicas (e.g. 2)'),
-        string(name: 'MAX_MESSAGE_BYTES', defaultValue: '', description: 'max.message.bytes (e.g. 1048576)')
+        // 👇 Simple mode fields
+        string(name: 'RETENTION_DAYS', defaultValue: '', description: 'Retention period (in days)'),
+        choice(name: 'CLEANUP_POLICY', choices: ['delete', 'compact', 'delete,compact'], description: 'Kafka cleanup.policy'),
+        string(name: 'SEGMENT_BYTES', defaultValue: '', description: 'Segment size in bytes (e.g. 1073741824)'),
+        string(name: 'MIN_INSYNC_REPLICAS', defaultValue: '', description: 'Minimum in-sync replicas'),
+        string(name: 'MAX_MESSAGE_BYTES', defaultValue: '', description: 'Maximum message size in bytes'),
     ])
 ])
 
@@ -52,23 +53,41 @@ pipeline {
         stage('Build Config Changes') {
             steps {
                 script {
-                    def configs = [:]
+                    if (params.INPUT_MODE == 'Advanced') {
+                        if (!params.RAW_CONFIGS?.trim()) {
+                            error("❌ RAW_CONFIGS cannot be empty in Advanced mode.")
+                        }
+                        configList = params.RAW_CONFIGS.trim()
+                    } else {
+                        def configs = [:]
 
-                    if (params.RETENTION_MS?.trim()) configs['retention.ms'] = params.RETENTION_MS.trim()
-                    if (params.CLEANUP_POLICY?.trim()) configs['cleanup.policy'] = params.CLEANUP_POLICY.trim()
-                    if (params.SEGMENT_BYTES?.trim()) configs['segment.bytes'] = params.SEGMENT_BYTES.trim()
-                    if (params.MIN_INSYNC_REPLICAS?.trim()) configs['min.insync.replicas'] = params.MIN_INSYNC_REPLICAS.trim()
-                    if (params.MAX_MESSAGE_BYTES?.trim()) configs['max.message.bytes'] = params.MAX_MESSAGE_BYTES.trim()
+                        if (params.RETENTION_DAYS?.trim()) {
+                         def days = params.RETENTION_DAYS.trim().toInteger()
+                         configs['retention.ms'] = (days * 24 * 60 * 60 * 1000).toString() // convert to ms
+                        }
+                        if (params.CLEANUP_POLICY?.trim()) {
+                         configs['cleanup.policy'] = params.CLEANUP_POLICY.trim()
+                       }
+                        if (params.SEGMENT_BYTES?.trim()) {
+                            configs['segment.bytes'] = params.SEGMENT_BYTES.trim()
+                        }
+                       if (params.MIN_INSYNC_REPLICAS?.trim()) {
+                           configs['min.insync.replicas'] = params.MIN_INSYNC_REPLICAS.trim()
+                        }
+                        if (params.MAX_MESSAGE_BYTES?.trim()) {
+                            configs['max.message.bytes'] = params.MAX_MESSAGE_BYTES.trim()
+                       }
 
-                    if (configs.isEmpty()) {
-                        error("❌ No valid configs to apply")
+                        if (configs.isEmpty()) {
+                          error("❌ At least one configuration must be provided in Simple mode.")
+                        }
+
+                       configList = configs.collect { k, v -> "${k}=${v}" }.join(',')
+                  }
+
+                    echo "🛠 Config changes to apply: ${configList}"
                     }
-
-                    // Compose comma separated key=value
-                    configList = configs.collect { k, v -> "${k}=${v}" }.join(',')
-                    echo "Config changes to apply: ${configList}"
-                }
-            }
+                  }
         }
 
         stage('Alter Topic Config') {
