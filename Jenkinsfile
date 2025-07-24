@@ -91,7 +91,7 @@ def checkTopicExists() {
             script: """
                 docker compose -f ${env.COMPOSE_DIR}/docker-compose.yml exec -T broker bash -c '
                     export KAFKA_OPTS=""
-                    kafka-topics --bootstrap-server ${env.KAFKA_SERVER} --list | grep "^${params.TOPIC_NAME}\$"
+                    kafka-topics --bootstrap-server ${env.KAFKA_SERVER} --list | grep "${params.TOPIC_NAME}"
                 '
             """,
             returnStdout: true
