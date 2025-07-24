@@ -93,7 +93,7 @@ pipeline {
 
         stage('Verify Registration') {
             when {
-                not { params.DRY_RUN }
+                expression { !params.DRY_RUN }
             }
             steps {
                 script {
