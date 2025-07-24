@@ -63,6 +63,14 @@ def consumeMessages() {
     def result = sh(
         script: """
             docker compose -f ${env.COMPOSE_DIR}/docker-compose.yml exec -T broker bash -c '
+                # Clear JVM options to prevent agent conflicts
+                export KAFKA_OPTS=""
+                export JMX_PORT=""
+                export KAFKA_JMX_OPTS=""
+                unset JMX_PORT
+                unset KAFKA_JMX_OPTS
+                unset KAFKA_OPTS
+                
                 cat > /tmp/consumer.properties << EOF
 bootstrap.servers=${env.KAFKA_SERVER}
 group.id=${params.CONSUMER_GROUP_ID}
@@ -75,7 +83,7 @@ sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule require
 ${getSchemaConfig()}
 EOF
 
-                # Consume messages and save to temp file
+                # Consume messages
                 timeout 30s kafka-console-consumer \\
                     --bootstrap-server ${env.KAFKA_SERVER} \\
                     --topic "${params.TOPIC_NAME}" \\
@@ -84,10 +92,7 @@ EOF
                     --property print.key=true \\
                     --property print.timestamp=true \\
                     --property key.separator=" | " \\
-                    --timeout-ms 10000 > /tmp/kafka_output.txt 2>/dev/null || true
-                
-                # Filter out only JVM error messages, keep actual message content
-                cat /tmp/kafka_output.txt | grep -v "^FATAL ERROR\\|^Native frames:\\|^V  \\[libjvm\\|^C  \\[libjli\\|processing of -javaagent failed" || cat /tmp/kafka_output.txt
+                    --timeout-ms 10000 2>/dev/null || true
             '
         """,
         returnStdout: true
