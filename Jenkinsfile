@@ -84,7 +84,12 @@ def createKafkaTopic(topicName, partitions = 3, replicationFactor = 1) {
             returnStdout: true
         ).trim()
 
-        return "Topic '${topicName}' created or already exists.\n${createOutput}"
+        if (createOutput) {
+            return "✅ Topic '${topicName}' created.\n${createOutput}"
+        } else {
+            return "ℹ️ Topic '${topicName}' already exists."
+        }
+
     } catch (Exception e) {
         return "ERROR: Failed to create topic '${topicName}' - ${e.getMessage()}"
     }
