@@ -4,8 +4,12 @@ properties([
     parameters([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
         string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://localhost:8081', description: 'Schema Registry URL'),
-        string(name: 'SUBJECT_NAME', defaultValue: '', description: 'Enter subject name to describe (or leave empty to list all subjects)'),
-        booleanParam(name: 'INCLUDE_VERSIONS', defaultValue: false, description: 'Include all versions for each subject')
+        string(name: 'SUBJECT_NAME', defaultValue: '', description: 'Subject name for the schema (required)'),
+        choice(name: 'SCHEMA_TYPE', choices: ['AVRO', 'JSON', 'PROTOBUF'], description: 'Schema type'),
+        text(name: 'SCHEMA_CONTENT', defaultValue: '', description: 'Schema content (JSON for Avro/JSON Schema, .proto for Protobuf)'),
+        choice(name: 'COMPATIBILITY', choices: ['', 'BACKWARD', 'BACKWARD_TRANSITIVE', 'FORWARD', 'FORWARD_TRANSITIVE', 'FULL', 'FULL_TRANSITIVE', 'NONE'], description: 'Compatibility level (optional - leave empty to use global/existing)'),
+        booleanParam(name: 'DRY_RUN', defaultValue: false, description: 'Validate schema without registering'),
+        booleanParam(name: 'FORCE_REGISTER', defaultValue: false, description: 'Force registration even if schema already exists')
     ])
 ])
 
@@ -13,11 +17,20 @@ pipeline {
     agent any
 
     environment {
-        SCHEMA_SUBJECTS_FILE = 'schema-subjects-list.txt'
         SCHEMA_REGISTRY_CONFIG_FILE = '/tmp/schema-registry-client.properties'
+        TEMP_SCHEMA_FILE = '/tmp/temp-schema.json'
+        REGISTRATION_RESULT_FILE = 'schema-registration-result.txt'
     }
 
     stages {
+        stage('Validate Input Parameters') {
+            steps {
+                script {
+                    validateInputParameters()
+                }
+            }
+        }
+
         stage('Create Schema Registry Configuration') {
             steps {
                 script {
@@ -26,67 +39,65 @@ pipeline {
             }
         }
 
-        stage('List Schema Subjects') {
-            when {
-                expression { !params.SUBJECT_NAME?.trim() }
-            }
+        stage('Validate Schema Content') {
             steps {
                 script {
-                    def subjects = listSchemaSubjects()
-                    if (!subjects || subjects.isEmpty()) {
-                        echo "ℹ️ No schema subjects found in registry."
-                        writeFile file: env.SCHEMA_SUBJECTS_FILE, text: "# No schema subjects found\n# Generated: ${new Date().format('yyyy-MM-dd HH:mm:ss')}\n# Schema Registry: ${params.SCHEMA_REGISTRY_URL}\n\nNo subjects registered in the schema registry."
-                        return
-                    }
-
-                    echo "📋 Available schema subjects (${subjects.size()}):"
-                    subjects.eachWithIndex { subject, i -> echo "  ${i + 1}. ${subject}" }
-
-                    // Get detailed information if requested
-                    def subjectDetails = [:]
-                    if (params.INCLUDE_VERSIONS) {
-                        echo "\n🔍 Fetching version details for each subject..."
-                        subjects.each { subject ->
-                            subjectDetails[subject] = getSubjectVersions(subject)
-                        }
-                    }
-
-                    saveSubjectListToFile(subjects, subjectDetails)
-                    echo "\n💡 Re-run this job with a SUBJECT_NAME to describe a specific subject."
+                    validateSchemaContent()
                 }
             }
         }
 
-        stage('Describe Schema Subject') {
+        stage('Check Existing Schema') {
             when {
-                expression { params.SUBJECT_NAME?.trim() }
+                not { params.FORCE_REGISTER }
             }
             steps {
                 script {
-                    def inputSubject = params.SUBJECT_NAME.trim()
-                    def subjects = listSchemaSubjects()
+                    checkExistingSchema()
+                }
+            }
+        }
 
-                    if (!subjects.contains(inputSubject)) {
-                        def matches = subjects.findAll { it.toLowerCase().contains(inputSubject.toLowerCase()) }
-                        if (matches.size() == 1) {
-                            echo "✅ Partial match found: '${matches[0]}'"
-                            inputSubject = matches[0]
-                        } else if (matches.size() > 1) {
-                            echo "❌ Multiple matches found for '${params.SUBJECT_NAME}':"
-                            matches.each { echo "  - ${it}" }
-                            error("Please provide a more specific subject name.")
-                        } else {
-                            echo "❌ Subject '${inputSubject}' not found."
-                            error("Available subjects:\n" + subjects.take(10).collect { "  - $it" }.join('\n'))
-                        }
-                    } else {
-                        echo "✅ Subject '${inputSubject}' found"
-                    }
+        stage('Set Subject Compatibility') {
+            when {
+                expression { params.COMPATIBILITY?.trim() }
+            }
+            steps {
+                script {
+                    setSubjectCompatibility()
+                }
+            }
+        }
 
-                    echo "📝 Describing subject: ${inputSubject}"
-                    def subjectInfo = describeSchemaSubject(inputSubject)
-                    saveSubjectDescriptionToFile(inputSubject, subjectInfo)
-                    echo "✅ Subject description saved to ${env.SCHEMA_SUBJECTS_FILE}"
+        stage('Dry Run - Validate Schema') {
+            when {
+                expression { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    performDryRun()
+                }
+            }
+        }
+
+        stage('Register Schema') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    registerSchema()
+                }
+            }
+        }
+
+        stage('Verify Registration') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    verifyRegistration()
                 }
             }
         }
@@ -95,506 +106,548 @@ pipeline {
     post {
         always {
             script {
-                cleanupSchemaRegistryConfig()
+                cleanupTempFiles()
             }
         }
         success {
             script {
-                archiveArtifacts artifacts: "${env.SCHEMA_SUBJECTS_FILE}", fingerprint: true, allowEmptyArchive: true
-                echo "📦 Artifact '${env.SCHEMA_SUBJECTS_FILE}' archived successfully."
+                archiveArtifacts artifacts: "${env.REGISTRATION_RESULT_FILE}", fingerprint: true, allowEmptyArchive: true
+                echo "📦 Registration result archived successfully."
+            }
+        }
+        failure {
+            script {
+                echo "❌ Schema registration failed. Check the logs for details."
             }
         }
     }
 }
 
+def validateInputParameters() {
+    echo "🔍 Validating input parameters..."
+    
+    if (!params.SUBJECT_NAME?.trim()) {
+        error("❌ SUBJECT_NAME is required")
+    }
+    
+    if (!params.SCHEMA_CONTENT?.trim()) {
+        error("❌ SCHEMA_CONTENT is required")
+    }
+    
+    if (!params.SCHEMA_TYPE?.trim()) {
+        error("❌ SCHEMA_TYPE is required")
+    }
+    
+    // Validate schema type
+    def validTypes = ['AVRO', 'JSON', 'PROTOBUF']
+    if (!validTypes.contains(params.SCHEMA_TYPE)) {
+        error("❌ Invalid SCHEMA_TYPE. Must be one of: ${validTypes.join(', ')}")
+    }
+    
+    echo "✅ Input parameters validated successfully"
+    echo "   Subject: ${params.SUBJECT_NAME}"
+    echo "   Schema Type: ${params.SCHEMA_TYPE}"
+    echo "   Compatibility: ${params.COMPATIBILITY ?: 'Not specified (using default)'}"
+    echo "   Dry Run: ${params.DRY_RUN}"
+    echo "   Force Register: ${params.FORCE_REGISTER}"
+}
+
 def createSchemaRegistryConfig() {
+    echo "⚙️ Creating Schema Registry configuration..."
     sh """
         docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
         exec -T schema-registry bash -c 'cat > ${env.SCHEMA_REGISTRY_CONFIG_FILE} << "EOF"
 schema.registry.url=${params.SCHEMA_REGISTRY_URL}
 EOF'
     """
+    echo "✅ Schema Registry configuration created"
 }
 
-def listSchemaSubjects() {
+def validateSchemaContent() {
+    echo "🔍 Validating schema content..."
+    
     try {
-        def subjectsOutput = sh(
-            script: """
-                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-                exec -T schema-registry bash -c '
-                    RESPONSE=\$(curl -s ${params.SCHEMA_REGISTRY_URL}/subjects 2>/dev/null)
-                    if [ "\$RESPONSE" = "[]" ] || [ -z "\$RESPONSE" ]; then
-                        echo ""
-                    else
-                        echo "\$RESPONSE" | sed "s/\\[//g" | sed "s/\\]//g" | sed "s/\\"//g" | tr "," "\\n" | grep -v "^[[:space:]]*\$"
-                    fi
-                ' 2>/dev/null
-            """,
-            returnStdout: true
-        ).trim()
-
-        if (!subjectsOutput) {
-            return []
+        // Create temporary schema file based on type
+        def schemaContent = prepareSchemaContent()
+        
+        sh """
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            exec -T schema-registry bash -c 'cat > ${env.TEMP_SCHEMA_FILE} << "EOF"
+${schemaContent}
+EOF'
+        """
+        
+        // Perform basic validation based on schema type
+        switch (params.SCHEMA_TYPE) {
+            case 'AVRO':
+                validateAvroSchema()
+                break
+            case 'JSON':
+                validateJsonSchema()
+                break
+            case 'PROTOBUF':
+                validateProtobufSchema()
+                break
         }
-
-        return subjectsOutput.split('\n').findAll { it.trim() != '' }
+        
+        echo "✅ Schema content validation passed"
     } catch (Exception e) {
-        echo "⚠️ Warning: Failed to list schema subjects - ${e.getMessage()}"
-        return []
+        error("❌ Schema validation failed: ${e.getMessage()}")
     }
 }
 
-def getSubjectVersions(subjectName) {
-    try {
-        def versionsOutput = sh(
-            script: """
-                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-                exec -T schema-registry bash -c '
-                    curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${subjectName}/versions 2>/dev/null
-                ' 2>/dev/null
-            """,
-            returnStdout: true
-        ).trim()
-
-        return versionsOutput
-    } catch (Exception e) {
-        return "ERROR: Failed to get versions for subject '${subjectName}'"
+def prepareSchemaContent() {
+    def content = params.SCHEMA_CONTENT.trim()
+    
+    if (params.SCHEMA_TYPE == 'AVRO' || params.SCHEMA_TYPE == 'JSON') {
+        // For AVRO and JSON schemas, ensure it's valid JSON
+        try {
+            def jsonSlurper = new groovy.json.JsonSlurper()
+            def parsed = jsonSlurper.parseText(content)
+            return new groovy.json.JsonBuilder(parsed).toPrettyString()
+        } catch (Exception e) {
+            error("❌ Invalid JSON format for ${params.SCHEMA_TYPE} schema: ${e.getMessage()}")
+        }
+    } else if (params.SCHEMA_TYPE == 'PROTOBUF') {
+        // For Protobuf, return as-is
+        return content
     }
+    
+    return content
 }
 
-
-
-def describeSchemaSubject(subjectName) {
-    try {
-        // Get latest version and all versions
-        def schemaInfoOutput = sh(
-            script: """
-                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-                exec -T schema-registry bash -c '
-                    echo "=== Latest Version Info ==="
-                    LATEST=\$(curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${subjectName}/versions/latest 2>/dev/null)
-                    echo "\$LATEST"
-                    echo
-                    echo
-                    echo "=== All Versions ==="
-                    curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${subjectName}/versions 2>/dev/null
-                    echo
-                    echo
-                    echo "=== Subject Compatibility ==="
+def validateAvroSchema() {
+    echo "🔍 Validating Avro schema format..."
+    
+    def result = sh(
+        script: """
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            exec -T schema-registry bash -c '
+                # Basic Avro schema validation
+                SCHEMA_CONTENT=\$(cat ${env.TEMP_SCHEMA_FILE})
+                
+                # Check if it has required Avro fields
+                if echo "\$SCHEMA_CONTENT" | jq -e ".type" > /dev/null 2>&1; then
+                    echo "✅ Avro schema has required type field"
                     
-                    # Check subject-level compatibility first
-                    SUBJECT_COMPAT=\$(curl -s -w "%{http_code}" ${params.SCHEMA_REGISTRY_URL}/config/${subjectName} 2>/dev/null)
-                    HTTP_CODE=\$(echo "\$SUBJECT_COMPAT" | tail -c 4)
+                    # Check for record type specific fields
+                    SCHEMA_TYPE=\$(echo "\$SCHEMA_CONTENT" | jq -r ".type")
+                    if [ "\$SCHEMA_TYPE" = "record" ]; then
+                        if echo "\$SCHEMA_CONTENT" | jq -e ".name" > /dev/null 2>&1 && echo "\$SCHEMA_CONTENT" | jq -e ".fields" > /dev/null 2>&1; then
+                            echo "✅ Avro record schema has required name and fields"
+                        else
+                            echo "❌ Avro record schema missing name or fields"
+                            exit 1
+                        fi
+                    fi
+                else
+                    echo "❌ Invalid Avro schema: missing type field"
+                    exit 1
+                fi
+            '
+        """,
+        returnStatus: true
+    )
+    
+    if (result != 0) {
+        error("❌ Avro schema validation failed")
+    }
+}
+
+def validateJsonSchema() {
+    echo "🔍 Validating JSON schema format..."
+    
+    def result = sh(
+        script: """
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            exec -T schema-registry bash -c '
+                # Basic JSON schema validation
+                SCHEMA_CONTENT=\$(cat ${env.TEMP_SCHEMA_FILE})
+                
+                # Check if it has JSON schema indicators
+                if echo "\$SCHEMA_CONTENT" | jq -e "." > /dev/null 2>&1; then
+                    echo "✅ Valid JSON format"
+                    
+                    # Check for JSON Schema specific fields (optional but recommended)
+                    if echo "\$SCHEMA_CONTENT" | jq -e ".type" > /dev/null 2>&1 || echo "\$SCHEMA_CONTENT" | jq -e ".\\\$schema" > /dev/null 2>&1; then
+                        echo "✅ JSON Schema appears to have valid structure"
+                    else
+                        echo "⚠️ Warning: JSON Schema might be missing type or \\\$schema field"
+                    fi
+                else
+                    echo "❌ Invalid JSON format"
+                    exit 1
+                fi
+            '
+        """,
+        returnStatus: true
+    )
+    
+    if (result != 0) {
+        error("❌ JSON schema validation failed")
+    }
+}
+
+def validateProtobufSchema() {
+    echo "🔍 Validating Protobuf schema format..."
+    
+    def result = sh(
+        script: """
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            exec -T schema-registry bash -c '
+                # Basic Protobuf schema validation
+                SCHEMA_CONTENT=\$(cat ${env.TEMP_SCHEMA_FILE})
+                
+                # Check for basic Protobuf syntax
+                if echo "\$SCHEMA_CONTENT" | grep -q "syntax.*=.*\"proto"; then
+                    echo "✅ Protobuf schema has syntax declaration"
+                else
+                    echo "⚠️ Warning: Protobuf schema might be missing syntax declaration"
+                fi
+                
+                # Check for message definition
+                if echo "\$SCHEMA_CONTENT" | grep -q "message.*{"; then
+                    echo "✅ Protobuf schema has message definition"
+                else
+                    echo "❌ Protobuf schema missing message definition"
+                    exit 1
+                fi
+            '
+        """,
+        returnStatus: true
+    )
+    
+    if (result != 0) {
+        error("❌ Protobuf schema validation failed")
+    }
+}
+
+def checkExistingSchema() {
+    echo "🔍 Checking if subject already exists..."
+    
+    try {
+        def existingSchema = sh(
+            script: """
+                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+                exec -T schema-registry bash -c '
+                    RESPONSE=\$(curl -s -w "%{http_code}" ${params.SCHEMA_REGISTRY_URL}/subjects/${params.SUBJECT_NAME}/versions/latest 2>/dev/null)
+                    HTTP_CODE=\$(echo "\$RESPONSE" | tail -c 4)
                     
                     if [ "\$HTTP_CODE" = "200" ]; then
-                        echo "\$SUBJECT_COMPAT" | head -c -4
+                        echo "\$RESPONSE" | head -c -4
+                        exit 0
+                    elif [ "\$HTTP_CODE" = "404" ]; then
+                        echo "SUBJECT_NOT_FOUND"
+                        exit 0
                     else
-                        echo "Subject-level compatibility: Not configured (using global settings)"
-                        echo
-                        echo "=== Global Compatibility ==="
-                        curl -s ${params.SCHEMA_REGISTRY_URL}/config 2>/dev/null || echo "Unable to retrieve global compatibility settings"
+                        echo "ERROR: HTTP \$HTTP_CODE"
+                        exit 1
                     fi
                 ' 2>/dev/null
             """,
             returnStdout: true
         ).trim()
 
-        // Parse and format the schema for better readability
-        def formattedOutput = formatSchemaOutput(schemaInfoOutput)
-        return formattedOutput
-
-    } catch (Exception e) {
-        return "ERROR: Failed to describe subject '${subjectName}' - ${e.getMessage()}"
-    }
-}
-
-def formatSchemaOutput(rawOutput) {
-    try {
-        def lines = rawOutput.split('\n')
-        def formattedLines = []
-        def inLatestVersion = false
-        
-        for (line in lines) {
-            if (line.contains('=== Latest Version Info ===')) {
-                formattedLines.add(line)
-                inLatestVersion = true
-                continue
-            }
+        if (existingSchema == "SUBJECT_NOT_FOUND") {
+            echo "✅ Subject '${params.SUBJECT_NAME}' does not exist - ready for registration"
+        } else if (existingSchema.startsWith("ERROR:")) {
+            error("❌ Failed to check existing schema: ${existingSchema}")
+        } else {
+            // Parse existing schema info
+            def jsonSlurper = new groovy.json.JsonSlurper()
+            def schemaInfo = jsonSlurper.parseText(existingSchema)
             
-            if (line.contains('=== All Versions ===') || line.contains('=== Subject Compatibility ===')) {
-                inLatestVersion = false
-                formattedLines.add('')
-                formattedLines.add(line)
-                continue
-            }
+            echo "⚠️ Subject '${params.SUBJECT_NAME}' already exists:"
+            echo "   Current Version: ${schemaInfo.version}"
+            echo "   Schema ID: ${schemaInfo.id}"
             
-            // Format the schema JSON in the latest version section
-            if (inLatestVersion && line.trim().startsWith('{"subject"')) {
-                def schemaInfo = parseSchemaResponse(line)
-                formattedLines.addAll(schemaInfo)
+            if (!params.FORCE_REGISTER) {
+                error("❌ Subject already exists. Use FORCE_REGISTER=true to register a new version or choose a different subject name.")
             } else {
-                formattedLines.add(line)
+                echo "🔸 FORCE_REGISTER enabled - will attempt to register new version"
             }
         }
-        
-        return formattedLines.join('\n')
-        
     } catch (Exception e) {
-        echo "⚠️ Warning: Failed to format schema output, using raw format - ${e.getMessage()}"
-        return rawOutput
-    }
-}
-
-def parseSchemaResponse(jsonLine) {
-    try {
-        // Parse the JSON response
-        def jsonSlurper = new groovy.json.JsonSlurper()
-        def schemaData = jsonSlurper.parseText(jsonLine)
-        
-        def formattedLines = []
-        formattedLines.add("📋 Subject: ${schemaData.subject}")
-        formattedLines.add("🔢 Version: ${schemaData.version}")
-        formattedLines.add("🆔 Schema ID: ${schemaData.id}")
-        
-        // Detect schema type
-        def schemaType = detectSchemaType(schemaData)
-        formattedLines.add("📝 Schema Type: ${schemaType}")
-        formattedLines.add("")
-        
-        // Format based on schema type
-        switch (schemaType.toLowerCase()) {
-            case 'avro':
-                formattedLines.addAll(formatAvroSchema(schemaData.schema))
-                break
-            case 'json':
-                formattedLines.addAll(formatJsonSchema(schemaData.schema))
-                break
-            case 'protobuf':
-                formattedLines.addAll(formatProtobufSchema(schemaData.schema))
-                break
-            default:
-                formattedLines.addAll(formatGenericSchema(schemaData.schema, schemaType))
-                break
-        }
-        
-        formattedLines.add("")
-        formattedLines.add("=" * 80)
-        
-        return formattedLines
-        
-    } catch (Exception e) {
-        echo "⚠️ Warning: Failed to parse schema response, using original format - ${e.getMessage()}"
-        return [jsonLine]
-    }
-}
-
-def detectSchemaType(schemaData) {
-    try {
-        def schema = schemaData.schema
-        
-        // Check if it has schemaType field (newer Schema Registry versions)
-        if (schemaData.schemaType) {
-            return schemaData.schemaType
-        }
-        
-        // Try to detect by schema content
-        if (schema.startsWith('syntax = "proto')) {
-            return 'PROTOBUF'
-        } else if (schema.contains('"$schema"') && schema.contains('json-schema.org')) {
-            return 'JSON'
-        } else if (schema.startsWith('{') && (schema.contains('"type"') || schema.contains('"fields"'))) {
-            return 'AVRO'
+        if (e.getMessage().contains("Subject already exists")) {
+            throw e
         } else {
-            return 'UNKNOWN'
+            echo "⚠️ Warning: Could not check existing schema - ${e.getMessage()}"
+            echo "🔸 Proceeding with registration attempt..."
         }
-    } catch (Exception e) {
-        return 'UNKNOWN'
     }
 }
 
-def formatAvroSchema(schemaString) {
+def setSubjectCompatibility() {
+    echo "⚙️ Setting subject compatibility to ${params.COMPATIBILITY}..."
+    
     try {
-        def jsonSlurper = new groovy.json.JsonSlurper()
-        def schemaJson = jsonSlurper.parseText(schemaString)
+        def result = sh(
+            script: """
+                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+                exec -T schema-registry bash -c '
+                    RESPONSE=\$(curl -s -w "%{http_code}" -X PUT \\
+                        -H "Content-Type: application/vnd.schemaregistry.v1+json" \\
+                        -d "{\"compatibility\":\"${params.COMPATIBILITY}\"}" \\
+                        ${params.SCHEMA_REGISTRY_URL}/config/${params.SUBJECT_NAME} 2>/dev/null)
+                    
+                    HTTP_CODE=\$(echo "\$RESPONSE" | tail -c 4)
+                    RESPONSE_BODY=\$(echo "\$RESPONSE" | head -c -4)
+                    
+                    if [ "\$HTTP_CODE" = "200" ]; then
+                        echo "✅ Compatibility set to ${params.COMPATIBILITY}"
+                        echo "\$RESPONSE_BODY"
+                    else
+                        echo "❌ Failed to set compatibility: HTTP \$HTTP_CODE"
+                        echo "\$RESPONSE_BODY"
+                        exit 1
+                    fi
+                ' 2>/dev/null
+            """,
+            returnStdout: true
+        ).trim()
         
-        def lines = []
-        lines.add("📖 Avro Schema Details:")
-        lines.add("  Type: ${schemaJson.type}")
-        
-        if (schemaJson.name) {
-            lines.add("  Name: ${schemaJson.name}")
-        }
-        
-        if (schemaJson.namespace) {
-            lines.add("  Namespace: ${schemaJson.namespace}")
-        }
-        
-        if (schemaJson.doc) {
-            lines.add("  Documentation: ${schemaJson.doc}")
-        }
-        
-        lines.add("")
-        
-        if (schemaJson.fields) {
-            lines.add("🔍 Fields:")
-            schemaJson.fields.eachWithIndex { field, index ->
-                def fieldNum = String.format("%2d", index + 1)
-                lines.add("  ${fieldNum}. ${field.name}")
-                lines.add("      Type: ${formatFieldType(field.type)}")
-                
-                if (field.doc) {
-                    lines.add("      Doc: ${field.doc}")
-                }
-                
-                if (field.default != null) {
-                    lines.add("      Default: ${field.default}")
-                }
-                
-                if (field.aliases) {
-                    lines.add("      Aliases: ${field.aliases}")
-                }
-                
-                if (index < schemaJson.fields.size() - 1) {
-                    lines.add("")
-                }
-            }
-        } else if (schemaJson.symbols) {
-            lines.add("🔍 Enum Values: ${schemaJson.symbols.join(', ')}")
-        }
-        
-        return lines
-        
+        echo result
     } catch (Exception e) {
-        echo "⚠️ Warning: Failed to parse Avro schema - ${e.getMessage()}"
-        return formatGenericSchema(schemaString, 'AVRO')
+        error("❌ Failed to set subject compatibility: ${e.getMessage()}")
     }
 }
 
-def formatJsonSchema(schemaString) {
+def performDryRun() {
+    echo "🧪 Performing dry run - validating schema compatibility..."
+    
+    def schemaPayload = buildSchemaPayload()
+    
     try {
-        def jsonSlurper = new groovy.json.JsonSlurper()
-        def schemaJson = jsonSlurper.parseText(schemaString)
+        def result = sh(
+            script: """
+                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+                exec -T schema-registry bash -c '
+                    RESPONSE=\$(curl -s -w "%{http_code}" -X POST \\
+                        -H "Content-Type: application/vnd.schemaregistry.v1+json" \\
+                        -d "${schemaPayload}" \\
+                        ${params.SCHEMA_REGISTRY_URL}/compatibility/subjects/${params.SUBJECT_NAME}/versions/latest 2>/dev/null)
+                    
+                    HTTP_CODE=\$(echo "\$RESPONSE" | tail -c 4)
+                    RESPONSE_BODY=\$(echo "\$RESPONSE" | head -c -4)
+                    
+                    echo "HTTP Code: \$HTTP_CODE"
+                    echo "Response: \$RESPONSE_BODY"
+                    
+                    if [ "\$HTTP_CODE" = "200" ]; then
+                        IS_COMPATIBLE=\$(echo "\$RESPONSE_BODY" | jq -r ".is_compatible" 2>/dev/null || echo "unknown")
+                        if [ "\$IS_COMPATIBLE" = "true" ]; then
+                            echo "✅ Schema is compatible"
+                            exit 0
+                        else
+                            echo "❌ Schema is not compatible"
+                            exit 1
+                        fi
+                    elif [ "\$HTTP_CODE" = "404" ]; then
+                        echo "✅ New subject - no compatibility issues"
+                        exit 0
+                    else
+                        echo "❌ Compatibility check failed"
+                        exit 1
+                    fi
+                ' 2>/dev/null
+            """,
+            returnStdout: true
+        ).trim()
         
-        def lines = []
-        lines.add("📖 JSON Schema Details:")
+        echo result
         
-        if (schemaJson.'$schema') {
-            lines.add("  Schema Version: ${schemaJson.'$schema'}")
-        }
-        
-        if (schemaJson.title) {
-            lines.add("  Title: ${schemaJson.title}")
-        }
-        
-        if (schemaJson.description) {
-            lines.add("  Description: ${schemaJson.description}")
-        }
-        
-        if (schemaJson.type) {
-            lines.add("  Type: ${schemaJson.type}")
-        }
-        
-        lines.add("")
-        
-        if (schemaJson.properties) {
-            lines.add("Properties:")
-            schemaJson.properties.eachWithIndex { prop, index ->
-                def propNum = String.format("%2d", index + 1)
-                lines.add("  ${propNum}. ${prop.key}")
-                lines.add("      Type: ${prop.value.type ?: 'Not specified'}")
-                
-                if (prop.value.description) {
-                    lines.add("      Description: ${prop.value.description}")
-                }
-                
-                if (prop.value.format) {
-                    lines.add("      Format: ${prop.value.format}")
-                }
-                
-                if (prop.value.enum) {
-                    lines.add("      Enum: ${prop.value.enum.join(', ')}")
-                }
-                
-                if (index < schemaJson.properties.size() - 1) {
-                    lines.add("")
-                }
-            }
-        }
-        
-        if (schemaJson.required) {
-            lines.add("")
-            lines.add("Required Fields: ${schemaJson.required.join(', ')}")
-        }
-        
-        return lines
+        // Save dry run results
+        saveDryRunResults(result)
         
     } catch (Exception e) {
-        echo "Warning: Failed to parse JSON schema - ${e.getMessage()}"
-        return formatGenericSchema(schemaString, 'JSON')
+        error("❌ Dry run failed: ${e.getMessage()}")
     }
 }
 
-def formatProtobufSchema(schemaString) {
-    def lines = []
-    lines.add("Protocol Buffer Schema:")
-    lines.add("")
+def registerSchema() {
+    echo "📝 Registering schema for subject '${params.SUBJECT_NAME}'..."
     
-    // Split into lines and format
-    def schemaLines = schemaString.split('\n')
-    def inMessage = false
-    def indent = ""
+    def schemaPayload = buildSchemaPayload()
     
-    for (line in schemaLines) {
-        def trimmedLine = line.trim()
+    try {
+        def result = sh(
+            script: """
+                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+                exec -T schema-registry bash -c '
+                    RESPONSE=\$(curl -s -w "%{http_code}" -X POST \\
+                        -H "Content-Type: application/vnd.schemaregistry.v1+json" \\
+                        -d "${schemaPayload}" \\
+                        ${params.SCHEMA_REGISTRY_URL}/subjects/${params.SUBJECT_NAME}/versions 2>/dev/null)
+                    
+                    HTTP_CODE=\$(echo "\$RESPONSE" | tail -c 4)
+                    RESPONSE_BODY=\$(echo "\$RESPONSE" | head -c -4)
+                    
+                    echo "HTTP Code: \$HTTP_CODE"
+                    echo "Response: \$RESPONSE_BODY"
+                    
+                    if [ "\$HTTP_CODE" = "200" ]; then
+                        SCHEMA_ID=\$(echo "\$RESPONSE_BODY" | jq -r ".id" 2>/dev/null)
+                        echo "✅ Schema registered successfully with ID: \$SCHEMA_ID"
+                        exit 0
+                    else
+                        echo "❌ Schema registration failed"
+                        exit 1
+                    fi
+                ' 2>/dev/null
+            """,
+            returnStdout: true
+        ).trim()
         
-        if (trimmedLine.startsWith('syntax')) {
-            lines.add("${trimmedLine}")
-        } else if (trimmedLine.startsWith('package')) {
-            lines.add("${trimmedLine}")
-        } else if (trimmedLine.startsWith('import')) {
-            lines.add("${trimmedLine}")
-        } else if (trimmedLine.startsWith('message')) {
-            lines.add("")
-            lines.add("${trimmedLine}")
-            inMessage = true
-            indent = "  "
-        } else if (trimmedLine.startsWith('enum')) {
-            lines.add("")
-            lines.add("${trimmedLine}")
-            inMessage = true
-            indent = "  "
-        } else if (trimmedLine == '}') {
-            lines.add("${indent}}")
-            inMessage = false
-            indent = ""
-        } else if (trimmedLine && inMessage) {
-            lines.add("${indent}${trimmedLine}")
-        } else if (trimmedLine) {
-            lines.add(trimmedLine)
-        }
-    }
-    
-    return lines
-}
-
-def formatGenericSchema(schemaString, schemaType) {
-    def lines = []
-    lines.add("${schemaType} Schema:")
-    lines.add("")
-    lines.add("Raw Schema Content:")
-    lines.add("┌" + "─" * 78 + "┐")
-    
-    // Split long lines and add proper formatting
-    def schemaLines = schemaString.split('\n')
-    for (line in schemaLines) {
-        if (line.length() > 76) {
-            // Break long lines
-            def words = line.split(' ')
-            def currentLine = ""
-            for (word in words) {
-                if ((currentLine + word).length() > 76) {
-                    lines.add("│ ${currentLine.padRight(76)} │")
-                    currentLine = word + " "
-                } else {
-                    currentLine += word + " "
-                }
+        echo result
+        
+        // Extract schema ID for verification
+        def lines = result.split('\n')
+        def schemaId = null
+        for (line in lines) {
+            if (line.contains('Schema registered successfully with ID:')) {
+                schemaId = line.split('ID: ')[1]
+                break
             }
-            if (currentLine.trim()) {
-                lines.add("│ ${currentLine.trim().padRight(76)} │")
-            }
-        } else {
-            lines.add("│ ${line.padRight(76)} │")
         }
-    }
-    
-    lines.add("└" + "─" * 78 + "┘")
-    
-    return lines
-}
-
-def formatFieldType(fieldType) {
-    if (fieldType instanceof String) {
-        return fieldType
-    } else if (fieldType instanceof List) {
-        // Handle union types
-        def types = fieldType.collect { 
-            it instanceof String ? it : (it.type ?: it.toString())
+        
+        if (schemaId) {
+            env.REGISTERED_SCHEMA_ID = schemaId
+            echo "🆔 Registered Schema ID: ${schemaId}"
         }
-        return "Union[${types.join(', ')}]"
-    } else if (fieldType instanceof Map) {
-        // Handle complex types
-        if (fieldType.type == 'array') {
-            return "Array[${formatFieldType(fieldType.items)}]"
-        } else if (fieldType.type == 'map') {
-            return "Map[${formatFieldType(fieldType.values)}]"
-        } else if (fieldType.type == 'record') {
-            return "Record[${fieldType.name}]"
-        } else if (fieldType.type == 'enum') {
-            return "Enum[${fieldType.symbols?.join(', ')}]"
-        } else {
-            return fieldType.type ?: fieldType.toString()
-        }
-    } else {
-        return fieldType.toString()
+        
+    } catch (Exception e) {
+        error("❌ Schema registration failed: ${e.getMessage()}")
     }
 }
 
-def saveSubjectDescriptionToFile(subjectName, subjectInfo) {
+def verifyRegistration() {
+    echo "🔍 Verifying schema registration..."
+    
+    try {
+        def result = sh(
+            script: """
+                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+                exec -T schema-registry bash -c '
+                    RESPONSE=\$(curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${params.SUBJECT_NAME}/versions/latest 2>/dev/null)
+                    echo "\$RESPONSE"
+                    
+                    # Verify schema ID matches if we have it
+                    if [ -n "${env.REGISTERED_SCHEMA_ID ?: ''}" ]; then
+                        RETRIEVED_ID=\$(echo "\$RESPONSE" | jq -r ".id" 2>/dev/null)
+                        if [ "\$RETRIEVED_ID" = "${env.REGISTERED_SCHEMA_ID ?: ''}" ]; then
+                            echo "✅ Schema ID verification successful"
+                        else
+                            echo "⚠️ Schema ID mismatch: expected ${env.REGISTERED_SCHEMA_ID ?: ''}, got \$RETRIEVED_ID"
+                        fi
+                    fi
+                ' 2>/dev/null
+            """,
+            returnStdout: true
+        ).trim()
+        
+        // Parse and display verification results
+        def lines = result.split('\n')
+        def jsonLine = lines.find { it.trim().startsWith('{') }
+        
+        if (jsonLine) {
+            def jsonSlurper = new groovy.json.JsonSlurper()
+            def schemaInfo = jsonSlurper.parseText(jsonLine)
+            
+            echo "✅ Registration verification successful:"
+            echo "   Subject: ${schemaInfo.subject}"
+            echo "   Version: ${schemaInfo.version}"
+            echo "   Schema ID: ${schemaInfo.id}"
+            echo "   Schema Type: ${params.SCHEMA_TYPE}"
+            
+            // Save verification results
+            saveRegistrationResults(schemaInfo)
+        }
+        
+    } catch (Exception e) {
+        echo "⚠️ Warning: Could not verify registration - ${e.getMessage()}"
+    }
+}
+
+def buildSchemaPayload() {
+    def schemaContent = params.SCHEMA_CONTENT.trim()
+    
+    // Escape quotes and newlines for JSON payload
+    def escapedSchema = schemaContent
+        .replace('\\', '\\\\')
+        .replace('"', '\\"')
+        .replace('\n', '\\n')
+        .replace('\r', '\\r')
+        .replace('\t', '\\t')
+    
+    def payload = """{"schemaType":"${params.SCHEMA_TYPE}","schema":"${escapedSchema}"}"""
+    
+    return payload
+}
+
+def saveDryRunResults(results) {
     def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
-    def textContent = """# Schema Subject Description
+    def content = """# Schema Registration Dry Run Results
 # Generated: ${timestamp}
 # Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
-# Subject: ${subjectName}
+# Subject: ${params.SUBJECT_NAME}
+# Schema Type: ${params.SCHEMA_TYPE}
 
 ================================================================================
-Subject: ${subjectName}
+DRY RUN RESULTS
 ================================================================================
-${subjectInfo}
+
+${results}
+
+Schema Content:
+================================================================================
+${params.SCHEMA_CONTENT}
 
 """
 
-    writeFile file: env.SCHEMA_SUBJECTS_FILE, text: textContent
+    writeFile file: env.REGISTRATION_RESULT_FILE, text: content
+    echo "📄 Dry run results saved to ${env.REGISTRATION_RESULT_FILE}"
 }
 
-def saveSubjectListToFile(subjects, subjectDetails = [:]) {
+def saveRegistrationResults(schemaInfo) {
     def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
-    def textContent = """# Schema Registry Subjects List
+    def content = """# Schema Registration Results
 # Generated: ${timestamp}
-# Total subjects: ${subjects.size()}
 # Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
-# Include versions: ${params.INCLUDE_VERSIONS}
+
+================================================================================
+REGISTRATION SUCCESSFUL
+================================================================================
+
+Subject: ${schemaInfo.subject}
+Version: ${schemaInfo.version}
+Schema ID: ${schemaInfo.id}
+Schema Type: ${params.SCHEMA_TYPE}
+Compatibility: ${params.COMPATIBILITY ?: 'Default'}
+
+Schema Content:
+================================================================================
+${params.SCHEMA_CONTENT}
+
+Registration Details:
+================================================================================
+- Registration completed at: ${timestamp}
+- Force Register: ${params.FORCE_REGISTER}
+- Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
 
 """
 
-    if (subjects.isEmpty()) {
-        textContent += "No schema subjects found in the registry.\n"
-    } else {
-        textContent += "Available Schema Subjects:\n"
-        textContent += "=" * 50 + "\n\n"
-
-        subjects.eachWithIndex { subject, index ->
-            textContent += "${index + 1}. ${subject}\n"
-
-            if (params.INCLUDE_VERSIONS && subjectDetails.containsKey(subject)) {
-                textContent += "   Versions: ${subjectDetails[subject]}\n"
-            }
-        }
-
-        textContent += "\n" + "=" * 50 + "\n"
-        textContent += "\nTo get detailed information about a specific subject, re-run with SUBJECT_NAME parameter.\n"
-    }
-
-    writeFile file: env.SCHEMA_SUBJECTS_FILE, text: textContent
+    writeFile file: env.REGISTRATION_RESULT_FILE, text: content
+    echo "📄 Registration results saved to ${env.REGISTRATION_RESULT_FILE}"
 }
 
-
-def cleanupSchemaRegistryConfig() {
+def cleanupTempFiles() {
     try {
         sh """
             docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T schema-registry bash -c 'rm -f ${env.SCHEMA_REGISTRY_CONFIG_FILE}' 2>/dev/null || true
+            exec -T schema-registry bash -c 'rm -f ${env.SCHEMA_REGISTRY_CONFIG_FILE} ${env.TEMP_SCHEMA_FILE}' 2>/dev/null || true
         """
     } catch (Exception e) {
         // Ignore cleanup errors
+        echo "⚠️ Warning: Cleanup failed - ${e.getMessage()}"
     }
 }
