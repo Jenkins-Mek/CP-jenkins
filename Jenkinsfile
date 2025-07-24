@@ -397,7 +397,7 @@ def formatJsonSchema(schemaString) {
         lines.add("")
         
         if (schemaJson.properties) {
-            lines.add("🔍 Properties:")
+            lines.add("Properties:")
             schemaJson.properties.eachWithIndex { prop, index ->
                 def propNum = String.format("%2d", index + 1)
                 lines.add("  ${propNum}. ${prop.key}")
@@ -423,20 +423,20 @@ def formatJsonSchema(schemaString) {
         
         if (schemaJson.required) {
             lines.add("")
-            lines.add("⚠️ Required Fields: ${schemaJson.required.join(', ')}")
+            lines.add("Required Fields: ${schemaJson.required.join(', ')}")
         }
         
         return lines
         
     } catch (Exception e) {
-        echo "⚠️ Warning: Failed to parse JSON schema - ${e.getMessage()}"
+        echo "Warning: Failed to parse JSON schema - ${e.getMessage()}"
         return formatGenericSchema(schemaString, 'JSON')
     }
 }
 
 def formatProtobufSchema(schemaString) {
     def lines = []
-    lines.add("📖 Protocol Buffer Schema:")
+    lines.add("Protocol Buffer Schema:")
     lines.add("")
     
     // Split into lines and format
@@ -448,19 +448,19 @@ def formatProtobufSchema(schemaString) {
         def trimmedLine = line.trim()
         
         if (trimmedLine.startsWith('syntax')) {
-            lines.add("🔧 ${trimmedLine}")
+            lines.add("${trimmedLine}")
         } else if (trimmedLine.startsWith('package')) {
-            lines.add("📦 ${trimmedLine}")
+            lines.add("${trimmedLine}")
         } else if (trimmedLine.startsWith('import')) {
-            lines.add("📥 ${trimmedLine}")
+            lines.add("${trimmedLine}")
         } else if (trimmedLine.startsWith('message')) {
             lines.add("")
-            lines.add("📝 ${trimmedLine}")
+            lines.add("${trimmedLine}")
             inMessage = true
             indent = "  "
         } else if (trimmedLine.startsWith('enum')) {
             lines.add("")
-            lines.add("🔢 ${trimmedLine}")
+            lines.add("${trimmedLine}")
             inMessage = true
             indent = "  "
         } else if (trimmedLine == '}') {
@@ -479,7 +479,7 @@ def formatProtobufSchema(schemaString) {
 
 def formatGenericSchema(schemaString, schemaType) {
     def lines = []
-    lines.add("📖 ${schemaType} Schema:")
+    lines.add("${schemaType} Schema:")
     lines.add("")
     lines.add("Raw Schema Content:")
     lines.add("┌" + "─" * 78 + "┐")
@@ -581,7 +581,7 @@ def saveSubjectListToFile(subjects, subjectDetails = [:]) {
         }
 
         textContent += "\n" + "=" * 50 + "\n"
-        textContent += "\n💡 To get detailed information about a specific subject, re-run with SUBJECT_NAME parameter.\n"
+        textContent += "\nTo get detailed information about a specific subject, re-run with SUBJECT_NAME parameter.\n"
     }
 
     writeFile file: env.SCHEMA_SUBJECTS_FILE, text: textContent
