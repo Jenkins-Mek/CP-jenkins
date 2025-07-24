@@ -200,11 +200,12 @@ def prepareSchemaContent() {
     def content = params.SCHEMA_CONTENT.trim()
     
     if (params.SCHEMA_TYPE == 'AVRO' || params.SCHEMA_TYPE == 'JSON') {
-        // For AVRO and JSON schemas, ensure it's valid JSON
+        // For AVRO and JSON schemas, validate JSON format
         try {
             def jsonSlurper = new groovy.json.JsonSlurper()
             def parsed = jsonSlurper.parseText(content)
-            return new groovy.json.JsonBuilder(parsed).toPrettyString()
+            // Return the original content since JsonBuilder is not allowed
+            return content
         } catch (Exception e) {
             error("❌ Invalid JSON format for ${params.SCHEMA_TYPE} schema: ${e.getMessage()}")
         }
