@@ -252,13 +252,13 @@ def parseSchemaResponse(jsonLine) {
         def schemaData = jsonSlurper.parseText(jsonLine)
         
         def formattedLines = []
-        formattedLines.add("📋 Subject: ${schemaData.subject}")
-        formattedLines.add("🔢 Version: ${schemaData.version}")
-        formattedLines.add("🆔 Schema ID: ${schemaData.id}")
+        formattedLines.add("Subject: ${schemaData.subject}")
+        formattedLines.add("Version: ${schemaData.version}")
+        formattedLines.add("Schema ID: ${schemaData.id}")
         
         // Detect schema type
         def schemaType = detectSchemaType(schemaData)
-        formattedLines.add("📝 Schema Type: ${schemaType}")
+        formattedLines.add("Schema Type: ${schemaType}")
         formattedLines.add("")
         
         // Format based on schema type
@@ -283,7 +283,7 @@ def parseSchemaResponse(jsonLine) {
         return formattedLines
         
     } catch (Exception e) {
-        echo "⚠️ Warning: Failed to parse schema response, using original format - ${e.getMessage()}"
+        echo "Warning: Failed to parse schema response, using original format - ${e.getMessage()}"
         return [jsonLine]
     }
 }
@@ -318,7 +318,7 @@ def formatAvroSchema(schemaString) {
         def schemaJson = jsonSlurper.parseText(schemaString)
         
         def lines = []
-        lines.add("📖 Avro Schema Details:")
+        lines.add("Avro Schema Details:")
         lines.add("  Type: ${schemaJson.type}")
         
         if (schemaJson.name) {
@@ -336,7 +336,7 @@ def formatAvroSchema(schemaString) {
         lines.add("")
         
         if (schemaJson.fields) {
-            lines.add("🔍 Fields:")
+            lines.add("Fields:")
             schemaJson.fields.eachWithIndex { field, index ->
                 def fieldNum = String.format("%2d", index + 1)
                 lines.add("  ${fieldNum}. ${field.name}")
@@ -359,7 +359,7 @@ def formatAvroSchema(schemaString) {
                 }
             }
         } else if (schemaJson.symbols) {
-            lines.add("🔍 Enum Values: ${schemaJson.symbols.join(', ')}")
+            lines.add("Enum Values: ${schemaJson.symbols.join(', ')}")
         }
         
         return lines
@@ -376,7 +376,7 @@ def formatJsonSchema(schemaString) {
         def schemaJson = jsonSlurper.parseText(schemaString)
         
         def lines = []
-        lines.add("📖 JSON Schema Details:")
+        lines.add("JSON Schema Details:")
         
         if (schemaJson.'$schema') {
             lines.add("  Schema Version: ${schemaJson.'$schema'}")
