@@ -287,7 +287,7 @@ pipeline {
                                 parameters: [
                                     string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
                                     string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER ?: 'localhost:9092'}"),
-                                    choice(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL ?: 'SASL_PLAINTEXT'}"),
+                                    string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL ?: 'SASL_PLAINTEXT'}"),
                                     string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
                                     booleanParam(name: 'CONFIRM_DELETE', value: true)
                                 ],
