@@ -75,6 +75,7 @@ sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule require
 ${getSchemaConfig()}
 EOF
 
+                # Consume messages and filter out error messages
                 timeout 30s kafka-console-consumer \\
                     --bootstrap-server ${env.KAFKA_SERVER} \\
                     --topic "${params.TOPIC_NAME}" \\
@@ -83,7 +84,8 @@ EOF
                     --property print.key=true \\
                     --property print.timestamp=true \\
                     --property key.separator=" | " \\
-                    --timeout-ms 10000 2>/dev/null || true
+                    --timeout-ms 10000 2>/dev/null | \\
+                    grep -v "FATAL\\|ERROR\\|Native frames\\|libjvm\\|libjli\\|JavaMain\\|JNI_\\|jni_\\|Aborted\\|Threads::\\|JvmtiExport" || true
             '
         """,
         returnStdout: true
@@ -94,7 +96,25 @@ EOF
 
 def saveMessagesToFile(messages) {
     def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
-    def messageLines = messages.split('\n').findAll { it.trim() }
+    
+    // Filter out any remaining error messages and empty lines
+    def messageLines = messages.split('\n')
+        .findAll { line -> 
+            def trimmed = line.trim()
+            return trimmed && 
+                   !trimmed.contains('FATAL') && 
+                   !trimmed.contains('ERROR') && 
+                   !trimmed.contains('Native frames') &&
+                   !trimmed.contains('libjvm') &&
+                   !trimmed.contains('libjli') &&
+                   !trimmed.contains('JavaMain') &&
+                   !trimmed.contains('Aborted') &&
+                   !trimmed.contains('JNI_') &&
+                   !trimmed.contains('jni_') &&
+                   !trimmed.contains('Threads::') &&
+                   !trimmed.contains('JvmtiExport')
+        }
+    
     def messageCount = messageLines.size()
     
     def content = """# Kafka Messages Consumption Report
@@ -115,6 +135,7 @@ This could mean:
 - Topic is empty
 - All messages already consumed by this consumer group
 - Messages are newer than the offset reset policy
+- JVM errors prevented message consumption
 
 """
     } else {
