@@ -5,13 +5,19 @@ properties([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'localhost:9092', description: 'Kafka bootstrap server'),
         choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], defaultValue: 'SASL_PLAINTEXT', description: 'Kafka security protocol'),
-        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name to produce messages to'),
-        choice(name: 'PRODUCER_MODE', choices: ['WITHOUT_SCHEMA', 'WITH_JSON_SCHEMA', 'WITH_AVRO_SCHEMA', 'WITH_PROTOBUF_SCHEMA'], description: 'Message production mode'),
+        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name to consume messages from'),
+        string(name: 'CONSUMER_GROUP_ID', defaultValue: 'jenkins-consumer-group', description: 'Consumer group ID'),
+        choice(name: 'CONSUMER_MODE', choices: ['WITHOUT_SCHEMA', 'WITH_JSON_SCHEMA', 'WITH_AVRO_SCHEMA', 'WITH_PROTOBUF_SCHEMA'], description: 'Message consumption mode'),
         string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://schema-registry:8081', description: 'Schema Registry URL (only used when schema is enabled)'),
-        text(name: 'MESSAGE_DATA', defaultValue: '{"message": "Hello World", "timestamp": "2024-01-01T00:00:00Z"}', description: 'Message data (JSON format for single message, or multiple lines for multiple messages)'),
-        string(name: 'MESSAGE_COUNT', defaultValue: '1', description: 'Number of messages to produce (will repeat the message data)'),
-        booleanParam(name: 'USE_FILE_INPUT', defaultValue: false, description: 'Use file input instead of parameter data'),
-        string(name: 'INPUT_FILE_PATH', defaultValue: '/tmp/input-messages.json', description: 'Path to input file (only used when USE_FILE_INPUT is true)')
+        choice(name: 'OFFSET_RESET', choices: ['earliest', 'latest', 'none'], defaultValue: 'latest', description: 'Auto offset reset strategy'),
+        string(name: 'MAX_MESSAGES', defaultValue: '100', description: 'Maximum number of messages to consume (0 for unlimited)'),
+        string(name: 'TIMEOUT_MS', defaultValue: '30000', description: 'Consumer timeout in milliseconds'),
+        booleanParam(name: 'SAVE_TO_FILE', defaultValue: true, description: 'Save consumed messages to file'),
+        string(name: 'OUTPUT_FILE_PATH', defaultValue: '/tmp/consumed-messages.json', description: 'Path to save consumed messages (only used when SAVE_TO_FILE is true)'),
+        booleanParam(name: 'SHOW_KEY', defaultValue: true, description: 'Display message keys in output'),
+        booleanParam(name: 'SHOW_HEADERS', defaultValue: false, description: 'Display message headers in output'),
+        booleanParam(name: 'SHOW_TIMESTAMP', defaultValue: true, description: 'Display message timestamps in output'),
+        booleanParam(name: 'SHOW_PARTITION', defaultValue: true, description: 'Display partition information in output')
     ])
 ])
 
@@ -20,8 +26,8 @@ pipeline {
 
     environment {
         CLIENT_CONFIG_FILE = '/tmp/client.properties'
-        PRODUCER_OUTPUT_FILE = 'producer-results.txt'
-        MESSAGE_DATA_FILE = '/tmp/producer-messages.json'
+        CONSUMER_OUTPUT_FILE = 'consumer-results.txt'
+        CONSUMED_MESSAGES_FILE = '/tmp/consumed-messages.json'
     }
 
     stages {
@@ -29,22 +35,32 @@ pipeline {
             steps {
                 script {
                     if (!params.TOPIC_NAME?.trim()) {
-                        error("❌ TOPIC_NAME parameter is required to produce messages.")
+                        error("❌ TOPIC_NAME parameter is required to consume messages.")
                     }
                     
-                    if (params.MESSAGE_COUNT && !params.MESSAGE_COUNT.isNumber()) {
-                        error("❌ MESSAGE_COUNT must be a valid number")
+                    if (!params.CONSUMER_GROUP_ID?.trim()) {
+                        error("❌ CONSUMER_GROUP_ID parameter is required.")
                     }
                     
-                    def messageCount = params.MESSAGE_COUNT.toInteger()
-                    if (messageCount <= 0 || messageCount > 10000) {
-                        error("❌ MESSAGE_COUNT must be between 1 and 10000")
+                    if (params.MAX_MESSAGES && !params.MAX_MESSAGES.isNumber()) {
+                        error("❌ MAX_MESSAGES must be a valid number")
+                    }
+                    
+                    if (params.TIMEOUT_MS && !params.TIMEOUT_MS.isNumber()) {
+                        error("❌ TIMEOUT_MS must be a valid number")
+                    }
+                    
+                    def maxMessages = params.MAX_MESSAGES.toInteger()
+                    if (maxMessages < 0 || maxMessages > 50000) {
+                        error("❌ MAX_MESSAGES must be between 0 and 50000 (0 for unlimited)")
                     }
                     
                     echo "✅ Parameters validated successfully"
                     echo "   Topic: ${params.TOPIC_NAME}"
-                    echo "   Mode: ${params.PRODUCER_MODE}"
-                    echo "   Message Count: ${messageCount}"
+                    echo "   Consumer Group: ${params.CONSUMER_GROUP_ID}"
+                    echo "   Mode: ${params.CONSUMER_MODE}"
+                    echo "   Max Messages: ${maxMessages == 0 ? 'Unlimited' : maxMessages}"
+                    echo "   Offset Reset: ${params.OFFSET_RESET}"
                 }
             }
         }
@@ -59,23 +75,9 @@ pipeline {
             }
         }
 
-        stage('Prepare Message Data') {
-            steps {
-                script {
-                    if (params.USE_FILE_INPUT) {
-                        echo "📁 Using file input: ${params.INPUT_FILE_PATH}"
-                        prepareMessageDataFromFile()
-                    } else {
-                        echo "📝 Using parameter input data"
-                        prepareMessageDataFromParameter()
-                    }
-                }
-            }
-        }
-
         stage('Validate Schema Registry') {
             when {
-                expression { params.PRODUCER_MODE != 'WITHOUT_SCHEMA' }
+                expression { params.CONSUMER_MODE != 'WITHOUT_SCHEMA' }
             }
             steps {
                 script {
@@ -85,15 +87,24 @@ pipeline {
             }
         }
 
-        stage('Produce Messages') {
+        stage('Check Topic Exists') {
+            steps {
+                script {
+                    echo "🔍 Checking if topic exists..."
+                    checkTopicExists()
+                }
+            }
+        }
+
+        stage('Consume Messages') {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', usernameVariable: 'KAFKA_USERNAME', passwordVariable: 'KAFKA_PASSWORD')]) {
                         def topicName = params.TOPIC_NAME.trim()
-                        echo "🚀 Producing messages to topic: ${topicName}"
-                        def result = produceKafkaMessages(topicName, env.KAFKA_USERNAME, env.KAFKA_PASSWORD)
+                        echo "🔽 Consuming messages from topic: ${topicName}"
+                        def result = consumeKafkaMessages(topicName, env.KAFKA_USERNAME, env.KAFKA_PASSWORD)
                         echo result
-                        saveProducerResults(result)
+                        saveConsumerResults(result)
                     }
                 }
             }
@@ -108,92 +119,167 @@ pipeline {
         }
         success {
             script {
-                archiveArtifacts artifacts: "${env.PRODUCER_OUTPUT_FILE}", fingerprint: true, allowEmptyArchive: true
-                echo "📦 Producer results archived successfully."
-                echo "✅ Message production completed successfully!"
+                archiveArtifacts artifacts: "${env.CONSUMER_OUTPUT_FILE}", fingerprint: true, allowEmptyArchive: true
+                if (params.SAVE_TO_FILE) {
+                    archiveArtifacts artifacts: "consumed-messages-*.json", fingerprint: true, allowEmptyArchive: true
+                }
+                echo "📦 Consumer results archived successfully."
+                echo "✅ Message consumption completed successfully!"
             }
         }
         failure {
             script {
-                echo "❌ Message production failed. Check the logs above for details."
+                echo "❌ Message consumption failed. Check the logs above for details."
             }
         }
     }
 }
 
-def produceKafkaMessages(topicName, username, password) {
+def consumeKafkaMessages(topicName, username, password) {
     try {
-        // Determine serializer based on producer mode
-        def valueSerializer = getValueSerializer(params.PRODUCER_MODE)
+        // Determine deserializer based on consumer mode
+        def valueDeserializer = getValueDeserializer(params.CONSUMER_MODE)
+        def maxMessages = params.MAX_MESSAGES.toInteger()
+        def maxMessagesFlag = maxMessages > 0 ? "--max-messages ${maxMessages}" : ""
         
-        def produceOutput = sh(
+        // Build formatter options
+        def formatterOptions = buildFormatterOptions()
+        
+        def consumeOutput = sh(
             script: """
                 docker compose --project-directory '${params.COMPOSE_DIR}' -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
                 exec -T broker bash -c '
                     set -e
                     unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
                     
-                    # Create producer configuration
-                    cat > /tmp/producer.properties << "PRODUCER_EOF"
+                    # Create consumer configuration
+                    cat > /tmp/consumer.properties << "CONSUMER_EOF"
 bootstrap.servers=${params.KAFKA_BOOTSTRAP_SERVER}
-key.serializer=org.apache.kafka.common.serialization.StringSerializer
-value.serializer=${valueSerializer}
+group.id=${params.CONSUMER_GROUP_ID}
+key.deserializer=org.apache.kafka.common.serialization.StringDeserializer
+value.deserializer=${valueDeserializer}
+auto.offset.reset=${params.OFFSET_RESET}
+enable.auto.commit=true
 security.protocol=${params.SECURITY_PROTOCOL}
 sasl.mechanism=PLAIN
 sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
+consumer.timeout.ms=${params.TIMEOUT_MS}
 ${getSchemaRegistryConfig()}
-PRODUCER_EOF
+CONSUMER_EOF
                     
-                    echo "Producer configuration:"
-                    cat /tmp/producer.properties
+                    echo "Consumer configuration:"
+                    cat /tmp/consumer.properties
                     echo ""
                     
-                    echo "Message data preview:"
-                    head -3 ${env.MESSAGE_DATA_FILE}
+                    echo "Starting message consumption from topic ${topicName}..."
+                    echo "Consumer Group: ${params.CONSUMER_GROUP_ID}"
+                    echo "Offset Reset: ${params.OFFSET_RESET}"
+                    echo "Max Messages: ${maxMessages == 0 ? 'Unlimited' : maxMessages}"
+                    echo "Timeout: ${params.TIMEOUT_MS}ms"
                     echo ""
-                    
-                    MESSAGE_COUNT=\$(wc -l < ${env.MESSAGE_DATA_FILE})
-                    echo "Producing \$MESSAGE_COUNT messages to topic ${topicName}..."
                     
                     START_TIME=\$(date +%s)
-                    kafka-console-producer --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
-                        --topic "${topicName}" \\
-                        --producer.config /tmp/producer.properties < ${env.MESSAGE_DATA_FILE}
-                    END_TIME=\$(date +%s)
                     
+                    # Create output file for consumed messages
+                    CONSUMED_FILE="/tmp/consumed-messages-\$(date +%Y%m%d-%H%M%S).json"
+                    
+                    # Consume messages with timeout handling
+                    timeout ${params.TIMEOUT_MS.toInteger() / 1000 + 10}s kafka-console-consumer \\
+                        --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                        --topic "${topicName}" \\
+                        --consumer.config /tmp/consumer.properties \\
+                        ${maxMessagesFlag} \\
+                        ${formatterOptions} > "\$CONSUMED_FILE" 2>/dev/null || {
+                            EXIT_CODE=\$?
+                            if [ \$EXIT_CODE -eq 124 ]; then
+                                echo "Consumer timed out after ${params.TIMEOUT_MS}ms"
+                            elif [ \$EXIT_CODE -eq 1 ]; then
+                                echo "Consumer finished (no more messages or reached max messages)"
+                            else
+                                echo "Consumer exited with code \$EXIT_CODE"
+                            fi
+                        }
+                    
+                    END_TIME=\$(date +%s)
                     DURATION=\$((END_TIME - START_TIME))
+                    
+                    # Count consumed messages
+                    MESSAGE_COUNT=\$(wc -l < "\$CONSUMED_FILE" 2>/dev/null || echo "0")
+                    
                     echo ""
-                    echo "✅ Successfully produced \$MESSAGE_COUNT messages in \$DURATION seconds"
+                    echo "✅ Consumption completed in \$DURATION seconds"
                     echo "   Topic: ${topicName}"
-                    echo "   Producer Mode: ${params.PRODUCER_MODE}"
-                    echo "   Serializer: ${valueSerializer}"
+                    echo "   Consumer Group: ${params.CONSUMER_GROUP_ID}"
+                    echo "   Messages Consumed: \$MESSAGE_COUNT"
+                    echo "   Consumer Mode: ${params.CONSUMER_MODE}"
+                    echo "   Deserializer: ${valueDeserializer}"
+                    
+                    # Show sample messages if any were consumed
+                    if [ \$MESSAGE_COUNT -gt 0 ]; then
+                        echo ""
+                        echo "📝 Sample consumed messages (first 5):"
+                        head -5 "\$CONSUMED_FILE" 2>/dev/null || echo "No messages to display"
+                        
+                        # Copy to workspace if SAVE_TO_FILE is enabled
+                        if [ "${params.SAVE_TO_FILE}" = "true" ]; then
+                            cp "\$CONSUMED_FILE" "${env.CONSUMED_MESSAGES_FILE}"
+                            echo ""
+                            echo "💾 Messages saved to: \$CONSUMED_FILE"
+                        fi
+                    else
+                        echo ""
+                        echo "ℹ️  No messages were consumed from the topic"
+                    fi
                 '
             """,
             returnStdout: true
         ).trim()
 
-        return "✅ Messages produced successfully.\n${produceOutput}"
+        return "✅ Messages consumed successfully.\n${consumeOutput}"
 
     } catch (Exception e) {
-        return "ERROR: Failed to produce messages to topic '${topicName}' - ${e.getMessage()}"
+        return "ERROR: Failed to consume messages from topic '${topicName}' - ${e.getMessage()}"
     }
 }
 
-def getValueSerializer(producerMode) {
-    switch (producerMode.toLowerCase()) {
+def getValueDeserializer(consumerMode) {
+    switch (consumerMode.toLowerCase()) {
         case 'with_json_schema':
-            return 'io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializer'
+            return 'io.confluent.kafka.serializers.json.KafkaJsonSchemaDeserializer'
         case 'with_avro_schema':
-            return 'io.confluent.kafka.serializers.KafkaAvroSerializer'
+            return 'io.confluent.kafka.serializers.KafkaAvroDeserializer'
         case 'with_protobuf_schema':
-            return 'io.confluent.kafka.serializers.protobuf.KafkaProtobufSerializer'
+            return 'io.confluent.kafka.serializers.protobuf.KafkaProtobufDeserializer'
         default:
-            return 'org.apache.kafka.common.serialization.StringSerializer'
+            return 'org.apache.kafka.common.serialization.StringDeserializer'
     }
+}
+
+def buildFormatterOptions() {
+    def options = []
+    
+    if (params.SHOW_KEY) {
+        options.add("--property print.key=true")
+        options.add("--property key.separator=\" | \"")
+    }
+    
+    if (params.SHOW_TIMESTAMP) {
+        options.add("--property print.timestamp=true")
+    }
+    
+    if (params.SHOW_PARTITION) {
+        options.add("--property print.partition=true")
+    }
+    
+    if (params.SHOW_HEADERS) {
+        options.add("--property print.headers=true")
+    }
+    
+    return options.join(" ")
 }
 
 def getSchemaRegistryConfig() {
-    if (params.PRODUCER_MODE != 'WITHOUT_SCHEMA') {
+    if (params.CONSUMER_MODE != 'WITHOUT_SCHEMA') {
         return "schema.registry.url=${params.SCHEMA_REGISTRY_URL}"
     }
     return ""
@@ -229,38 +315,32 @@ EOF'
     """
 }
 
-def prepareMessageDataFromFile() {
-    sh """
-        docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-        exec -T broker bash -c '
-            if [ -f "${params.INPUT_FILE_PATH}" ]; then
-                cp "${params.INPUT_FILE_PATH}" "${env.MESSAGE_DATA_FILE}"
-                echo "✅ Message data copied from ${params.INPUT_FILE_PATH}"
-            else
-                echo "❌ Input file ${params.INPUT_FILE_PATH} not found"
-                exit 1
-            fi
-        '
-    """
-}
-
-def prepareMessageDataFromParameter() {
-    def messageCount = params.MESSAGE_COUNT.toInteger()
-    def messageData = params.MESSAGE_DATA.trim()
-    
-    sh """
-        docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-        exec -T broker bash -c '
-            echo "Preparing ${messageCount} messages..."
-            rm -f "${env.MESSAGE_DATA_FILE}"
-            for i in \$(seq 1 ${messageCount}); do
-                echo "${messageData}" >> "${env.MESSAGE_DATA_FILE}"
-            done
-            echo "✅ Message data file prepared with ${messageCount} messages"
-            echo "Sample content:"
-            head -3 "${env.MESSAGE_DATA_FILE}"
-        '
-    """
+def checkTopicExists() {
+    try {
+        withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', usernameVariable: 'KAFKA_USERNAME', passwordVariable: 'KAFKA_PASSWORD')]) {
+            sh """
+                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+                exec -T broker bash -c '
+                    kafka-topics --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                        --command-config ${env.CLIENT_CONFIG_FILE} \\
+                        --describe --topic "${params.TOPIC_NAME}" >/dev/null 2>&1
+                    if [ \$? -eq 0 ]; then
+                        echo "✅ Topic ${params.TOPIC_NAME} exists and is accessible"
+                        
+                        # Get topic details
+                        kafka-topics --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                            --command-config ${env.CLIENT_CONFIG_FILE} \\
+                            --describe --topic "${params.TOPIC_NAME}"
+                    else
+                        echo "❌ Topic ${params.TOPIC_NAME} does not exist or is not accessible"
+                        exit 1
+                    fi
+                '
+            """
+        }
+    } catch (Exception e) {
+        error("❌ Topic validation failed: ${e.getMessage()}")
+    }
 }
 
 def validateSchemaRegistry() {
@@ -282,19 +362,20 @@ def validateSchemaRegistry() {
     }
 }
 
-def saveProducerResults(result) {
+def saveConsumerResults(result) {
     def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
-    def content = """# Kafka Message Producer Results
+    def content = """# Kafka Message Consumer Results
 # Generated: ${timestamp}
 # Topic: ${params.TOPIC_NAME}
-# Producer Mode: ${params.PRODUCER_MODE}
-# Message Count: ${params.MESSAGE_COUNT}
+# Consumer Group: ${params.CONSUMER_GROUP_ID}
+# Consumer Mode: ${params.CONSUMER_MODE}
+# Max Messages: ${params.MAX_MESSAGES}
 # Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
 # Security Protocol: ${params.SECURITY_PROTOCOL}
 # Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
 
 ================================================================================
-PRODUCER EXECUTION RESULTS
+CONSUMER EXECUTION RESULTS
 ================================================================================
 
 ${result}
@@ -304,25 +385,32 @@ CONFIGURATION SUMMARY
 ================================================================================
 
 Topic Name: ${params.TOPIC_NAME}
-Producer Mode: ${params.PRODUCER_MODE}
-Message Count: ${params.MESSAGE_COUNT}
+Consumer Group ID: ${params.CONSUMER_GROUP_ID}
+Consumer Mode: ${params.CONSUMER_MODE}
+Offset Reset Strategy: ${params.OFFSET_RESET}
+Max Messages: ${params.MAX_MESSAGES}
+Timeout (ms): ${params.TIMEOUT_MS}
 Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
 Security Protocol: ${params.SECURITY_PROTOCOL}
 Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
-Use File Input: ${params.USE_FILE_INPUT}
-Input File Path: ${params.INPUT_FILE_PATH}
+Save to File: ${params.SAVE_TO_FILE}
+Output File Path: ${params.OUTPUT_FILE_PATH}
+Show Key: ${params.SHOW_KEY}
+Show Headers: ${params.SHOW_HEADERS}
+Show Timestamp: ${params.SHOW_TIMESTAMP}
+Show Partition: ${params.SHOW_PARTITION}
 
 ================================================================================
 """
 
-    writeFile file: env.PRODUCER_OUTPUT_FILE, text: content
+    writeFile file: env.CONSUMER_OUTPUT_FILE, text: content
 }
 
 def cleanupClientConfig() {
     try {
         sh """
             docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T broker bash -c "rm -f ${env.CLIENT_CONFIG_FILE} ${env.MESSAGE_DATA_FILE}" 2>/dev/null || true
+            exec -T broker bash -c "rm -f ${env.CLIENT_CONFIG_FILE} /tmp/consumed-messages-*.json" 2>/dev/null || true
         """
     } catch (Exception e) {
         // Ignore cleanup errors
