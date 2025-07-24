@@ -121,14 +121,14 @@ def listSchemaSubjects() {
         def subjectsOutput = sh(
             script: """
                 docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-                exec -T schema-registry bash -c "
-                    RESPONSE=\\\$(curl -s ${params.SCHEMA_REGISTRY_URL}/subjects 2>/dev/null)
-                    if [ \"\\\$RESPONSE\" = '[]' ] || [ -z \"\\\$RESPONSE\" ]; then
-                        echo ''
+                exec -T schema-registry bash -c '
+                    RESPONSE=\$(curl -s ${params.SCHEMA_REGISTRY_URL}/subjects 2>/dev/null)
+                    if [ "\$RESPONSE" = "[]" ] || [ -z "\$RESPONSE" ]; then
+                        echo ""
                     else
-                        echo \"\\\$RESPONSE\" | sed 's/\\[//g' | sed 's/\\]//g' | sed 's/\"//g' | tr ',' '\\n' | grep -v '^\\s*\$'
+                        echo "\$RESPONSE" | sed "s/\\[//g" | sed "s/\\]//g" | sed "s/\\"//g" | tr "," "\\n" | grep -v "^[[:space:]]*\$"
                     fi
-                " 2>/dev/null
+                ' 2>/dev/null
             """,
             returnStdout: true
         ).trim()
@@ -149,9 +149,9 @@ def getSubjectVersions(subjectName) {
         def versionsOutput = sh(
             script: """
                 docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-                exec -T schema-registry bash -c "
+                exec -T schema-registry bash -c '
                     curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${subjectName}/versions 2>/dev/null
-                " 2>/dev/null
+                ' 2>/dev/null
             """,
             returnStdout: true
         ).trim()
@@ -168,18 +168,18 @@ def describeSchemaSubject(subjectName) {
         def latestVersionOutput = sh(
             script: """
                 docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-                exec -T schema-registry bash -c "
-                    echo '=== Latest Version ==='
+                exec -T schema-registry bash -c '
+                    echo "=== Latest Version ==="
                     curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${subjectName}/versions/latest 2>/dev/null
                     echo
                     echo
-                    echo '=== All Versions ==='
+                    echo "=== All Versions ==="
                     curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${subjectName}/versions 2>/dev/null
                     echo
                     echo
-                    echo '=== Subject Compatibility ==='
-                    curl -s ${params.SCHEMA_REGISTRY_URL}/config/${subjectName} 2>/dev/null || echo 'Using global compatibility settings'
-                " 2>/dev/null
+                    echo "=== Subject Compatibility ==="
+                    curl -s ${params.SCHEMA_REGISTRY_URL}/config/${subjectName} 2>/dev/null || echo "Using global compatibility settings"
+                ' 2>/dev/null
             """,
             returnStdout: true
         ).trim()
@@ -242,7 +242,7 @@ def cleanupSchemaRegistryConfig() {
     try {
         sh """
             docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T schema-registry bash -c "rm -f ${env.SCHEMA_REGISTRY_CONFIG_FILE}" 2>/dev/null || true
+            exec -T schema-registry bash -c 'rm -f ${env.SCHEMA_REGISTRY_CONFIG_FILE}' 2>/dev/null || true
         """
     } catch (Exception e) {
         // Ignore cleanup errors
