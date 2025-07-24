@@ -285,11 +285,13 @@ pipeline {
                             echo "==== Calling Delete Topic job ===="
                             build job: 'GIT-org/jenkins1/delete-topic',
                                 parameters: [
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER ?: 'localhost:9092'}"),
+                                    choice(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL ?: 'SASL_PLAINTEXT'}"),
                                     string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
-                                    string(name: 'ParamsAsENV', value: 'true'),
-                                    string(name: 'ENVIRONMENT_PARAMS', value: "${env.COMPOSE_DIR},${env.CONNECTION_TYPE}")
+                                    booleanParam(name: 'CONFIRM_DELETE', value: true)
                                 ],
-                                propagate: false,
+                                propagate: true,
                                 wait: true
                             break
 
