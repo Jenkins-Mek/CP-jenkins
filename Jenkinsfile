@@ -96,6 +96,8 @@ pipeline {
                     def cmd = """
                         docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
                         exec -T broker bash -c '
+                            set -e
+                            unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
                             kafka-configs --alter --entity-type topics --entity-name ${params.TOPIC_NAME.trim()} \\
                             --add-config ${configList} \\
                             --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
