@@ -88,11 +88,13 @@ pipeline {
         stage('Produce Messages') {
             steps {
                 script {
-                    def topicName = params.TOPIC_NAME.trim()
-                    echo "🚀 Producing messages to topic: ${topicName}"
-                    def result = produceKafkaMessages(topicName)
-                    echo result
-                    saveProducerResults(result)
+                    withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', usernameVariable: 'KAFKA_USERNAME', passwordVariable: 'KAFKA_PASSWORD')]) {
+                        def topicName = params.TOPIC_NAME.trim()
+                        echo "🚀 Producing messages to topic: ${topicName}"
+                        def result = produceKafkaMessages(topicName, env.KAFKA_USERNAME, env.KAFKA_PASSWORD)
+                        echo result
+                        saveProducerResults(result)
+                    }
                 }
             }
         }
@@ -129,7 +131,7 @@ pipeline {
     }
 }
 
-def produceKafkaMessages(topicName) {
+def produceKafkaMessages(topicName, username, password) {
     try {
         // Determine serializer based on producer mode
         def valueSerializer = getValueSerializer(params.PRODUCER_MODE)
@@ -148,7 +150,7 @@ key.serializer=org.apache.kafka.common.serialization.StringSerializer
 value.serializer=${valueSerializer}
 security.protocol=${params.SECURITY_PROTOCOL}
 sasl.mechanism=PLAIN
-sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${env.KAFKA_USERNAME}" password="${env.KAFKA_PASSWORD}";
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
 ${getSchemaRegistryConfig()}
 PRODUCER_EOF
                     
