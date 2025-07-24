@@ -4,8 +4,7 @@ properties([
         string(name: 'CONSUMER_GROUP_ID', defaultValue: 'jenkins-consumer', description: 'Consumer group ID'),
         string(name: 'MAX_MESSAGES', defaultValue: '100', description: 'Max messages to consume (0 = unlimited)'),
         choice(name: 'OFFSET_RESET', choices: ['latest', 'earliest'], defaultValue: 'latest', description: 'Where to start consuming'),
-        choice(name: 'CONSUMER_MODE', choices: ['STRING', 'JSON_SCHEMA', 'AVRO_SCHEMA'], defaultValue: 'STRING', description: 'Message format'),
-        booleanParam(name: 'SAVE_TO_FILE', defaultValue: true, description: 'Save messages to file')
+        choice(name: 'CONSUMER_MODE', choices: ['STRING', 'JSON_SCHEMA', 'AVRO_SCHEMA'], defaultValue: 'STRING', description: 'Message format')
     ])
 ])
 
@@ -16,7 +15,7 @@ pipeline {
         COMPOSE_DIR = '/confluent/cp-mysetup/cp-all-in-one'
         KAFKA_SERVER = 'localhost:9092'
         SCHEMA_REGISTRY = 'http://schema-registry:8081'
-        OUTPUT_FILE = 'consumed-messages.json'
+        MESSAGES_FILE = 'consumed-messages.txt'
     }
 
     stages {
@@ -37,7 +36,8 @@ pipeline {
                     withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', 
                                                    usernameVariable: 'KAFKA_USER', 
                                                    passwordVariable: 'KAFKA_PASS')]) {
-                        consumeMessages()
+                        def messages = consumeMessages()
+                        saveMessagesToFile(messages)
                     }
                 }
             }
@@ -46,12 +46,8 @@ pipeline {
 
     post {
         success {
-            script {
-                if (params.SAVE_TO_FILE) {
-                    archiveArtifacts artifacts: "${env.OUTPUT_FILE}", allowEmptyArchive: true
-                }
-                echo "✅ Message consumption completed!"
-            }
+            archiveArtifacts artifacts: "${env.MESSAGES_FILE}", allowEmptyArchive: true
+            echo "✅ Message consumption completed and archived!"
         }
         failure {
             echo "❌ Message consumption failed"
@@ -64,12 +60,10 @@ def consumeMessages() {
     def maxMsgs = params.MAX_MESSAGES.toInteger()
     def maxMsgFlag = maxMsgs > 0 ? "--max-messages ${maxMsgs}" : ""
     
-    try {
-        def result = sh(
-            script: """
-                docker compose -f ${env.COMPOSE_DIR}/docker-compose.yml exec -T broker bash -c '
-                    # Create consumer config
-                    cat > /tmp/consumer.properties << EOF
+    def result = sh(
+        script: """
+            docker compose -f ${env.COMPOSE_DIR}/docker-compose.yml exec -T broker bash -c '
+                cat > /tmp/consumer.properties << EOF
 bootstrap.servers=${env.KAFKA_SERVER}
 group.id=${params.CONSUMER_GROUP_ID}
 key.deserializer=org.apache.kafka.common.serialization.StringDeserializer
@@ -81,37 +75,71 @@ sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule require
 ${getSchemaConfig()}
 EOF
 
-                    echo "🔽 Starting consumption from ${params.TOPIC_NAME}..."
-                    
-                    # Consume messages
-                    timeout 60s kafka-console-consumer \\
-                        --bootstrap-server ${env.KAFKA_SERVER} \\
-                        --topic "${params.TOPIC_NAME}" \\
-                        --consumer.config /tmp/consumer.properties \\
-                        ${maxMsgFlag} \\
-                        --property print.key=true \\
-                        --property print.timestamp=true \\
-                        --property key.separator=" | " > ${env.OUTPUT_FILE} 2>/dev/null || true
-                    
-                    # Count messages
-                    MSG_COUNT=\$(wc -l < ${env.OUTPUT_FILE} 2>/dev/null || echo "0")
-                    echo "📊 Consumed \$MSG_COUNT messages"
-                    
-                    # Show sample
-                    if [ \$MSG_COUNT -gt 0 ]; then
-                        echo "📝 Sample messages:"
-                        head -3 ${env.OUTPUT_FILE}
-                    fi
-                '
-            """,
-            returnStdout: true
-        )
+                timeout 30s kafka-console-consumer \\
+                    --bootstrap-server ${env.KAFKA_SERVER} \\
+                    --topic "${params.TOPIC_NAME}" \\
+                    --consumer.config /tmp/consumer.properties \\
+                    ${maxMsgFlag} \\
+                    --property print.key=true \\
+                    --property print.timestamp=true \\
+                    --property key.separator=" | " \\
+                    --timeout-ms 10000 2>/dev/null || true
+            '
+        """,
+        returnStdout: true
+    )
+    
+    return result.trim()
+}
+
+def saveMessagesToFile(messages) {
+    def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
+    def messageLines = messages.split('\n').findAll { it.trim() }
+    def messageCount = messageLines.size()
+    
+    def content = """# Kafka Messages Consumption Report
+# Generated: ${timestamp}
+# Topic: ${params.TOPIC_NAME}
+# Consumer Group: ${params.CONSUMER_GROUP_ID}
+# Total messages: ${messageCount}
+# Bootstrap server: ${env.KAFKA_SERVER}
+# Offset reset: ${params.OFFSET_RESET}
+# Max messages: ${params.MAX_MESSAGES}
+# Consumer mode: ${params.CONSUMER_MODE}
+
+"""
+
+    if (messageCount == 0) {
+        content += """⚠️ No messages consumed.
+This could mean:
+- Topic is empty
+- All messages already consumed by this consumer group
+- Messages are newer than the offset reset policy
+
+"""
+    } else {
+        content += """${'='*80}
+CONSUMED MESSAGES
+${'='*80}
+
+"""
+        messageLines.eachWithIndex { message, index ->
+            content += "Message ${index + 1}:\n${message}\n\n"
+        }
         
-        echo result
-        
-    } catch (Exception e) {
-        error("Failed to consume messages: ${e.getMessage()}")
+        content += """${'='*80}
+SUMMARY
+${'='*80}
+• Total messages consumed: ${messageCount}
+• Topic: ${params.TOPIC_NAME}
+• Consumer Group: ${params.CONSUMER_GROUP_ID}
+• Consumption time: ${timestamp}
+
+"""
     }
+    
+    writeFile file: env.MESSAGES_FILE, text: content
+    echo "✅ Messages saved to: ${env.MESSAGES_FILE} (${messageCount} messages)"
 }
 
 def getDeserializer() {
