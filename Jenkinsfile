@@ -162,15 +162,18 @@ def getSubjectVersions(subjectName) {
     }
 }
 
+
+
 def describeSchemaSubject(subjectName) {
     try {
-        // Get latest version
-        def latestVersionOutput = sh(
+        // Get latest version and all versions
+        def schemaInfoOutput = sh(
             script: """
                 docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
                 exec -T schema-registry bash -c '
-                    echo "=== Latest Version ==="
-                    curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${subjectName}/versions/latest 2>/dev/null
+                    echo "=== Latest Version Info ==="
+                    LATEST=\$(curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${subjectName}/versions/latest 2>/dev/null)
+                    echo "\$LATEST"
                     echo
                     echo
                     echo "=== All Versions ==="
@@ -178,47 +181,362 @@ def describeSchemaSubject(subjectName) {
                     echo
                     echo
                     echo "=== Subject Compatibility ==="
-                    curl -s ${params.SCHEMA_REGISTRY_URL}/config/${subjectName} 2>/dev/null || echo "Using global compatibility settings"
+                    
+                    # Check subject-level compatibility first
+                    SUBJECT_COMPAT=\$(curl -s -w "%{http_code}" ${params.SCHEMA_REGISTRY_URL}/config/${subjectName} 2>/dev/null)
+                    HTTP_CODE=\$(echo "\$SUBJECT_COMPAT" | tail -c 4)
+                    
+                    if [ "\$HTTP_CODE" = "200" ]; then
+                        echo "\$SUBJECT_COMPAT" | head -c -4
+                    else
+                        echo "Subject-level compatibility: Not configured (using global settings)"
+                        echo
+                        echo "=== Global Compatibility ==="
+                        curl -s ${params.SCHEMA_REGISTRY_URL}/config 2>/dev/null || echo "Unable to retrieve global compatibility settings"
+                    fi
                 ' 2>/dev/null
             """,
             returnStdout: true
         ).trim()
 
-        return latestVersionOutput
+        // Parse and format the schema for better readability
+        def formattedOutput = formatSchemaOutput(schemaInfoOutput)
+        return formattedOutput
+
     } catch (Exception e) {
         return "ERROR: Failed to describe subject '${subjectName}' - ${e.getMessage()}"
     }
 }
 
-def saveSubjectListToFile(subjects, subjectDetails = [:]) {
-    def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
-    def textContent = """# Schema Registry Subjects List
-# Generated: ${timestamp}
-# Total subjects: ${subjects.size()}
-# Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
-# Include versions: ${params.INCLUDE_VERSIONS}
-
-"""
-
-    if (subjects.isEmpty()) {
-        textContent += "No schema subjects found in the registry.\n"
-    } else {
-        textContent += "Available Schema Subjects:\n"
-        textContent += "=" * 50 + "\n\n"
+def formatSchemaOutput(rawOutput) {
+    try {
+        def lines = rawOutput.split('\n')
+        def formattedLines = []
+        def inLatestVersion = false
         
-        subjects.eachWithIndex { subject, index ->
-            textContent += "${index + 1}. ${subject}\n"
+        for (line in lines) {
+            if (line.contains('=== Latest Version Info ===')) {
+                formattedLines.add(line)
+                inLatestVersion = true
+                continue
+            }
             
-            if (params.INCLUDE_VERSIONS && subjectDetails.containsKey(subject)) {
-                textContent += "   Versions: ${subjectDetails[subject]}\n"
+            if (line.contains('=== All Versions ===') || line.contains('=== Subject Compatibility ===')) {
+                inLatestVersion = false
+                formattedLines.add('')
+                formattedLines.add(line)
+                continue
+            }
+            
+            // Format the schema JSON in the latest version section
+            if (inLatestVersion && line.trim().startsWith('{"subject"')) {
+                def schemaInfo = parseSchemaResponse(line)
+                formattedLines.addAll(schemaInfo)
+            } else {
+                formattedLines.add(line)
             }
         }
         
-        textContent += "\n" + "=" * 50 + "\n"
-        textContent += "\n💡 To get detailed information about a specific subject, re-run with SUBJECT_NAME parameter.\n"
+        return formattedLines.join('\n')
+        
+    } catch (Exception e) {
+        echo "⚠️ Warning: Failed to format schema output, using raw format - ${e.getMessage()}"
+        return rawOutput
     }
+}
 
-    writeFile file: env.SCHEMA_SUBJECTS_FILE, text: textContent
+def parseSchemaResponse(jsonLine) {
+    try {
+        // Parse the JSON response
+        def jsonSlurper = new groovy.json.JsonSlurper()
+        def schemaData = jsonSlurper.parseText(jsonLine)
+        
+        def formattedLines = []
+        formattedLines.add("📋 Subject: ${schemaData.subject}")
+        formattedLines.add("🔢 Version: ${schemaData.version}")
+        formattedLines.add("🆔 Schema ID: ${schemaData.id}")
+        
+        // Detect schema type
+        def schemaType = detectSchemaType(schemaData)
+        formattedLines.add("📝 Schema Type: ${schemaType}")
+        formattedLines.add("")
+        
+        // Format based on schema type
+        switch (schemaType.toLowerCase()) {
+            case 'avro':
+                formattedLines.addAll(formatAvroSchema(schemaData.schema))
+                break
+            case 'json':
+                formattedLines.addAll(formatJsonSchema(schemaData.schema))
+                break
+            case 'protobuf':
+                formattedLines.addAll(formatProtobufSchema(schemaData.schema))
+                break
+            default:
+                formattedLines.addAll(formatGenericSchema(schemaData.schema, schemaType))
+                break
+        }
+        
+        formattedLines.add("")
+        formattedLines.add("=" * 80)
+        
+        return formattedLines
+        
+    } catch (Exception e) {
+        echo "⚠️ Warning: Failed to parse schema response, using original format - ${e.getMessage()}"
+        return [jsonLine]
+    }
+}
+
+def detectSchemaType(schemaData) {
+    try {
+        def schema = schemaData.schema
+        
+        // Check if it has schemaType field (newer Schema Registry versions)
+        if (schemaData.schemaType) {
+            return schemaData.schemaType
+        }
+        
+        // Try to detect by schema content
+        if (schema.startsWith('syntax = "proto')) {
+            return 'PROTOBUF'
+        } else if (schema.contains('"$schema"') && schema.contains('json-schema.org')) {
+            return 'JSON'
+        } else if (schema.startsWith('{') && (schema.contains('"type"') || schema.contains('"fields"'))) {
+            return 'AVRO'
+        } else {
+            return 'UNKNOWN'
+        }
+    } catch (Exception e) {
+        return 'UNKNOWN'
+    }
+}
+
+def formatAvroSchema(schemaString) {
+    try {
+        def jsonSlurper = new groovy.json.JsonSlurper()
+        def schemaJson = jsonSlurper.parseText(schemaString)
+        
+        def lines = []
+        lines.add("📖 Avro Schema Details:")
+        lines.add("  Type: ${schemaJson.type}")
+        
+        if (schemaJson.name) {
+            lines.add("  Name: ${schemaJson.name}")
+        }
+        
+        if (schemaJson.namespace) {
+            lines.add("  Namespace: ${schemaJson.namespace}")
+        }
+        
+        if (schemaJson.doc) {
+            lines.add("  Documentation: ${schemaJson.doc}")
+        }
+        
+        lines.add("")
+        
+        if (schemaJson.fields) {
+            lines.add("🔍 Fields:")
+            schemaJson.fields.eachWithIndex { field, index ->
+                def fieldNum = String.format("%2d", index + 1)
+                lines.add("  ${fieldNum}. ${field.name}")
+                lines.add("      Type: ${formatFieldType(field.type)}")
+                
+                if (field.doc) {
+                    lines.add("      Doc: ${field.doc}")
+                }
+                
+                if (field.default != null) {
+                    lines.add("      Default: ${field.default}")
+                }
+                
+                if (field.aliases) {
+                    lines.add("      Aliases: ${field.aliases}")
+                }
+                
+                if (index < schemaJson.fields.size() - 1) {
+                    lines.add("")
+                }
+            }
+        } else if (schemaJson.symbols) {
+            lines.add("🔍 Enum Values: ${schemaJson.symbols.join(', ')}")
+        }
+        
+        return lines
+        
+    } catch (Exception e) {
+        echo "⚠️ Warning: Failed to parse Avro schema - ${e.getMessage()}"
+        return formatGenericSchema(schemaString, 'AVRO')
+    }
+}
+
+def formatJsonSchema(schemaString) {
+    try {
+        def jsonSlurper = new groovy.json.JsonSlurper()
+        def schemaJson = jsonSlurper.parseText(schemaString)
+        
+        def lines = []
+        lines.add("📖 JSON Schema Details:")
+        
+        if (schemaJson.'$schema') {
+            lines.add("  Schema Version: ${schemaJson.'$schema'}")
+        }
+        
+        if (schemaJson.title) {
+            lines.add("  Title: ${schemaJson.title}")
+        }
+        
+        if (schemaJson.description) {
+            lines.add("  Description: ${schemaJson.description}")
+        }
+        
+        if (schemaJson.type) {
+            lines.add("  Type: ${schemaJson.type}")
+        }
+        
+        lines.add("")
+        
+        if (schemaJson.properties) {
+            lines.add("🔍 Properties:")
+            schemaJson.properties.eachWithIndex { prop, index ->
+                def propNum = String.format("%2d", index + 1)
+                lines.add("  ${propNum}. ${prop.key}")
+                lines.add("      Type: ${prop.value.type ?: 'Not specified'}")
+                
+                if (prop.value.description) {
+                    lines.add("      Description: ${prop.value.description}")
+                }
+                
+                if (prop.value.format) {
+                    lines.add("      Format: ${prop.value.format}")
+                }
+                
+                if (prop.value.enum) {
+                    lines.add("      Enum: ${prop.value.enum.join(', ')}")
+                }
+                
+                if (index < schemaJson.properties.size() - 1) {
+                    lines.add("")
+                }
+            }
+        }
+        
+        if (schemaJson.required) {
+            lines.add("")
+            lines.add("⚠️ Required Fields: ${schemaJson.required.join(', ')}")
+        }
+        
+        return lines
+        
+    } catch (Exception e) {
+        echo "⚠️ Warning: Failed to parse JSON schema - ${e.getMessage()}"
+        return formatGenericSchema(schemaString, 'JSON')
+    }
+}
+
+def formatProtobufSchema(schemaString) {
+    def lines = []
+    lines.add("📖 Protocol Buffer Schema:")
+    lines.add("")
+    
+    // Split into lines and format
+    def schemaLines = schemaString.split('\n')
+    def inMessage = false
+    def indent = ""
+    
+    for (line in schemaLines) {
+        def trimmedLine = line.trim()
+        
+        if (trimmedLine.startsWith('syntax')) {
+            lines.add("🔧 ${trimmedLine}")
+        } else if (trimmedLine.startsWith('package')) {
+            lines.add("📦 ${trimmedLine}")
+        } else if (trimmedLine.startsWith('import')) {
+            lines.add("📥 ${trimmedLine}")
+        } else if (trimmedLine.startsWith('message')) {
+            lines.add("")
+            lines.add("📝 ${trimmedLine}")
+            inMessage = true
+            indent = "  "
+        } else if (trimmedLine.startsWith('enum')) {
+            lines.add("")
+            lines.add("🔢 ${trimmedLine}")
+            inMessage = true
+            indent = "  "
+        } else if (trimmedLine == '}') {
+            lines.add("${indent}}")
+            inMessage = false
+            indent = ""
+        } else if (trimmedLine && inMessage) {
+            lines.add("${indent}${trimmedLine}")
+        } else if (trimmedLine) {
+            lines.add(trimmedLine)
+        }
+    }
+    
+    return lines
+}
+
+def formatGenericSchema(schemaString, schemaType) {
+    def lines = []
+    lines.add("📖 ${schemaType} Schema:")
+    lines.add("")
+    lines.add("Raw Schema Content:")
+    lines.add("┌" + "─" * 78 + "┐")
+    
+    // Split long lines and add proper formatting
+    def schemaLines = schemaString.split('\n')
+    for (line in schemaLines) {
+        if (line.length() > 76) {
+            // Break long lines
+            def words = line.split(' ')
+            def currentLine = ""
+            for (word in words) {
+                if ((currentLine + word).length() > 76) {
+                    lines.add("│ ${currentLine.padRight(76)} │")
+                    currentLine = word + " "
+                } else {
+                    currentLine += word + " "
+                }
+            }
+            if (currentLine.trim()) {
+                lines.add("│ ${currentLine.trim().padRight(76)} │")
+            }
+        } else {
+            lines.add("│ ${line.padRight(76)} │")
+        }
+    }
+    
+    lines.add("└" + "─" * 78 + "┘")
+    
+    return lines
+}
+
+def formatFieldType(fieldType) {
+    if (fieldType instanceof String) {
+        return fieldType
+    } else if (fieldType instanceof List) {
+        // Handle union types
+        def types = fieldType.collect { 
+            it instanceof String ? it : (it.type ?: it.toString())
+        }
+        return "Union[${types.join(', ')}]"
+    } else if (fieldType instanceof Map) {
+        // Handle complex types
+        if (fieldType.type == 'array') {
+            return "Array[${formatFieldType(fieldType.items)}]"
+        } else if (fieldType.type == 'map') {
+            return "Map[${formatFieldType(fieldType.values)}]"
+        } else if (fieldType.type == 'record') {
+            return "Record[${fieldType.name}]"
+        } else if (fieldType.type == 'enum') {
+            return "Enum[${fieldType.symbols?.join(', ')}]"
+        } else {
+            return fieldType.type ?: fieldType.toString()
+        }
+    } else {
+        return fieldType.toString()
+    }
 }
 
 def saveSubjectDescriptionToFile(subjectName, subjectInfo) {
@@ -237,6 +555,38 @@ ${subjectInfo}
 
     writeFile file: env.SCHEMA_SUBJECTS_FILE, text: textContent
 }
+
+def saveSubjectListToFile(subjects, subjectDetails = [:]) {
+    def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
+    def textContent = """# Schema Registry Subjects List
+# Generated: ${timestamp}
+# Total subjects: ${subjects.size()}
+# Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
+# Include versions: ${params.INCLUDE_VERSIONS}
+
+"""
+
+    if (subjects.isEmpty()) {
+        textContent += "No schema subjects found in the registry.\n"
+    } else {
+        textContent += "Available Schema Subjects:\n"
+        textContent += "=" * 50 + "\n\n"
+
+        subjects.eachWithIndex { subject, index ->
+            textContent += "${index + 1}. ${subject}\n"
+
+            if (params.INCLUDE_VERSIONS && subjectDetails.containsKey(subject)) {
+                textContent += "   Versions: ${subjectDetails[subject]}\n"
+            }
+        }
+
+        textContent += "\n" + "=" * 50 + "\n"
+        textContent += "\n💡 To get detailed information about a specific subject, re-run with SUBJECT_NAME parameter.\n"
+    }
+
+    writeFile file: env.SCHEMA_SUBJECTS_FILE, text: textContent
+}
+
 
 def cleanupSchemaRegistryConfig() {
     try {
