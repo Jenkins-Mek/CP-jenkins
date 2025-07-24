@@ -49,7 +49,7 @@ pipeline {
 
         stage('Check Existing Schema') {
             when {
-                not { params.FORCE_REGISTER }
+                expression { !params.FORCE_REGISTER }
             }
             steps {
                 script {
@@ -82,7 +82,7 @@ pipeline {
 
         stage('Register Schema') {
             when {
-                not { params.DRY_RUN }
+                expression { !params.DRY_RUN }
             }
             steps {
                 script {
