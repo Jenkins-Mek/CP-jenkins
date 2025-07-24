@@ -167,8 +167,11 @@ consumer.timeout.ms=${params.TIMEOUT_MS}
 ${getSchemaRegistryConfig()}
 CONSUMER_EOF
                     
-                    echo "Consumer configuration:"
-                    cat /tmp/consumer.properties
+                    echo "Consumer configuration created:"
+                    echo "Bootstrap servers: ${params.KAFKA_BOOTSTRAP_SERVER}"
+                    echo "Group ID: ${params.CONSUMER_GROUP_ID}"
+                    echo "Value deserializer: ${valueDeserializer}"
+                    echo "Auto offset reset: ${params.OFFSET_RESET}"
                     echo ""
                     
                     echo "Starting message consumption from topic ${topicName}..."
@@ -183,20 +186,38 @@ CONSUMER_EOF
                     # Create output file for consumed messages
                     CONSUMED_FILE="/tmp/consumed-messages-\$(date +%Y%m%d-%H%M%S).json"
                     
-                    # Consume messages with timeout handling
+                    # Test consumer connectivity first
+                    echo "Testing consumer connectivity..."
+                    if ! kafka-console-consumer --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                        --consumer.config /tmp/consumer.properties \\
+                        --topic "${topicName}" \\
+                        --timeout-ms 5000 \\
+                        --max-messages 1 > /dev/null 2>/tmp/consumer_test.log; then
+                        echo "❌ Consumer connectivity test failed:"
+                        cat /tmp/consumer_test.log
+                        exit 1
+                    fi
+                    echo "✅ Consumer connectivity test passed"
+                    
+                    # Consume messages with proper timeout handling
+                    echo "Starting actual message consumption..."
                     timeout ${params.TIMEOUT_MS.toInteger() / 1000 + 10}s kafka-console-consumer \\
                         --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
                         --topic "${topicName}" \\
                         --consumer.config /tmp/consumer.properties \\
                         ${maxMessagesFlag} \\
-                        ${formatterOptions} > "\$CONSUMED_FILE" 2>/dev/null || {
+                        ${formatterOptions} > "\$CONSUMED_FILE" 2>/tmp/consumer_error.log || {
                             EXIT_CODE=\$?
                             if [ \$EXIT_CODE -eq 124 ]; then
-                                echo "Consumer timed out after ${params.TIMEOUT_MS}ms"
+                                echo "⏱️  Consumer timed out after ${params.TIMEOUT_MS}ms"
                             elif [ \$EXIT_CODE -eq 1 ]; then
-                                echo "Consumer finished (no more messages or reached max messages)"
+                                echo "✅ Consumer finished normally (no more messages or reached max messages)"
                             else
-                                echo "Consumer exited with code \$EXIT_CODE"
+                                echo "❌ Consumer exited with code \$EXIT_CODE"
+                                if [ -s /tmp/consumer_error.log ]; then
+                                    echo "Error details:"
+                                    cat /tmp/consumer_error.log
+                                fi
                             fi
                         }
                     
@@ -229,6 +250,17 @@ CONSUMER_EOF
                     else
                         echo ""
                         echo "ℹ️  No messages were consumed from the topic"
+                        echo "This could mean:"
+                        echo "   - The topic is empty"
+                        echo "   - All messages were consumed by other consumers"
+                        echo "   - The offset reset strategy skipped available messages"
+                        
+                        # Show consumer group status
+                        echo ""
+                        echo "Consumer group status:"
+                        kafka-consumer-groups --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                            --command-config /tmp/consumer.properties \\
+                            --describe --group ${params.CONSUMER_GROUP_ID} 2>/dev/null || echo "Consumer group details not available"
                     fi
                 '
             """,
@@ -321,18 +353,41 @@ def checkTopicExists() {
             sh """
                 docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
                 exec -T broker bash -c '
-                    kafka-topics --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                    set -e
+                    unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
+                    
+                    echo "🔍 Checking Kafka connection and topic existence..."
+                    echo "Bootstrap server: ${params.KAFKA_BOOTSTRAP_SERVER}"
+                    echo "Topic: ${params.TOPIC_NAME}"
+                    
+                    # First, test basic connectivity by listing all topics
+                    echo "Testing Kafka connectivity..."
+                    if kafka-topics --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
                         --command-config ${env.CLIENT_CONFIG_FILE} \\
-                        --describe --topic "${params.TOPIC_NAME}" >/dev/null 2>&1
-                    if [ \$? -eq 0 ]; then
-                        echo "✅ Topic ${params.TOPIC_NAME} exists and is accessible"
+                        --list > /tmp/topic_list.txt 2>&1; then
+                        echo "✅ Successfully connected to Kafka cluster"
+                        echo "Available topics:"
+                        cat /tmp/topic_list.txt | head -10
                         
-                        # Get topic details
-                        kafka-topics --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
-                            --command-config ${env.CLIENT_CONFIG_FILE} \\
-                            --describe --topic "${params.TOPIC_NAME}"
+                        # Check if our specific topic exists in the list
+                        if grep -q "^${params.TOPIC_NAME}$" /tmp/topic_list.txt; then
+                            echo "✅ Topic ${params.TOPIC_NAME} found in topic list"
+                            
+                            # Get detailed topic information
+                            echo "Getting topic details..."
+                            kafka-topics --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                                --command-config ${env.CLIENT_CONFIG_FILE} \\
+                                --describe --topic "${params.TOPIC_NAME}"
+                        else
+                            echo "❌ Topic ${params.TOPIC_NAME} not found in available topics"
+                            echo "Available topics are:"
+                            cat /tmp/topic_list.txt
+                            exit 1
+                        fi
                     else
-                        echo "❌ Topic ${params.TOPIC_NAME} does not exist or is not accessible"
+                        echo "❌ Failed to connect to Kafka cluster"
+                        echo "Error output:"
+                        cat /tmp/topic_list.txt
                         exit 1
                     fi
                 '
