@@ -3,9 +3,15 @@
 properties([
     parameters([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
-        string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://localhost:8081', description: 'Schema Registry URL'),
-        string(name: 'SUBJECT_NAME', defaultValue: '', description: 'Enter subject name to describe (or leave empty to list all subjects)'),
-        booleanParam(name: 'INCLUDE_VERSIONS', defaultValue: false, description: 'Include all versions for each subject')
+        string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'localhost:9092', description: 'Kafka bootstrap server'),
+        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], defaultValue: 'SASL_PLAINTEXT', description: 'Kafka security protocol'),
+        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name to produce messages to'),
+        choice(name: 'PRODUCER_MODE', choices: ['WITHOUT_SCHEMA', 'WITH_JSON_SCHEMA', 'WITH_AVRO_SCHEMA', 'WITH_PROTOBUF_SCHEMA'], description: 'Message production mode'),
+        string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://schema-registry:8081', description: 'Schema Registry URL (only used when schema is enabled)'),
+        text(name: 'MESSAGE_DATA', defaultValue: '{"message": "Hello World", "timestamp": "2024-01-01T00:00:00Z"}', description: 'Message data (JSON format for single message, or multiple lines for multiple messages)'),
+        string(name: 'MESSAGE_COUNT', defaultValue: '1', description: 'Number of messages to produce (will repeat the message data)'),
+        booleanParam(name: 'USE_FILE_INPUT', defaultValue: false, description: 'Use file input instead of parameter data'),
+        string(name: 'INPUT_FILE_PATH', defaultValue: '/tmp/input-messages.json', description: 'Path to input file (only used when USE_FILE_INPUT is true)')
     ])
 ])
 
@@ -13,80 +19,90 @@ pipeline {
     agent any
 
     environment {
-        SCHEMA_SUBJECTS_FILE = 'schema-subjects-list.txt'
-        SCHEMA_REGISTRY_CONFIG_FILE = '/tmp/schema-registry-client.properties'
+        CLIENT_CONFIG_FILE = '/tmp/client.properties'
+        PRODUCER_OUTPUT_FILE = 'producer-results.txt'
+        MESSAGE_DATA_FILE = '/tmp/producer-messages.json'
     }
 
     stages {
-        stage('Create Schema Registry Configuration') {
+        stage('Validate Input') {
             steps {
                 script {
-                    createSchemaRegistryConfig()
+                    if (!params.TOPIC_NAME?.trim()) {
+                        error("❌ TOPIC_NAME parameter is required to produce messages.")
+                    }
+                    
+                    if (params.MESSAGE_COUNT && !params.MESSAGE_COUNT.isNumber()) {
+                        error("❌ MESSAGE_COUNT must be a valid number")
+                    }
+                    
+                    def messageCount = params.MESSAGE_COUNT.toInteger()
+                    if (messageCount <= 0 || messageCount > 10000) {
+                        error("❌ MESSAGE_COUNT must be between 1 and 10000")
+                    }
+                    
+                    echo "✅ Parameters validated successfully"
+                    echo "   Topic: ${params.TOPIC_NAME}"
+                    echo "   Mode: ${params.PRODUCER_MODE}"
+                    echo "   Message Count: ${messageCount}"
                 }
             }
         }
 
-        stage('List Schema Subjects') {
-            when {
-                expression { !params.SUBJECT_NAME?.trim() }
-            }
+        stage('Create Kafka Client Config') {
             steps {
                 script {
-                    def subjects = listSchemaSubjects()
-                    if (!subjects || subjects.isEmpty()) {
-                        echo "ℹ️ No schema subjects found in registry."
-                        writeFile file: env.SCHEMA_SUBJECTS_FILE, text: "# No schema subjects found\n# Generated: ${new Date().format('yyyy-MM-dd HH:mm:ss')}\n# Schema Registry: ${params.SCHEMA_REGISTRY_URL}\n\nNo subjects registered in the schema registry."
-                        return
+                    withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', usernameVariable: 'KAFKA_USERNAME', passwordVariable: 'KAFKA_PASSWORD')]) {
+                        createKafkaClientConfig(env.KAFKA_USERNAME, env.KAFKA_PASSWORD)
                     }
-
-                    echo "📋 Available schema subjects (${subjects.size()}):"
-                    subjects.eachWithIndex { subject, i -> echo "  ${i + 1}. ${subject}" }
-
-                    // Get detailed information if requested
-                    def subjectDetails = [:]
-                    if (params.INCLUDE_VERSIONS) {
-                        echo "\n🔍 Fetching version details for each subject..."
-                        subjects.each { subject ->
-                            subjectDetails[subject] = getSubjectVersions(subject)
-                        }
-                    }
-
-                    saveSubjectListToFile(subjects, subjectDetails)
-                    echo "\n💡 Re-run this job with a SUBJECT_NAME to describe a specific subject."
                 }
             }
         }
 
-        stage('Describe Schema Subject') {
-            when {
-                expression { params.SUBJECT_NAME?.trim() }
-            }
+        stage('Prepare Message Data') {
             steps {
                 script {
-                    def inputSubject = params.SUBJECT_NAME.trim()
-                    def subjects = listSchemaSubjects()
-
-                    if (!subjects.contains(inputSubject)) {
-                        def matches = subjects.findAll { it.toLowerCase().contains(inputSubject.toLowerCase()) }
-                        if (matches.size() == 1) {
-                            echo "✅ Partial match found: '${matches[0]}'"
-                            inputSubject = matches[0]
-                        } else if (matches.size() > 1) {
-                            echo "❌ Multiple matches found for '${params.SUBJECT_NAME}':"
-                            matches.each { echo "  - ${it}" }
-                            error("Please provide a more specific subject name.")
-                        } else {
-                            echo "❌ Subject '${inputSubject}' not found."
-                            error("Available subjects:\n" + subjects.take(10).collect { "  - $it" }.join('\n'))
-                        }
+                    if (params.USE_FILE_INPUT) {
+                        echo "📁 Using file input: ${params.INPUT_FILE_PATH}"
+                        prepareMessageDataFromFile()
                     } else {
-                        echo "✅ Subject '${inputSubject}' found"
+                        echo "📝 Using parameter input data"
+                        prepareMessageDataFromParameter()
                     }
+                }
+            }
+        }
 
-                    echo "📝 Describing subject: ${inputSubject}"
-                    def subjectInfo = describeSchemaSubject(inputSubject)
-                    saveSubjectDescriptionToFile(inputSubject, subjectInfo)
-                    echo "✅ Subject description saved to ${env.SCHEMA_SUBJECTS_FILE}"
+        stage('Validate Schema Registry') {
+            when {
+                expression { params.PRODUCER_MODE != 'WITHOUT_SCHEMA' }
+            }
+            steps {
+                script {
+                    echo "🔍 Validating Schema Registry connection..."
+                    validateSchemaRegistry()
+                }
+            }
+        }
+
+        stage('Produce Messages') {
+            steps {
+                script {
+                    def topicName = params.TOPIC_NAME.trim()
+                    echo "🚀 Producing messages to topic: ${topicName}"
+                    def result = produceKafkaMessages(topicName)
+                    echo result
+                    saveProducerResults(result)
+                }
+            }
+        }
+
+        stage('Verify Message Production') {
+            steps {
+                script {
+                    echo "🔍 Verifying message production..."
+                    def verification = verifyMessageProduction(params.TOPIC_NAME.trim())
+                    echo verification
                 }
             }
         }
@@ -95,504 +111,257 @@ pipeline {
     post {
         always {
             script {
-                cleanupSchemaRegistryConfig()
+                cleanupClientConfig()
             }
         }
         success {
             script {
-                archiveArtifacts artifacts: "${env.SCHEMA_SUBJECTS_FILE}", fingerprint: true, allowEmptyArchive: true
-                echo "📦 Artifact '${env.SCHEMA_SUBJECTS_FILE}' archived successfully."
+                archiveArtifacts artifacts: "${env.PRODUCER_OUTPUT_FILE}", fingerprint: true, allowEmptyArchive: true
+                echo "📦 Producer results archived successfully."
+                echo "✅ Message production completed successfully!"
+            }
+        }
+        failure {
+            script {
+                echo "❌ Message production failed. Check the logs above for details."
             }
         }
     }
 }
 
-def createSchemaRegistryConfig() {
+def produceKafkaMessages(topicName) {
+    try {
+        // Determine serializer based on producer mode
+        def valueSerializer = getValueSerializer(params.PRODUCER_MODE)
+        
+        def produceOutput = sh(
+            script: """
+                docker compose --project-directory '${params.COMPOSE_DIR}' -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
+                exec -T broker bash -c '
+                    set -e
+                    unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
+                    
+                    # Create producer configuration
+                    cat > /tmp/producer.properties << "PRODUCER_EOF"
+bootstrap.servers=${params.KAFKA_BOOTSTRAP_SERVER}
+key.serializer=org.apache.kafka.common.serialization.StringSerializer
+value.serializer=${valueSerializer}
+security.protocol=${params.SECURITY_PROTOCOL}
+sasl.mechanism=PLAIN
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${env.KAFKA_USERNAME}" password="${env.KAFKA_PASSWORD}";
+${getSchemaRegistryConfig()}
+PRODUCER_EOF
+                    
+                    echo "Producer configuration:"
+                    cat /tmp/producer.properties
+                    echo ""
+                    
+                    echo "Message data preview:"
+                    head -3 ${env.MESSAGE_DATA_FILE}
+                    echo ""
+                    
+                    MESSAGE_COUNT=\$(wc -l < ${env.MESSAGE_DATA_FILE})
+                    echo "Producing \$MESSAGE_COUNT messages to topic ${topicName}..."
+                    
+                    START_TIME=\$(date +%s)
+                    kafka-console-producer --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                        --topic "${topicName}" \\
+                        --producer.config /tmp/producer.properties < ${env.MESSAGE_DATA_FILE}
+                    END_TIME=\$(date +%s)
+                    
+                    DURATION=\$((END_TIME - START_TIME))
+                    echo ""
+                    echo "✅ Successfully produced \$MESSAGE_COUNT messages in \$DURATION seconds"
+                    echo "   Topic: ${topicName}"
+                    echo "   Producer Mode: ${params.PRODUCER_MODE}"
+                    echo "   Serializer: ${valueSerializer}"
+                '
+            """,
+            returnStdout: true
+        ).trim()
+
+        return "✅ Messages produced successfully.\n${produceOutput}"
+
+    } catch (Exception e) {
+        return "ERROR: Failed to produce messages to topic '${topicName}' - ${e.getMessage()}"
+    }
+}
+
+def getValueSerializer(producerMode) {
+    switch (producerMode.toLowerCase()) {
+        case 'with_json_schema':
+            return 'io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializer'
+        case 'with_avro_schema':
+            return 'io.confluent.kafka.serializers.KafkaAvroSerializer'
+        case 'with_protobuf_schema':
+            return 'io.confluent.kafka.serializers.protobuf.KafkaProtobufSerializer'
+        default:
+            return 'org.apache.kafka.common.serialization.StringSerializer'
+    }
+}
+
+def getSchemaRegistryConfig() {
+    if (params.PRODUCER_MODE != 'WITHOUT_SCHEMA') {
+        return "schema.registry.url=${params.SCHEMA_REGISTRY_URL}"
+    }
+    return ""
+}
+
+def createKafkaClientConfig(username, password) {
+    def securityConfig = ""
+
+    switch(params.SECURITY_PROTOCOL) {
+        case 'SASL_PLAINTEXT':
+        case 'SASL_SSL':
+            securityConfig = """
+security.protocol=${params.SECURITY_PROTOCOL}
+sasl.mechanism=PLAIN
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
+"""
+            break
+        default:
+            securityConfig = """
+security.protocol=SASL_PLAINTEXT
+sasl.mechanism=PLAIN
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
+"""
+            break
+    }
+
     sh """
         docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-        exec -T schema-registry bash -c 'cat > ${env.SCHEMA_REGISTRY_CONFIG_FILE} << "EOF"
-schema.registry.url=${params.SCHEMA_REGISTRY_URL}
+        exec -T broker bash -c 'cat > ${env.CLIENT_CONFIG_FILE} << "EOF"
+bootstrap.servers=${params.KAFKA_BOOTSTRAP_SERVER}
+${securityConfig}
 EOF'
     """
 }
 
-def listSchemaSubjects() {
-    try {
-        def subjectsOutput = sh(
-            script: """
-                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-                exec -T schema-registry bash -c '
-                    RESPONSE=\$(curl -s ${params.SCHEMA_REGISTRY_URL}/subjects 2>/dev/null)
-                    if [ "\$RESPONSE" = "[]" ] || [ -z "\$RESPONSE" ]; then
-                        echo ""
-                    else
-                        echo "\$RESPONSE" | sed "s/\\[//g" | sed "s/\\]//g" | sed "s/\\"//g" | tr "," "\\n" | grep -v "^[[:space:]]*\$"
-                    fi
-                ' 2>/dev/null
-            """,
-            returnStdout: true
-        ).trim()
-
-        if (!subjectsOutput) {
-            return []
-        }
-
-        return subjectsOutput.split('\n').findAll { it.trim() != '' }
-    } catch (Exception e) {
-        echo "⚠️ Warning: Failed to list schema subjects - ${e.getMessage()}"
-        return []
-    }
+def prepareMessageDataFromFile() {
+    sh """
+        docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+        exec -T broker bash -c '
+            if [ -f "${params.INPUT_FILE_PATH}" ]; then
+                cp "${params.INPUT_FILE_PATH}" "${env.MESSAGE_DATA_FILE}"
+                echo "✅ Message data copied from ${params.INPUT_FILE_PATH}"
+            else
+                echo "❌ Input file ${params.INPUT_FILE_PATH} not found"
+                exit 1
+            fi
+        '
+    """
 }
 
-def getSubjectVersions(subjectName) {
-    try {
-        def versionsOutput = sh(
-            script: """
-                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-                exec -T schema-registry bash -c '
-                    curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${subjectName}/versions 2>/dev/null
-                ' 2>/dev/null
-            """,
-            returnStdout: true
-        ).trim()
-
-        return versionsOutput
-    } catch (Exception e) {
-        return "ERROR: Failed to get versions for subject '${subjectName}'"
-    }
-}
-
-
-
-def describeSchemaSubject(subjectName) {
-    try {
-        // Get latest version and all versions
-        def schemaInfoOutput = sh(
-            script: """
-                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-                exec -T schema-registry bash -c '
-                    echo "=== Latest Version Info ==="
-                    LATEST=\$(curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${subjectName}/versions/latest 2>/dev/null)
-                    echo "\$LATEST"
-                    echo
-                    echo
-                    echo "=== All Versions ==="
-                    curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${subjectName}/versions 2>/dev/null
-                    echo
-                    echo
-                    echo "=== Subject Compatibility ==="
-                    
-                    # Check subject-level compatibility first
-                    SUBJECT_COMPAT=\$(curl -s -w "%{http_code}" ${params.SCHEMA_REGISTRY_URL}/config/${subjectName} 2>/dev/null)
-                    HTTP_CODE=\$(echo "\$SUBJECT_COMPAT" | tail -c 4)
-                    
-                    if [ "\$HTTP_CODE" = "200" ]; then
-                        echo "\$SUBJECT_COMPAT" | head -c -4
-                    else
-                        echo "Subject-level compatibility: Not configured (using global settings)"
-                        echo
-                        echo "=== Global Compatibility ==="
-                        curl -s ${params.SCHEMA_REGISTRY_URL}/config 2>/dev/null || echo "Unable to retrieve global compatibility settings"
-                    fi
-                ' 2>/dev/null
-            """,
-            returnStdout: true
-        ).trim()
-
-        // Parse and format the schema for better readability
-        def formattedOutput = formatSchemaOutput(schemaInfoOutput)
-        return formattedOutput
-
-    } catch (Exception e) {
-        return "ERROR: Failed to describe subject '${subjectName}' - ${e.getMessage()}"
-    }
-}
-
-def formatSchemaOutput(rawOutput) {
-    try {
-        def lines = rawOutput.split('\n')
-        def formattedLines = []
-        def inLatestVersion = false
-        
-        for (line in lines) {
-            if (line.contains('=== Latest Version Info ===')) {
-                formattedLines.add(line)
-                inLatestVersion = true
-                continue
-            }
-            
-            if (line.contains('=== All Versions ===') || line.contains('=== Subject Compatibility ===')) {
-                inLatestVersion = false
-                formattedLines.add('')
-                formattedLines.add(line)
-                continue
-            }
-            
-            // Format the schema JSON in the latest version section
-            if (inLatestVersion && line.trim().startsWith('{"subject"')) {
-                def schemaInfo = parseSchemaResponse(line)
-                formattedLines.addAll(schemaInfo)
-            } else {
-                formattedLines.add(line)
-            }
-        }
-        
-        return formattedLines.join('\n')
-        
-    } catch (Exception e) {
-        echo "⚠️ Warning: Failed to format schema output, using raw format - ${e.getMessage()}"
-        return rawOutput
-    }
-}
-
-def parseSchemaResponse(jsonLine) {
-    try {
-        // Parse the JSON response
-        def jsonSlurper = new groovy.json.JsonSlurper()
-        def schemaData = jsonSlurper.parseText(jsonLine)
-        
-        def formattedLines = []
-        formattedLines.add("Subject: ${schemaData.subject}")
-        formattedLines.add("Version: ${schemaData.version}")
-        formattedLines.add("Schema ID: ${schemaData.id}")
-        
-        // Detect schema type
-        def schemaType = detectSchemaType(schemaData)
-        formattedLines.add("Schema Type: ${schemaType}")
-        formattedLines.add("")
-        
-        // Format based on schema type
-        switch (schemaType.toLowerCase()) {
-            case 'avro':
-                formattedLines.addAll(formatAvroSchema(schemaData.schema))
-                break
-            case 'json':
-                formattedLines.addAll(formatJsonSchema(schemaData.schema))
-                break
-            case 'protobuf':
-                formattedLines.addAll(formatProtobufSchema(schemaData.schema))
-                break
-            default:
-                formattedLines.addAll(formatGenericSchema(schemaData.schema, schemaType))
-                break
-        }
-        
-        formattedLines.add("")
-        formattedLines.add("=" * 80)
-        
-        return formattedLines
-        
-    } catch (Exception e) {
-        echo "Warning: Failed to parse schema response, using original format - ${e.getMessage()}"
-        return [jsonLine]
-    }
-}
-
-def detectSchemaType(schemaData) {
-    try {
-        def schema = schemaData.schema
-        
-        // Check if it has schemaType field (newer Schema Registry versions)
-        if (schemaData.schemaType) {
-            return schemaData.schemaType
-        }
-        
-        // Try to detect by schema content
-        if (schema.startsWith('syntax = "proto')) {
-            return 'PROTOBUF'
-        } else if (schema.contains('"$schema"') && schema.contains('json-schema.org')) {
-            return 'JSON'
-        } else if (schema.startsWith('{') && (schema.contains('"type"') || schema.contains('"fields"'))) {
-            return 'AVRO'
-        } else {
-            return 'UNKNOWN'
-        }
-    } catch (Exception e) {
-        return 'UNKNOWN'
-    }
-}
-
-def formatAvroSchema(schemaString) {
-    try {
-        def jsonSlurper = new groovy.json.JsonSlurper()
-        def schemaJson = jsonSlurper.parseText(schemaString)
-        
-        def lines = []
-        lines.add("Avro Schema Details:")
-        lines.add("  Type: ${schemaJson.type}")
-        
-        if (schemaJson.name) {
-            lines.add("  Name: ${schemaJson.name}")
-        }
-        
-        if (schemaJson.namespace) {
-            lines.add("  Namespace: ${schemaJson.namespace}")
-        }
-        
-        if (schemaJson.doc) {
-            lines.add("  Documentation: ${schemaJson.doc}")
-        }
-        
-        lines.add("")
-        
-        if (schemaJson.fields) {
-            lines.add("Fields:")
-            schemaJson.fields.eachWithIndex { field, index ->
-                def fieldNum = String.format("%2d", index + 1)
-                lines.add("  ${fieldNum}. ${field.name}")
-                lines.add("      Type: ${formatFieldType(field.type)}")
-                
-                if (field.doc) {
-                    lines.add("      Doc: ${field.doc}")
-                }
-                
-                if (field.default != null) {
-                    lines.add("      Default: ${field.default}")
-                }
-                
-                if (field.aliases) {
-                    lines.add("      Aliases: ${field.aliases}")
-                }
-                
-                if (index < schemaJson.fields.size() - 1) {
-                    lines.add("")
-                }
-            }
-        } else if (schemaJson.symbols) {
-            lines.add("Enum Values: ${schemaJson.symbols.join(', ')}")
-        }
-        
-        return lines
-        
-    } catch (Exception e) {
-        echo "⚠️ Warning: Failed to parse Avro schema - ${e.getMessage()}"
-        return formatGenericSchema(schemaString, 'AVRO')
-    }
-}
-
-def formatJsonSchema(schemaString) {
-    try {
-        def jsonSlurper = new groovy.json.JsonSlurper()
-        def schemaJson = jsonSlurper.parseText(schemaString)
-        
-        def lines = []
-        lines.add("JSON Schema Details:")
-        
-        if (schemaJson.'$schema') {
-            lines.add("  Schema Version: ${schemaJson.'$schema'}")
-        }
-        
-        if (schemaJson.title) {
-            lines.add("  Title: ${schemaJson.title}")
-        }
-        
-        if (schemaJson.description) {
-            lines.add("  Description: ${schemaJson.description}")
-        }
-        
-        if (schemaJson.type) {
-            lines.add("  Type: ${schemaJson.type}")
-        }
-        
-        lines.add("")
-        
-        if (schemaJson.properties) {
-            lines.add("Properties:")
-            schemaJson.properties.eachWithIndex { prop, index ->
-                def propNum = String.format("%2d", index + 1)
-                lines.add("  ${propNum}. ${prop.key}")
-                lines.add("      Type: ${prop.value.type ?: 'Not specified'}")
-                
-                if (prop.value.description) {
-                    lines.add("      Description: ${prop.value.description}")
-                }
-                
-                if (prop.value.format) {
-                    lines.add("      Format: ${prop.value.format}")
-                }
-                
-                if (prop.value.enum) {
-                    lines.add("      Enum: ${prop.value.enum.join(', ')}")
-                }
-                
-                if (index < schemaJson.properties.size() - 1) {
-                    lines.add("")
-                }
-            }
-        }
-        
-        if (schemaJson.required) {
-            lines.add("")
-            lines.add("Required Fields: ${schemaJson.required.join(', ')}")
-        }
-        
-        return lines
-        
-    } catch (Exception e) {
-        echo "Warning: Failed to parse JSON schema - ${e.getMessage()}"
-        return formatGenericSchema(schemaString, 'JSON')
-    }
-}
-
-def formatProtobufSchema(schemaString) {
-    def lines = []
-    lines.add("Protocol Buffer Schema:")
-    lines.add("")
+def prepareMessageDataFromParameter() {
+    def messageCount = params.MESSAGE_COUNT.toInteger()
+    def messageData = params.MESSAGE_DATA.trim()
     
-    // Split into lines and format
-    def schemaLines = schemaString.split('\n')
-    def inMessage = false
-    def indent = ""
-    
-    for (line in schemaLines) {
-        def trimmedLine = line.trim()
-        
-        if (trimmedLine.startsWith('syntax')) {
-            lines.add("${trimmedLine}")
-        } else if (trimmedLine.startsWith('package')) {
-            lines.add("${trimmedLine}")
-        } else if (trimmedLine.startsWith('import')) {
-            lines.add("${trimmedLine}")
-        } else if (trimmedLine.startsWith('message')) {
-            lines.add("")
-            lines.add("${trimmedLine}")
-            inMessage = true
-            indent = "  "
-        } else if (trimmedLine.startsWith('enum')) {
-            lines.add("")
-            lines.add("${trimmedLine}")
-            inMessage = true
-            indent = "  "
-        } else if (trimmedLine == '}') {
-            lines.add("${indent}}")
-            inMessage = false
-            indent = ""
-        } else if (trimmedLine && inMessage) {
-            lines.add("${indent}${trimmedLine}")
-        } else if (trimmedLine) {
-            lines.add(trimmedLine)
-        }
-    }
-    
-    return lines
+    sh """
+        docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+        exec -T broker bash -c '
+            echo "Preparing ${messageCount} messages..."
+            rm -f "${env.MESSAGE_DATA_FILE}"
+            for i in \$(seq 1 ${messageCount}); do
+                echo "${messageData}" >> "${env.MESSAGE_DATA_FILE}"
+            done
+            echo "✅ Message data file prepared with ${messageCount} messages"
+            echo "Sample content:"
+            head -3 "${env.MESSAGE_DATA_FILE}"
+        '
+    """
 }
 
-def formatGenericSchema(schemaString, schemaType) {
-    def lines = []
-    lines.add("${schemaType} Schema:")
-    lines.add("")
-    lines.add("Raw Schema Content:")
-    lines.add("┌" + "─" * 78 + "┐")
-    
-    // Split long lines and add proper formatting
-    def schemaLines = schemaString.split('\n')
-    for (line in schemaLines) {
-        if (line.length() > 76) {
-            // Break long lines
-            def words = line.split(' ')
-            def currentLine = ""
-            for (word in words) {
-                if ((currentLine + word).length() > 76) {
-                    lines.add("│ ${currentLine.padRight(76)} │")
-                    currentLine = word + " "
-                } else {
-                    currentLine += word + " "
-                }
-            }
-            if (currentLine.trim()) {
-                lines.add("│ ${currentLine.trim().padRight(76)} │")
-            }
-        } else {
-            lines.add("│ ${line.padRight(76)} │")
-        }
-    }
-    
-    lines.add("└" + "─" * 78 + "┘")
-    
-    return lines
-}
-
-def formatFieldType(fieldType) {
-    if (fieldType instanceof String) {
-        return fieldType
-    } else if (fieldType instanceof List) {
-        // Handle union types
-        def types = fieldType.collect { 
-            it instanceof String ? it : (it.type ?: it.toString())
-        }
-        return "Union[${types.join(', ')}]"
-    } else if (fieldType instanceof Map) {
-        // Handle complex types
-        if (fieldType.type == 'array') {
-            return "Array[${formatFieldType(fieldType.items)}]"
-        } else if (fieldType.type == 'map') {
-            return "Map[${formatFieldType(fieldType.values)}]"
-        } else if (fieldType.type == 'record') {
-            return "Record[${fieldType.name}]"
-        } else if (fieldType.type == 'enum') {
-            return "Enum[${fieldType.symbols?.join(', ')}]"
-        } else {
-            return fieldType.type ?: fieldType.toString()
-        }
-    } else {
-        return fieldType.toString()
-    }
-}
-
-def saveSubjectDescriptionToFile(subjectName, subjectInfo) {
-    def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
-    def textContent = """# Schema Subject Description
-# Generated: ${timestamp}
-# Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
-# Subject: ${subjectName}
-
-================================================================================
-Subject: ${subjectName}
-================================================================================
-${subjectInfo}
-
-"""
-
-    writeFile file: env.SCHEMA_SUBJECTS_FILE, text: textContent
-}
-
-def saveSubjectListToFile(subjects, subjectDetails = [:]) {
-    def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
-    def textContent = """# Schema Registry Subjects List
-# Generated: ${timestamp}
-# Total subjects: ${subjects.size()}
-# Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
-# Include versions: ${params.INCLUDE_VERSIONS}
-
-"""
-
-    if (subjects.isEmpty()) {
-        textContent += "No schema subjects found in the registry.\n"
-    } else {
-        textContent += "Available Schema Subjects:\n"
-        textContent += "=" * 50 + "\n\n"
-
-        subjects.eachWithIndex { subject, index ->
-            textContent += "${index + 1}. ${subject}\n"
-
-            if (params.INCLUDE_VERSIONS && subjectDetails.containsKey(subject)) {
-                textContent += "   Versions: ${subjectDetails[subject]}\n"
-            }
-        }
-
-        textContent += "\n" + "=" * 50 + "\n"
-        textContent += "\nTo get detailed information about a specific subject, re-run with SUBJECT_NAME parameter.\n"
-    }
-
-    writeFile file: env.SCHEMA_SUBJECTS_FILE, text: textContent
-}
-
-
-def cleanupSchemaRegistryConfig() {
+def validateSchemaRegistry() {
     try {
         sh """
             docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T schema-registry bash -c 'rm -f ${env.SCHEMA_REGISTRY_CONFIG_FILE}' 2>/dev/null || true
+            exec -T schema-registry bash -c '
+                RESPONSE=\$(curl -s -o /dev/null -w "%{http_code}" ${params.SCHEMA_REGISTRY_URL}/subjects 2>/dev/null)
+                if [ "\$RESPONSE" = "200" ]; then
+                    echo "✅ Schema Registry is accessible at ${params.SCHEMA_REGISTRY_URL}"
+                else
+                    echo "❌ Schema Registry is not accessible (HTTP \$RESPONSE)"
+                    exit 1
+                fi
+            '
+        """
+    } catch (Exception e) {
+        error("❌ Schema Registry validation failed: ${e.getMessage()}")
+    }
+}
+
+def verifyMessageProduction(topicName) {
+    try {
+        def verification = sh(
+            script: """
+                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+                exec -T broker bash -c '
+                    echo "Verifying messages in topic ${topicName}..."
+                    
+                    # Get topic info
+                    kafka-topics --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                        --command-config ${env.CLIENT_CONFIG_FILE} \\
+                        --describe --topic ${topicName}
+                    
+                    echo ""
+                    echo "Recent messages (last 5):"
+                    timeout 10s kafka-console-consumer --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                        --consumer.config ${env.CLIENT_CONFIG_FILE} \\
+                        --topic ${topicName} \\
+                        --from-beginning \\
+                        --max-messages 5 2>/dev/null || echo "No messages found or timeout reached"
+                ' 2>/dev/null
+            """,
+            returnStdout: true
+        )
+        
+        return verification
+    } catch (Exception e) {
+        return "⚠️ Warning: Failed to verify message production - ${e.getMessage()}"
+    }
+}
+
+def saveProducerResults(result) {
+    def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
+    def content = """# Kafka Message Producer Results
+# Generated: ${timestamp}
+# Topic: ${params.TOPIC_NAME}
+# Producer Mode: ${params.PRODUCER_MODE}
+# Message Count: ${params.MESSAGE_COUNT}
+# Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
+# Security Protocol: ${params.SECURITY_PROTOCOL}
+# Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
+
+================================================================================
+PRODUCER EXECUTION RESULTS
+================================================================================
+
+${result}
+
+================================================================================
+CONFIGURATION SUMMARY
+================================================================================
+
+Topic Name: ${params.TOPIC_NAME}
+Producer Mode: ${params.PRODUCER_MODE}
+Message Count: ${params.MESSAGE_COUNT}
+Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
+Security Protocol: ${params.SECURITY_PROTOCOL}
+Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
+Use File Input: ${params.USE_FILE_INPUT}
+Input File Path: ${params.INPUT_FILE_PATH}
+
+================================================================================
+"""
+
+    writeFile file: env.PRODUCER_OUTPUT_FILE, text: content
+}
+
+def cleanupClientConfig() {
+    try {
+        sh """
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            exec -T broker bash -c "rm -f ${env.CLIENT_CONFIG_FILE} ${env.MESSAGE_DATA_FILE}" 2>/dev/null || true
         """
     } catch (Exception e) {
         // Ignore cleanup errors
