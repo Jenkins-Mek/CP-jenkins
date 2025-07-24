@@ -261,7 +261,7 @@ pipeline {
                             echo "==== Calling Describe Topic job ===="
                             build job: 'org-cp-tools/CP-jenkins/describe-topic',
                                 parameters: [
-                                    string(name: 'TopicName', value: "${env.TOPIC_NAME}"),
+                                    string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
                                     string(name: 'ParamsAsENV', value: 'true'),
                                     string(name: 'ENVIRONMENT_PARAMS', value: "${env.COMPOSE_DIR},${env.CONNECTION_TYPE}")
                                 ],
@@ -283,7 +283,7 @@ pipeline {
                             echo "==== Calling Delete Topic job ===="
                             build job: 'GIT-org/jenkins1/delete-topic',
                                 parameters: [
-                                    string(name: 'TopicName', value: "${env.TOPIC_NAME}"),
+                                    string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
                                     string(name: 'ParamsAsENV', value: 'true'),
                                     string(name: 'ENVIRONMENT_PARAMS', value: "${env.COMPOSE_DIR},${env.CONNECTION_TYPE}")
                                 ],
