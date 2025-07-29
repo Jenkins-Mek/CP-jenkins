@@ -3,7 +3,10 @@ properties([
         string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name (required)'),
         string(name: 'CONSUMER_GROUP_ID', defaultValue: 'jenkins-simple-consumer', description: 'Consumer group ID'),
         string(name: 'MAX_MESSAGES', defaultValue: '100', description: 'Max messages to consume (0 = unlimited)'),
-        choice(name: 'OFFSET_RESET', choices: ['latest', 'earliest'], description: 'Where to start consuming'),
+        choice(name: 'OFFSET_RESET', choices: ['latest', 'earliest'], defaultValue: 'latest', description: 'Where to start consuming'),
+        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL', 'PLAINTEXT'], defaultValue: 'SASL_PLAINTEXT', description: 'Security protocol'),
+        string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'localhost:9092', description: 'Kafka bootstrap server'),
+        string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker compose directory'),
         string(name: 'TIMEOUT_SECONDS', defaultValue: '30', description: 'Consumer timeout in seconds')
     ])
 ])
@@ -12,8 +15,9 @@ pipeline {
     agent any
     
     environment {
-        COMPOSE_DIR = '/confluent/cp-mysetup/cp-all-in-one'
-        KAFKA_SERVER = 'localhost:9092'
+        COMPOSE_DIR = params.COMPOSE_DIR ?: '/confluent/cp-mysetup/cp-all-in-one'
+        KAFKA_SERVER = params.KAFKA_BOOTSTRAP_SERVER ?: 'localhost:9092'
+        CLIENT_CONFIG_FILE = '/tmp/simple-consumer.properties'
         MESSAGES_FILE = 'consumed-messages.txt'
         STATS_FILE = 'consumption-stats.json'
     }
@@ -51,6 +55,9 @@ pipeline {
                     withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', 
                                                    usernameVariable: 'KAFKA_USER', 
                                                    passwordVariable: 'KAFKA_PASS')]) {
+                        // Create client configuration
+                        createKafkaClientConfig(env.KAFKA_USER, env.KAFKA_PASS)
+                        
                         def startTime = System.currentTimeMillis()
                         def messages = consumeMessages()
                         def endTime = System.currentTimeMillis()
@@ -77,7 +84,9 @@ pipeline {
             echo "❌ Message consumption failed"
         }
         always {
-            sh "rm -f /tmp/simple-consumer.properties || true"
+            script {
+                cleanupClientConfig()
+            }
         }
     }
 }
@@ -86,13 +95,13 @@ def checkTopicExists() {
     try {
         def result = sh(
             script: """
-                docker compose -f ${env.COMPOSE_DIR}/docker-compose.yml exec -T broker bash -c '
+                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml exec -T broker bash -c '
                     # Clear all JMX and monitoring related environment variables
                     unset KAFKA_OPTS JMX_PORT KAFKA_JMX_OPTS KAFKA_HEAP_OPTS
                     export KAFKA_OPTS=""
                     export JMX_PORT=""
                     
-                    kafka-topics --bootstrap-server ${env.KAFKA_SERVER} --list | grep -x "${params.TOPIC_NAME}"
+                    kafka-topics --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} --list | grep -x "${params.TOPIC_NAME}"
                 '
             """,
             returnStdout: true
@@ -111,7 +120,7 @@ def consumeMessages() {
     
     def result = sh(
         script: """
-            docker compose -f ${env.COMPOSE_DIR}/docker-compose.yml exec -T broker bash -c '
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml exec -T broker bash -c '
                 # Completely disable JMX to avoid port conflicts
                 unset KAFKA_OPTS JMX_PORT KAFKA_JMX_OPTS KAFKA_HEAP_OPTS
                 export KAFKA_OPTS=""
@@ -119,27 +128,25 @@ def consumeMessages() {
                 export KAFKA_JMX_OPTS=""
                 export KAFKA_HEAP_OPTS=""
                 
-                # Create simple consumer properties
-                cat > /tmp/simple-consumer.properties << EOF
-bootstrap.servers=${env.KAFKA_SERVER}
+                # Add consumer-specific settings to existing client config
+                cat >> ${env.CLIENT_CONFIG_FILE} << EOF
 group.id=${params.CONSUMER_GROUP_ID}
 key.deserializer=org.apache.kafka.common.serialization.StringDeserializer
 value.deserializer=org.apache.kafka.common.serialization.StringDeserializer
 auto.offset.reset=${params.OFFSET_RESET}
-security.protocol=SASL_PLAINTEXT
-sasl.mechanism=PLAIN
-sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${env.KAFKA_USER}" password="${env.KAFKA_PASS}";
 enable.auto.commit=true
 auto.commit.interval.ms=1000
 session.timeout.ms=30000
 heartbeat.interval.ms=3000
+# Disable JMX to avoid port conflicts
+jmx.port=
 EOF
 
                 # Consume messages with JMX disabled
                 timeout ${timeoutSeconds}s kafka-console-consumer \\
-                    --bootstrap-server ${env.KAFKA_SERVER} \\
+                    --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
                     --topic "${params.TOPIC_NAME}" \\
-                    --consumer.config /tmp/simple-consumer.properties \\
+                    --consumer.config ${env.CLIENT_CONFIG_FILE} \\
                     ${maxMsgFlag} \\
                     --property print.key=true \\
                     --property print.timestamp=true \\
@@ -151,6 +158,50 @@ EOF
     )
     
     return result.trim()
+}
+
+def cleanupClientConfig() {
+    try {
+        sh """
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            exec -T broker bash -c "rm -f ${env.CLIENT_CONFIG_FILE}" 2>/dev/null || true
+        """
+    } catch (Exception e) {
+        // Ignore cleanup errors
+    }
+}
+
+def createKafkaClientConfig(username, password) {
+    def securityConfig = ""
+    switch(params.SECURITY_PROTOCOL) {
+        case 'SASL_PLAINTEXT':
+        case 'SASL_SSL':
+            securityConfig = """
+security.protocol=${params.SECURITY_PROTOCOL}
+sasl.mechanism=PLAIN
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
+"""
+            break
+        case 'PLAINTEXT':
+            securityConfig = """
+security.protocol=PLAINTEXT
+"""
+            break
+        default:
+            securityConfig = """
+security.protocol=SASL_PLAINTEXT
+sasl.mechanism=PLAIN
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
+"""
+            break
+    }
+    sh """
+        docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+        exec -T broker bash -c 'cat > ${env.CLIENT_CONFIG_FILE} << "EOF"
+bootstrap.servers=${params.KAFKA_BOOTSTRAP_SERVER}
+${securityConfig}
+EOF'
+    """
 }
 
 def saveMessages(messages, duration) {
