@@ -113,7 +113,6 @@ pipeline {
                         echo "📝 Using parameter input data"
                         prepareMessageDataFromParameter()
                     }
-                    
                     if (params.VALIDATE_SCHEMA_COMPATIBILITY) {
                         validateMessageAgainstSchema()
                     }
@@ -309,10 +308,10 @@ def registerSchema(schemaSubject) {
     try {
         // Prepare the schema payload based on schema type
         def schemaType = params.SCHEMA_TYPE.replace('_SCHEMA', '').toUpperCase()
-        def escapedSchema = params.SCHEMA_DEFINITION.replace('"', '\\"').replace('\n', '\\n').replace('\r', '')
-        
+        def rawSchema = params.SCHEMA_DEFINITION.trim()
         def requestBodyMap = [:]
-        requestBodyMap.schema = escapedSchema
+        requestBodyMap.schema = rawSchema
+
         
         // Add schemaType field for non-Avro schemas
         if (schemaType != 'AVRO') {
