@@ -129,7 +129,7 @@ def consumeMessages() {
     def timeoutSeconds = params.TIMEOUT_SECONDS.toInteger()
     def composeDir = env.COMPOSE_DIR ?: params.COMPOSE_DIR
     def kafkaServer = env.KAFKA_SERVER ?: params.KAFKA_BOOTSTRAP_SERVER
-    
+    //group.id=${params.CONSUMER_GROUP_ID}
     def result = sh(
         script: """
             docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml exec -T broker bash -c '
@@ -142,7 +142,7 @@ def consumeMessages() {
                 
                 # Add consumer-specific settings to existing client config
                 cat >> ${env.CLIENT_CONFIG_FILE} << EOF
-group.id=${params.CONSUMER_GROUP_ID}
+
 auto.offset.reset=${params.OFFSET_RESET}
 enable.auto.commit=true
 auto.commit.interval.ms=1000
