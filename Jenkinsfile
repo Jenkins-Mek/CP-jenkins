@@ -15,8 +15,6 @@ pipeline {
     agent any
     
     environment {
-        COMPOSE_DIR = params.COMPOSE_DIR ?: '/confluent/cp-mysetup/cp-all-in-one'
-        KAFKA_SERVER = params.KAFKA_BOOTSTRAP_SERVER ?: 'localhost:9092'
         CLIENT_CONFIG_FILE = '/tmp/simple-consumer.properties'
         MESSAGES_FILE = 'consumed-messages.txt'
         STATS_FILE = 'consumption-stats.json'
@@ -26,6 +24,10 @@ pipeline {
         stage('Validate Input') {
             steps {
                 script {
+                    // Set environment variables with defaults
+                    env.COMPOSE_DIR = params.COMPOSE_DIR ?: '/confluent/cp-mysetup/cp-all-in-one'
+                    env.KAFKA_SERVER = params.KAFKA_BOOTSTRAP_SERVER ?: 'localhost:9092'
+                    
                     if (!params.TOPIC_NAME?.trim()) {
                         error("❌ TOPIC_NAME is required")
                     }
@@ -33,6 +35,8 @@ pipeline {
                     echo "📊 Consumer Group: ${params.CONSUMER_GROUP_ID}"
                     echo "⏰ Timeout: ${params.TIMEOUT_SECONDS}s"
                     echo "📝 Max Messages: ${params.MAX_MESSAGES}"
+                    echo "🏠 Compose Dir: ${env.COMPOSE_DIR}"
+                    echo "🌐 Kafka Server: ${env.KAFKA_SERVER}"
                 }
             }
         }
@@ -99,16 +103,19 @@ pipeline {
 
 def checkTopicExists() {
     try {
+        def composeDir = env.COMPOSE_DIR ?: params.COMPOSE_DIR
+        def kafkaServer = env.KAFKA_SERVER ?: params.KAFKA_BOOTSTRAP_SERVER
+        
         def result = sh(
             script: """
-                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml exec -T broker bash -c "
+                docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml exec -T broker bash -c "
                     export KAFKA_OPTS=''
                     export JMX_PORT=''
                     export KAFKA_JMX_OPTS=''
                     unset JMX_PORT
                     unset KAFKA_JMX_OPTS
                     unset KAFKA_OPTS
-                    kafka-topics --list --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} --command-config ${env.CLIENT_CONFIG_FILE} | grep -x '${params.TOPIC_NAME}'
+                    kafka-topics --list --bootstrap-server ${kafkaServer} --command-config ${env.CLIENT_CONFIG_FILE} | grep -x '${params.TOPIC_NAME}'
                 " 2>/dev/null
             """,
             returnStdout: true
@@ -124,10 +131,12 @@ def consumeMessages() {
     def maxMsgs = params.MAX_MESSAGES.toInteger()
     def maxMsgFlag = maxMsgs > 0 ? "--max-messages ${maxMsgs}" : ""
     def timeoutSeconds = params.TIMEOUT_SECONDS.toInteger()
+    def composeDir = env.COMPOSE_DIR ?: params.COMPOSE_DIR
+    def kafkaServer = env.KAFKA_SERVER ?: params.KAFKA_BOOTSTRAP_SERVER
     
     def result = sh(
         script: """
-            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml exec -T broker bash -c '
+            docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml exec -T broker bash -c '
                 # Completely disable JMX to avoid port conflicts
                 unset KAFKA_OPTS JMX_PORT KAFKA_JMX_OPTS KAFKA_HEAP_OPTS
                 export KAFKA_OPTS=""
@@ -151,7 +160,7 @@ EOF
 
                 # Consume messages with JMX disabled
                 timeout ${timeoutSeconds}s kafka-console-consumer \\
-                    --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                    --bootstrap-server ${kafkaServer} \\
                     --topic "${params.TOPIC_NAME}" \\
                     --consumer.config ${env.CLIENT_CONFIG_FILE} \\
                     ${maxMsgFlag} \\
@@ -169,8 +178,9 @@ EOF
 
 def cleanupClientConfig() {
     try {
+        def composeDir = env.COMPOSE_DIR ?: params.COMPOSE_DIR
         sh """
-            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml \\
             exec -T broker bash -c "rm -f ${env.CLIENT_CONFIG_FILE}" 2>/dev/null || true
         """
     } catch (Exception e) {
@@ -179,6 +189,9 @@ def cleanupClientConfig() {
 }
 
 def createKafkaClientConfig(username, password) {
+    def composeDir = env.COMPOSE_DIR ?: params.COMPOSE_DIR
+    def kafkaServer = env.KAFKA_SERVER ?: params.KAFKA_BOOTSTRAP_SERVER
+    
     def securityConfig = ""
     switch(params.SECURITY_PROTOCOL) {
         case 'SASL_PLAINTEXT':
@@ -203,9 +216,9 @@ sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule require
             break
     }
     sh """
-        docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+        docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml \\
         exec -T broker bash -c 'cat > ${env.CLIENT_CONFIG_FILE} << "EOF"
-bootstrap.servers=${params.KAFKA_BOOTSTRAP_SERVER}
+bootstrap.servers=${kafkaServer}
 ${securityConfig}
 EOF'
     """
