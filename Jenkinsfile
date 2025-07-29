@@ -161,7 +161,7 @@ EOF
                 # Consume messages with JMX disabled
                 timeout ${timeoutSeconds}s kafka-console-consumer \\
                     --bootstrap-server ${kafkaServer} \\
-                    --topic "${params.TOPIC_NAME}" \\
+                    --topic ${params.TOPIC_NAME} \\
                     --consumer.config ${env.CLIENT_CONFIG_FILE} \\
                     ${maxMsgFlag} \\
                     --property print.key=true \\
