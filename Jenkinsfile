@@ -6,16 +6,15 @@ properties([
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'localhost:9092', description: 'Kafka bootstrap server'),
         choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], description: 'Security protocol'),
         string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name'),
-        choice(name: 'INPUT_MODE', choices: ['Simple', 'Advanced'], defaultValue: 'Simple', description: 'Choose input method'),
+        choice(name: 'INPUT_MODE', choices: ['Simple', 'Advanced'], description: 'Choose input method'),
 
-        // 👇 Simple mode fields
+
         string(name: 'RETENTION_DAYS', defaultValue: '', description: 'Retention period (in days)'),
         choice(name: 'CLEANUP_POLICY', choices: ['delete', 'compact', 'delete,compact'], description: 'Kafka cleanup.policy'),
         string(name: 'SEGMENT_BYTES', defaultValue: '', description: 'Segment size in bytes (e.g. 1073741824)'),
         string(name: 'MIN_INSYNC_REPLICAS', defaultValue: '', description: 'Minimum in-sync replicas'),
         string(name: 'MAX_MESSAGE_BYTES', defaultValue: '', description: 'Maximum message size in bytes'),
 
-        // 👇 Advanced
         text(name: 'RAW_CONFIGS', defaultValue: '', description: 'Advanced mode: key=value,key=value (e.g. retention.ms=60000,cleanup.policy=compact)')
     ])
 ])
