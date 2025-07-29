@@ -87,6 +87,11 @@ def checkTopicExists() {
         def result = sh(
             script: """
                 docker compose -f ${env.COMPOSE_DIR}/docker-compose.yml exec -T broker bash -c '
+                    # Clear all JMX and monitoring related environment variables
+                    unset KAFKA_OPTS JMX_PORT KAFKA_JMX_OPTS KAFKA_HEAP_OPTS
+                    export KAFKA_OPTS=""
+                    export JMX_PORT=""
+                    
                     kafka-topics --bootstrap-server ${env.KAFKA_SERVER} --list | grep -x "${params.TOPIC_NAME}"
                 '
             """,
@@ -107,8 +112,12 @@ def consumeMessages() {
     def result = sh(
         script: """
             docker compose -f ${env.COMPOSE_DIR}/docker-compose.yml exec -T broker bash -c '
-                # Clear JVM options
-                unset KAFKA_OPTS JMX_PORT KAFKA_JMX_OPTS
+                # Completely disable JMX to avoid port conflicts
+                unset KAFKA_OPTS JMX_PORT KAFKA_JMX_OPTS KAFKA_HEAP_OPTS
+                export KAFKA_OPTS=""
+                export JMX_PORT=""
+                export KAFKA_JMX_OPTS=""
+                export KAFKA_HEAP_OPTS=""
                 
                 # Create simple consumer properties
                 cat > /tmp/simple-consumer.properties << EOF
@@ -126,7 +135,7 @@ session.timeout.ms=30000
 heartbeat.interval.ms=3000
 EOF
 
-                # Consume messages
+                # Consume messages with JMX disabled
                 timeout ${timeoutSeconds}s kafka-console-consumer \\
                     --bootstrap-server ${env.KAFKA_SERVER} \\
                     --topic "${params.TOPIC_NAME}" \\
