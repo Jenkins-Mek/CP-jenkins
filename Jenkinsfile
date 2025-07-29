@@ -7,7 +7,8 @@ properties([
         text(name: 'MESSAGE_DATA', defaultValue: '{"message": "Hello World", "timestamp": "2024-01-01T00:00:00Z"}', description: 'Message data (JSON format for single message, or multiple lines for multiple messages)'),
         string(name: 'MESSAGE_COUNT', defaultValue: '1', description: 'Number of messages to produce (will repeat the message data)'),
         booleanParam(name: 'USE_FILE_INPUT', defaultValue: false, description: 'Use file input instead of parameter data'),
-        string(name: 'INPUT_FILE_PATH', defaultValue: '/tmp/input-messages.json', description: 'Path to input file (only used when USE_FILE_INPUT is true)')
+        string(name: 'INPUT_FILE_PATH', defaultValue: '/tmp/input-messages.json', description: 'Path to input file (only used when USE_FILE_INPUT is true)'),
+        booleanParam(name: 'CLEAN_WORKSPACE', defaultValue: false, description: 'Clean workspace before build (use if Git issues occur)')
     ])
 ])
 
@@ -21,6 +22,23 @@ pipeline {
     }
 
     stages {
+        stage('Workspace Cleanup') {
+            when {
+                anyOf {
+                    params.CLEAN_WORKSPACE == true
+                    // Automatically clean if we detect Git issues
+                    expression { 
+                        return fileExists('.git/index') && sh(script: 'test -s .git/index', returnStatus: true) != 0
+                    }
+                }
+            }
+            steps {
+                echo "🧹 Cleaning workspace due to Git corruption or manual request..."
+                deleteDir()
+                echo "✅ Workspace cleaned successfully"
+            }
+        }
+
         stage('Validate Input') {
             steps {
                 script {
@@ -41,6 +59,21 @@ pipeline {
                     echo "   Topic: ${params.TOPIC_NAME}"
                     echo "   Mode: Simple String Producer"
                     echo "   Message Count: ${messageCount}"
+                }
+            }
+        }
+
+        stage('Docker Environment Check') {
+            steps {
+                script {
+                    try {
+                        sh """
+                            docker compose --project-directory '${params.COMPOSE_DIR}' -f '${params.COMPOSE_DIR}/docker-compose.yml' ps broker
+                        """
+                        echo "✅ Docker Compose environment is running"
+                    } catch (Exception e) {
+                        error("❌ Docker Compose environment is not accessible. Please ensure the Kafka cluster is running.\nError: ${e.getMessage()}")
+                    }
                 }
             }
         }
@@ -100,6 +133,7 @@ pipeline {
         failure {
             script {
                 echo "❌ Message production failed. Check the logs above for details."
+                echo "💡 If you encountered Git issues, try running the build again with 'CLEAN_WORKSPACE' parameter set to true."
             }
         }
     }
@@ -122,6 +156,11 @@ value.serializer=org.apache.kafka.common.serialization.StringSerializer
 security.protocol=${params.SECURITY_PROTOCOL}
 sasl.mechanism=PLAIN
 sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
+acks=all
+retries=3
+batch.size=16384
+linger.ms=1
+buffer.memory=33554432
 PRODUCER_EOF
                     
                     echo "Producer configuration:"
@@ -147,6 +186,7 @@ PRODUCER_EOF
                     echo "   Topic: ${topicName}"
                     echo "   Producer Mode: Simple String Producer"
                     echo "   Serializer: StringSerializer"
+                    echo "   Throughput: \$(( MESSAGE_COUNT / (DURATION + 1) )) messages/second"
                 '
             """,
             returnStdout: true
@@ -196,6 +236,7 @@ def prepareMessageDataFromFile() {
             if [ -f "${params.INPUT_FILE_PATH}" ]; then
                 cp "${params.INPUT_FILE_PATH}" "${env.MESSAGE_DATA_FILE}"
                 echo "✅ Message data copied from ${params.INPUT_FILE_PATH}"
+                echo "File contains \$(wc -l < "${env.MESSAGE_DATA_FILE}") messages"
             else
                 echo "❌ Input file ${params.INPUT_FILE_PATH} not found"
                 exit 1
