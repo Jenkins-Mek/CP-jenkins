@@ -1,10 +1,12 @@
+import groovy.json.JsonOutput
+
 properties([
     parameters([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'localhost:9092', description: 'Kafka bootstrap server'),
-        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], defaultValue: 'SASL_PLAINTEXT', description: 'Kafka security protocol'),
+        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], description: 'Kafka security protocol'),
         string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name to produce messages to'),
-        choice(name: 'SCHEMA_TYPE', choices: ['JSON_SCHEMA', 'AVRO_SCHEMA', 'PROTOBUF_SCHEMA'], defaultValue: 'JSON_SCHEMA', description: 'Schema type for message serialization'),
+        choice(name: 'SCHEMA_TYPE', choices: ['JSON_SCHEMA', 'AVRO_SCHEMA', 'PROTOBUF_SCHEMA'], description: 'Schema type for message serialization'),
         string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://schema-registry:8081', description: 'Schema Registry URL'),
         string(name: 'SCHEMA_SUBJECT', defaultValue: '', description: 'Schema subject name (optional - defaults to topic-value)'),
         text(name: 'SCHEMA_DEFINITION', defaultValue: '', description: 'Schema definition (JSON Schema/Avro/Protobuf format)'),
@@ -303,29 +305,38 @@ SCHEMA_EOF
     """
 }
 
-def registerSchema(schemaSubject) {
-    try {
-        def schemaPayload = prepareSchemaPayload()
-        sh """
+def registerSchema() {
+    def requestBodyMap = (params.SCHEMA_TYPE == 'AVRO') ?
+        [schema: params.SCHEMA_CONTENT] :
+        [schemaType: params.SCHEMA_TYPE, schema: params.SCHEMA_CONTENT]
+
+    def requestBody = JsonOutput.toJson(requestBodyMap)
+
+    echo "📦 Final request body: ${requestBody}"
+
+    def response = sh(
+        script: """
             docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
             exec -T schema-registry bash -c '
-                echo "Registering schema for subject: ${schemaSubject}"
-                RESPONSE=\$(curl -s -X POST \\
-                    -H "Content-Type: application/vnd.schemaregistry.v1+json" \\
-                    --data "${schemaPayload}" \\
-                    ${params.SCHEMA_REGISTRY_URL}/subjects/${schemaSubject}/versions)
-                
-                if echo "\$RESPONSE" | grep -q "id"; then
-                    SCHEMA_ID=\$(echo "\$RESPONSE" | grep -o \'"id":[0-9]*\' | cut -d: -f2)
-                    echo "✅ Schema registered successfully with ID: \$SCHEMA_ID"
-                else
-                    echo "❌ Schema registration failed: \$RESPONSE"
-                    exit 1
-                fi
+                curl -s -w "\\n%{http_code}" -X POST \\
+                -H "Content-Type: application/vnd.schemaregistry.v1+json" \\
+                --data '${requestBody}' \\
+                ${params.SCHEMA_REGISTRY_URL}/subjects/${params.SUBJECT_NAME}/versions
             '
-        """
-    } catch (Exception e) {
-        error("❌ Schema registration failed: ${e.getMessage()}")
+        """,
+        returnStdout: true
+    ).trim()
+
+    def lines = response.split('\n')
+    def httpCode = lines[-1]
+    def responseBody = lines.size() > 1 ? lines[0..-2].join('\n') : ''
+
+    echo "📤 Registration response: ${responseBody}"
+
+    if (httpCode.startsWith('2')) {
+        echo "✅ Schema registered successfully (HTTP ${httpCode})"
+    } else {
+        error("❌ Schema registration failed (HTTP ${httpCode}): ${responseBody}")
     }
 }
 
