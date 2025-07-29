@@ -3,8 +3,8 @@ properties([
         string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name (required)'),
         string(name: 'CONSUMER_GROUP_ID', defaultValue: 'jenkins-simple-consumer', description: 'Consumer group ID'),
         string(name: 'MAX_MESSAGES', defaultValue: '100', description: 'Max messages to consume (0 = unlimited)'),
-        choice(name: 'OFFSET_RESET', choices: ['latest', 'earliest'], defaultValue: 'latest', description: 'Where to start consuming'),
-        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL', 'PLAINTEXT'], defaultValue: 'SASL_PLAINTEXT', description: 'Security protocol'),
+        choice(name: 'OFFSET_RESET', choices: ['latest', 'earliest'], description: 'Where to start consuming'),
+        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL', 'PLAINTEXT'], description: 'Security protocol'),
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'localhost:9092', description: 'Kafka bootstrap server'),
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker compose directory'),
         string(name: 'TIMEOUT_SECONDS', defaultValue: '30', description: 'Consumer timeout in seconds')
@@ -75,7 +75,6 @@ pipeline {
                     def duration = endTime - startTime
                     
                     saveMessages(messages, duration)
-                    generateStats(messages, duration)
                 }
             }
         }
@@ -283,27 +282,4 @@ Value: ${parts[2]}
     
     writeFile file: env.MESSAGES_FILE, text: content
     echo "✅ Saved ${messageCount} messages to ${env.MESSAGES_FILE}"
-}
-
-def generateStats(messages, duration) {
-    def messageLines = messages.split('\n')
-        .findAll { line -> 
-            def trimmed = line.trim()
-            return trimmed && trimmed.contains('|') && 
-                   !trimmed.contains('ERROR') && 
-                   !trimmed.contains('Consumer finished')
-        }
-    
-    def stats = [
-        topic: params.TOPIC_NAME,
-        consumerGroup: params.CONSUMER_GROUP_ID,
-        messageCount: messageLines.size(),
-        durationMs: duration,
-        offsetReset: params.OFFSET_RESET,
-        maxMessages: params.MAX_MESSAGES,
-        timestamp: new Date().format('yyyy-MM-dd HH:mm:ss')
-    ]
-    
-    def statsJson = groovy.json.JsonBuilder(stats).toPrettyString()
-    writeFile file: env.STATS_FILE, text: statsJson
 }
