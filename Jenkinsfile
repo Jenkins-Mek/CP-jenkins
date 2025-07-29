@@ -1,4 +1,4 @@
-@Library('kafka-ops-shared-lib') _
+//@Library('kafka-ops-shared-lib') _
 
 properties([
     parameters([
@@ -29,7 +29,7 @@ pipeline {
                             passwordVariable: 'KAFKA_PASSWORD'
                         )
                     ]) {
-                        confluentOps.createKafkaClientConfig(env.KAFKA_USERNAME, env.KAFKA_PASSWORD)
+                        createKafkaClientConfig(env.KAFKA_USERNAME, env.KAFKA_PASSWORD)
                     }
                     echo "✅ Client configuration created"
                 }
@@ -40,14 +40,14 @@ pipeline {
             steps {
                 script {
                     echo "📋 Retrieving Kafka topics..."
-                    def topics = confluentOps.listKafkaTopics()
+                    def topics = listKafkaTopics()
 
                     if (topics.size() > 0) {
                         echo "✅ Found ${topics.size()} topic(s)"
                         topics.eachWithIndex { topic, index ->
                             echo "  ${index + 1}. ${topic}"
                         }
-                        confluentOps.saveTopicsToFile(topics)
+                        saveTopicsToFile(topics)
                     } else {
                         echo "⚠️ No topics found"
                         writeFile file: env.TOPICS_LIST_FILE, text: "# No topics found\n"
@@ -71,8 +71,87 @@ pipeline {
         }
         always {
             script {
-                confluentOps.cleanupClientConfig()
+                cleanupClientConfig()
             }
         }
+    }
+}
+
+def createKafkaClientConfig(username, password) {
+    def securityConfig = ""
+
+    switch(params.SECURITY_PROTOCOL) {
+        case 'SASL_PLAINTEXT':
+        case 'SASL_SSL':
+            securityConfig = """
+security.protocol=${params.SECURITY_PROTOCOL}
+sasl.mechanism=PLAIN
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
+"""
+            break
+        default:
+            securityConfig = """
+security.protocol=SASL_PLAINTEXT
+sasl.mechanism=PLAIN
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
+"""
+            break
+    }
+
+    sh """
+        docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+        exec -T broker bash -c 'cat > ${env.CLIENT_CONFIG_FILE} << "EOF"
+bootstrap.servers=${params.KAFKA_BOOTSTRAP_SERVER}
+${securityConfig}
+EOF'
+    """
+}
+
+def listKafkaTopics() {
+    def topicsOutput = sh(
+        script: """
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            exec -T broker bash -c "
+                export KAFKA_OPTS=''
+                export JMX_PORT=''
+                export KAFKA_JMX_OPTS=''
+                unset JMX_PORT
+                unset KAFKA_JMX_OPTS
+                unset KAFKA_OPTS
+                kafka-topics --list --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} --command-config ${env.CLIENT_CONFIG_FILE}
+            " 2>/dev/null
+        """,
+        returnStdout: true
+    ).trim()
+
+    def allTopics = topicsOutput.split('\n').findAll { it.trim() != '' && !it.startsWith('WARNING') && !it.contains('FATAL') }
+    return params.INCLUDE_INTERNAL ? allTopics : allTopics.findAll { !it.startsWith('_') }
+}
+
+def saveTopicsToFile(topics) {
+    def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
+    def textContent = """# Kafka Topics List
+# Generated: ${timestamp}
+# Total topics: ${topics.size()}
+# Include internal: ${params.INCLUDE_INTERNAL}
+# Bootstrap server: ${params.KAFKA_BOOTSTRAP_SERVER}
+# Security protocol: ${params.SECURITY_PROTOCOL}
+
+"""
+    topics.each { topic ->
+        textContent += "${topic}\n"
+    }
+
+    writeFile file: env.TOPICS_LIST_FILE, text: textContent
+}
+
+def cleanupClientConfig() {
+    try {
+        sh """
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            exec -T broker bash -c "rm -f ${env.CLIENT_CONFIG_FILE}" 2>/dev/null || true
+        """
+    } catch (Exception e) {
+        // Ignore cleanup errors
     }
 }
