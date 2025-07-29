@@ -84,10 +84,7 @@ pipeline {
         success {
             archiveArtifacts artifacts: "${env.MESSAGES_FILE}, ${env.STATS_FILE}", allowEmptyArchive: true
             echo "✅ Message consumption completed!"
-            script {
-                def stats = readFile(env.STATS_FILE)
-                echo "📊 Summary:\n${stats}"
-            }
+
         }
         failure {
             echo "❌ Message consumption failed"
@@ -146,15 +143,11 @@ def consumeMessages() {
                 # Add consumer-specific settings to existing client config
                 cat >> ${env.CLIENT_CONFIG_FILE} << EOF
 group.id=${params.CONSUMER_GROUP_ID}
-key.deserializer=org.apache.kafka.common.serialization.StringDeserializer
-value.deserializer=org.apache.kafka.common.serialization.StringDeserializer
 auto.offset.reset=${params.OFFSET_RESET}
 enable.auto.commit=true
 auto.commit.interval.ms=1000
 session.timeout.ms=30000
 heartbeat.interval.ms=3000
-# Disable JMX to avoid port conflicts
-jmx.port=
 EOF
 
                 # Consume messages with JMX disabled
@@ -251,7 +244,7 @@ def saveMessages(messages, duration) {
 """
 
     if (messageCount == 0) {
-        content += """⚠️ No messages found.
+        content += """No messages found.
 
 Possible reasons:
 - Topic is empty
@@ -281,5 +274,5 @@ Value: ${parts[2]}
     }
     
     writeFile file: env.MESSAGES_FILE, text: content
-    echo "✅ Saved ${messageCount} messages to ${env.MESSAGES_FILE}"
+    echo "Saved ${messageCount} messages to ${env.MESSAGES_FILE}"
 }
