@@ -14,22 +14,6 @@ pipeline {
     agent any
 
     stages {
-        stage('List Available Subjects') {
-            steps {
-                script {
-                    listSubjects()
-                }
-            }
-        }
-
-        stage('List Available Topics') {
-            steps {
-                script {
-                    listTopics()
-                }
-            }
-        }
-
         stage('Validate Input') {
             steps {
                 script {
@@ -58,22 +42,6 @@ pipeline {
             }
         }
 
-        stage('Check Subject Exists') {
-            steps {
-                script {
-                    checkSubjectExists()
-                }
-            }
-        }
-
-        stage('Check Topic Exists') {
-            steps {
-                script {
-                    checkTopicExists()
-                }
-            }
-        }
-
         stage('Register Schema') {
             steps {
                 script {
@@ -89,14 +57,6 @@ pipeline {
                 }
             }
         }
-
-        stage('Show Consumer Commands') {
-            steps {
-                script {
-                    showConsumerCommands()
-                }
-            }
-        }
     }
 
     post {
@@ -107,126 +67,6 @@ pipeline {
             echo "❌ Schema registration failed for subject: ${env.SUBJECT_NAME}"
         }
     }
-}
-
-def listSubjects() {
-    echo "📋 Listing existing schema subjects..."
-    def subjects = sh(
-        script: """
-            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T schema-registry bash -c '
-                curl -s http://localhost:8081/subjects
-            '
-        """,
-        returnStdout: true
-    ).trim()
-    
-    echo "Existing schema subjects:"
-    if (subjects && subjects != '[]') {
-        def jsonSlurper = new groovy.json.JsonSlurper()
-        try {
-            def subjectList = jsonSlurper.parseText(subjects)
-            subjectList.each { subject ->
-                echo "  - ${subject}"
-            }
-        } catch (Exception e) {
-            echo "  Raw response: ${subjects}"
-        }
-    } else {
-        echo "  No subjects found"
-    }
-}
-
-def listTopics() {
-    echo "📋 Listing available topics..."
-    def topics = sh(
-        script: """
-            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T broker bash -c '
-                kafka-topics --list --bootstrap-server localhost:9092
-            '
-        """,
-        returnStdout: true
-    ).trim()
-    
-    echo "Available topics:"
-    topics.split('\n').each { topic ->
-        echo "  - ${topic}"
-    }
-}
-
-def checkSubjectExists() {
-    echo "🔍 Checking if subject '${env.SUBJECT_NAME}' already exists..."
-    def response = sh(
-        script: """
-            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T schema-registry bash -c '
-                curl -s -w "\\n%{http_code}" ${params.SCHEMA_REGISTRY_URL}/subjects/${env.SUBJECT_NAME}/versions/latest
-            '
-        """,
-        returnStdout: true
-    ).trim()
-    
-    def lines = response.split('\n')
-    def httpCode = lines[-1]
-    
-    if (httpCode == '404') {
-        echo "✅ Subject '${env.SUBJECT_NAME}' does not exist - ready for registration"
-    } else if (httpCode.startsWith('2')) {
-        def responseBody = lines.size() > 1 ? lines[0..-2].join('\n') : ''
-        echo "⚠️ Subject '${env.SUBJECT_NAME}' already exists:"
-        echo "   Response: ${responseBody}"
-        
-        def userInput = input(
-            message: "Subject '${env.SUBJECT_NAME}' already exists. What would you like to do?",
-            parameters: [
-                choice(name: 'ACTION', choices: ['Continue (add new version)', 'Abort'], description: 'Choose action')
-            ]
-        )
-        
-        if (userInput == 'Abort') {
-            error("❌ User chose to abort - subject already exists")
-        } else {
-            echo "✅ User chose to continue - will register new version"
-        }
-    } else {
-        echo "⚠️ Unexpected response checking subject existence (HTTP ${httpCode})"
-    }
-}
-
-def checkTopicExists() {
-    echo "🔍 Checking if topic '${params.TOPIC_NAME}' exists..."
-    def topics = sh(
-        script: """
-            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T broker bash -c '
-                kafka-topics --list --bootstrap-server localhost:9092
-            '
-        """,
-        returnStdout: true
-    ).trim()
-    
-    if (!topics.split('\n').contains(params.TOPIC_NAME)) {
-        echo "⚠️ Topic '${params.TOPIC_NAME}' does not exist. Creating topic..."
-        createTopic()
-    } else {
-        echo "✅ Topic '${params.TOPIC_NAME}' exists"
-    }
-}
-
-def createTopic() {
-    def response = sh(
-        script: """
-            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T broker bash -c '
-                kafka-topics --create --topic ${params.TOPIC_NAME} --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1
-            '
-        """,
-        returnStdout: true
-    ).trim()
-    
-    echo "📝 Topic creation response: ${response}"
-    echo "✅ Topic '${params.TOPIC_NAME}' created successfully"
 }
 
 def registerSchema() {
@@ -292,52 +132,4 @@ def verifySchemaRegistration() {
     } else {
         error("❌ Schema verification failed: ${response}")
     }
-}
-
-def showConsumerCommands() {
-    echo "\n🚀 Consumer Commands for your registered schema:"
-    echo "=" * 60
-    
-    if (params.SCHEMA_TYPE == 'AVRO') {
-        echo "📝 Avro Consumer Command:"
-        echo """
-docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-    exec -T broker bash -c "
-        kafka-avro-console-consumer --bootstrap-server localhost:9092 \\
-        --topic ${params.TOPIC_NAME} --from-beginning \\
-        --property schema.registry.url=${params.SCHEMA_REGISTRY_URL}
-    "
-        """
-    } else if (params.SCHEMA_TYPE == 'JSON') {
-        echo "📝 JSON Schema Consumer Command:"
-        echo """
-docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-    exec -T broker bash -c "
-        kafka-json-schema-console-consumer --bootstrap-server localhost:9092 \\
-        --topic ${params.TOPIC_NAME} --from-beginning \\
-        --property schema.registry.url=${params.SCHEMA_REGISTRY_URL}
-    "
-        """
-    } else if (params.SCHEMA_TYPE == 'PROTOBUF') {
-        echo "📝 Protobuf Consumer Command:"
-        echo """
-docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-    exec -T broker bash -c "
-        kafka-protobuf-console-consumer --bootstrap-server localhost:9092 \\
-        --topic ${params.TOPIC_NAME} --from-beginning \\
-        --property schema.registry.url=${params.SCHEMA_REGISTRY_URL}
-    "
-        """
-    }
-    
-    echo "\n📝 Regular Console Consumer (without schema validation):"
-    echo """
-docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-    exec -T broker bash -c "
-        kafka-console-consumer --bootstrap-server localhost:9092 \\
-        --topic ${params.TOPIC_NAME} --from-beginning
-    "
-    """
-    
-    echo "=" * 60
 }
