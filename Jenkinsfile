@@ -1,13 +1,9 @@
-//@Library('kafka-ops-shared-lib') _
-
 properties([
     parameters([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'localhost:9092', description: 'Kafka bootstrap server'),
         choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], defaultValue: 'SASL_PLAINTEXT', description: 'Kafka security protocol'),
         string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name to produce messages to'),
-        choice(name: 'PRODUCER_MODE', choices: ['WITHOUT_SCHEMA', 'WITH_JSON_SCHEMA', 'WITH_AVRO_SCHEMA', 'WITH_PROTOBUF_SCHEMA'], description: 'Message production mode'),
-        string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://schema-registry:8081', description: 'Schema Registry URL (only used when schema is enabled)'),
         text(name: 'MESSAGE_DATA', defaultValue: '{"message": "Hello World", "timestamp": "2024-01-01T00:00:00Z"}', description: 'Message data (JSON format for single message, or multiple lines for multiple messages)'),
         string(name: 'MESSAGE_COUNT', defaultValue: '1', description: 'Number of messages to produce (will repeat the message data)'),
         booleanParam(name: 'USE_FILE_INPUT', defaultValue: false, description: 'Use file input instead of parameter data'),
@@ -31,19 +27,19 @@ pipeline {
                     if (!params.TOPIC_NAME?.trim()) {
                         error("❌ TOPIC_NAME parameter is required to produce messages.")
                     }
-                    
+
                     if (params.MESSAGE_COUNT && !params.MESSAGE_COUNT.isNumber()) {
                         error("❌ MESSAGE_COUNT must be a valid number")
                     }
-                    
+
                     def messageCount = params.MESSAGE_COUNT.toInteger()
                     if (messageCount <= 0 || messageCount > 10000) {
                         error("❌ MESSAGE_COUNT must be between 1 and 10000")
                     }
-                    
+
                     echo "✅ Parameters validated successfully"
                     echo "   Topic: ${params.TOPIC_NAME}"
-                    echo "   Mode: ${params.PRODUCER_MODE}"
+                    echo "   Mode: Simple String Producer"
                     echo "   Message Count: ${messageCount}"
                 }
             }
@@ -69,18 +65,6 @@ pipeline {
                         echo "📝 Using parameter input data"
                         prepareMessageDataFromParameter()
                     }
-                }
-            }
-        }
-
-        stage('Validate Schema Registry') {
-            when {
-                expression { params.PRODUCER_MODE != 'WITHOUT_SCHEMA' }
-            }
-            steps {
-                script {
-                    echo "🔍 Validating Schema Registry connection..."
-                    validateSchemaRegistry()
                 }
             }
         }
@@ -123,9 +107,6 @@ pipeline {
 
 def produceKafkaMessages(topicName, username, password) {
     try {
-        // Determine serializer based on producer mode
-        def valueSerializer = getValueSerializer(params.PRODUCER_MODE)
-        
         def produceOutput = sh(
             script: """
                 docker compose --project-directory '${params.COMPOSE_DIR}' -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
@@ -137,11 +118,10 @@ def produceKafkaMessages(topicName, username, password) {
                     cat > /tmp/producer.properties << "PRODUCER_EOF"
 bootstrap.servers=${params.KAFKA_BOOTSTRAP_SERVER}
 key.serializer=org.apache.kafka.common.serialization.StringSerializer
-value.serializer=${valueSerializer}
+value.serializer=org.apache.kafka.common.serialization.StringSerializer
 security.protocol=${params.SECURITY_PROTOCOL}
 sasl.mechanism=PLAIN
 sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
-${getSchemaRegistryConfig()}
 PRODUCER_EOF
                     
                     echo "Producer configuration:"
@@ -165,8 +145,8 @@ PRODUCER_EOF
                     echo ""
                     echo "✅ Successfully produced \$MESSAGE_COUNT messages in \$DURATION seconds"
                     echo "   Topic: ${topicName}"
-                    echo "   Producer Mode: ${params.PRODUCER_MODE}"
-                    echo "   Serializer: ${valueSerializer}"
+                    echo "   Producer Mode: Simple String Producer"
+                    echo "   Serializer: StringSerializer"
                 '
             """,
             returnStdout: true
@@ -177,26 +157,6 @@ PRODUCER_EOF
     } catch (Exception e) {
         return "ERROR: Failed to produce messages to topic '${topicName}' - ${e.getMessage()}"
     }
-}
-
-def getValueSerializer(producerMode) {
-    switch (producerMode.toLowerCase()) {
-        case 'with_json_schema':
-            return 'io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializer'
-        case 'with_avro_schema':
-            return 'io.confluent.kafka.serializers.KafkaAvroSerializer'
-        case 'with_protobuf_schema':
-            return 'io.confluent.kafka.serializers.protobuf.KafkaProtobufSerializer'
-        default:
-            return 'org.apache.kafka.common.serialization.StringSerializer'
-    }
-}
-
-def getSchemaRegistryConfig() {
-    if (params.PRODUCER_MODE != 'WITHOUT_SCHEMA') {
-        return "schema.registry.url=${params.SCHEMA_REGISTRY_URL}"
-    }
-    return ""
 }
 
 def createKafkaClientConfig(username, password) {
@@ -263,35 +223,15 @@ def prepareMessageDataFromParameter() {
     """
 }
 
-def validateSchemaRegistry() {
-    try {
-        sh """
-            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T schema-registry bash -c '
-                RESPONSE=\$(curl -s -o /dev/null -w "%{http_code}" ${params.SCHEMA_REGISTRY_URL}/subjects 2>/dev/null)
-                if [ "\$RESPONSE" = "200" ]; then
-                    echo "✅ Schema Registry is accessible at ${params.SCHEMA_REGISTRY_URL}"
-                else
-                    echo "❌ Schema Registry is not accessible (HTTP \$RESPONSE)"
-                    exit 1
-                fi
-            '
-        """
-    } catch (Exception e) {
-        error("❌ Schema Registry validation failed: ${e.getMessage()}")
-    }
-}
-
 def saveProducerResults(result) {
     def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
-    def content = """# Kafka Message Producer Results
+    def content = """# Kafka Message Producer Results (Simple String Producer)
 # Generated: ${timestamp}
 # Topic: ${params.TOPIC_NAME}
-# Producer Mode: ${params.PRODUCER_MODE}
+# Producer Mode: Simple String Producer
 # Message Count: ${params.MESSAGE_COUNT}
 # Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
 # Security Protocol: ${params.SECURITY_PROTOCOL}
-# Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
 
 ================================================================================
 PRODUCER EXECUTION RESULTS
@@ -304,11 +244,10 @@ CONFIGURATION SUMMARY
 ================================================================================
 
 Topic Name: ${params.TOPIC_NAME}
-Producer Mode: ${params.PRODUCER_MODE}
+Producer Mode: Simple String Producer
 Message Count: ${params.MESSAGE_COUNT}
 Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
 Security Protocol: ${params.SECURITY_PROTOCOL}
-Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
 Use File Input: ${params.USE_FILE_INPUT}
 Input File Path: ${params.INPUT_FILE_PATH}
 
