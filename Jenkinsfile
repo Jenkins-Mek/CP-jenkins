@@ -4,6 +4,7 @@ properties([
         string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://localhost:8081', description: 'Schema Registry URL'),
         string(name: 'TOPIC_NAME', defaultValue: '', description: 'Topic name (e.g., test-topic, user-topic)'),
         choice(name: 'SCHEMA_FOR', choices: ['value', 'key'], description: 'Schema for key or value'),
+        string(name: 'CUSTOM_SUBJECT_NAME', defaultValue: '', description: 'Custom subject name (optional - if empty, will use {topic-name}-{key|value})'),
         choice(name: 'SCHEMA_TYPE', choices: ['AVRO', 'JSON', 'PROTOBUF'], description: 'Schema type'),
         text(name: 'SCHEMA_CONTENT', defaultValue: '', description: 'Schema content (JSON for Avro/JSON, proto definition for Protobuf)')
     ])
@@ -13,6 +14,14 @@ pipeline {
     agent any
 
     stages {
+        stage('List Available Subjects') {
+            steps {
+                script {
+                    listSubjects()
+                }
+            }
+        }
+
         stage('List Available Topics') {
             steps {
                 script {
@@ -31,14 +40,28 @@ pipeline {
                         error("SCHEMA_CONTENT is required")
                     }
                     
-                    // Generate subject name from topic and schema type
-                    env.SUBJECT_NAME = "${params.TOPIC_NAME}-${params.SCHEMA_FOR}"
+                    // Generate subject name - use custom if provided, otherwise use standard naming
+                    if (params.CUSTOM_SUBJECT_NAME?.trim()) {
+                        env.SUBJECT_NAME = params.CUSTOM_SUBJECT_NAME.trim()
+                        echo "📋 Using custom subject name: ${env.SUBJECT_NAME}"
+                    } else {
+                        env.SUBJECT_NAME = "${params.TOPIC_NAME}-${params.SCHEMA_FOR}"
+                        echo "📋 Using standard subject name: ${env.SUBJECT_NAME}"
+                    }
                     
                     echo "✅ Input validation passed"
                     echo "📋 Topic: ${params.TOPIC_NAME}"
                     echo "📋 Subject: ${env.SUBJECT_NAME}"
                     echo "📝 Schema Type: ${params.SCHEMA_TYPE}"
                     echo "🔑 Schema For: ${params.SCHEMA_FOR}"
+                }
+            }
+        }
+
+        stage('Check Subject Exists') {
+            steps {
+                script {
+                    checkSubjectExists()
                 }
             }
         }
@@ -86,6 +109,34 @@ pipeline {
     }
 }
 
+def listSubjects() {
+    echo "📋 Listing existing schema subjects..."
+    def subjects = sh(
+        script: """
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            exec -T schema-registry bash -c '
+                curl -s http://localhost:8081/subjects
+            '
+        """,
+        returnStdout: true
+    ).trim()
+    
+    echo "Existing schema subjects:"
+    if (subjects && subjects != '[]') {
+        def jsonSlurper = new groovy.json.JsonSlurper()
+        try {
+            def subjectList = jsonSlurper.parseText(subjects)
+            subjectList.each { subject ->
+                echo "  - ${subject}"
+            }
+        } catch (Exception e) {
+            echo "  Raw response: ${subjects}"
+        }
+    } else {
+        echo "  No subjects found"
+    }
+}
+
 def listTopics() {
     echo "📋 Listing available topics..."
     def topics = sh(
@@ -101,6 +152,45 @@ def listTopics() {
     echo "Available topics:"
     topics.split('\n').each { topic ->
         echo "  - ${topic}"
+    }
+}
+
+def checkSubjectExists() {
+    echo "🔍 Checking if subject '${env.SUBJECT_NAME}' already exists..."
+    def response = sh(
+        script: """
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            exec -T schema-registry bash -c '
+                curl -s -w "\\n%{http_code}" ${params.SCHEMA_REGISTRY_URL}/subjects/${env.SUBJECT_NAME}/versions/latest
+            '
+        """,
+        returnStdout: true
+    ).trim()
+    
+    def lines = response.split('\n')
+    def httpCode = lines[-1]
+    
+    if (httpCode == '404') {
+        echo "✅ Subject '${env.SUBJECT_NAME}' does not exist - ready for registration"
+    } else if (httpCode.startsWith('2')) {
+        def responseBody = lines.size() > 1 ? lines[0..-2].join('\n') : ''
+        echo "⚠️ Subject '${env.SUBJECT_NAME}' already exists:"
+        echo "   Response: ${responseBody}"
+        
+        def userInput = input(
+            message: "Subject '${env.SUBJECT_NAME}' already exists. What would you like to do?",
+            parameters: [
+                choice(name: 'ACTION', choices: ['Continue (add new version)', 'Abort'], description: 'Choose action')
+            ]
+        )
+        
+        if (userInput == 'Abort') {
+            error("❌ User chose to abort - subject already exists")
+        } else {
+            echo "✅ User chose to continue - will register new version"
+        }
+    } else {
+        echo "⚠️ Unexpected response checking subject existence (HTTP ${httpCode})"
     }
 }
 
