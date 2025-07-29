@@ -314,7 +314,7 @@ def registerSchema(schemaSubject) {
                     -H "Content-Type: application/vnd.schemaregistry.v1+json" \\
                     --data "${schemaPayload}" \\
                     ${params.SCHEMA_REGISTRY_URL}/subjects/${schemaSubject}/versions)
-                
+
                 if echo "\$RESPONSE" | grep -q "id"; then
                     SCHEMA_ID=\$(echo "\$RESPONSE" | grep -o \'"id":[0-9]*\' | cut -d: -f2)
                     echo "✅ Schema registered successfully with ID: \$SCHEMA_ID"
@@ -336,7 +336,7 @@ def validateExistingSchema(schemaSubject) {
             exec -T schema-registry bash -c '
                 echo "Validating existing schema for subject: ${schemaSubject}"
                 RESPONSE=\$(curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${schemaSubject}/versions/latest)
-                
+
                 if echo "\$RESPONSE" | grep -q "schema"; then
                     SCHEMA_ID=\$(echo "\$RESPONSE" | grep -o \'"id":[0-9]*\' | cut -d: -f2)
                     echo "✅ Schema found with ID: \$SCHEMA_ID"
