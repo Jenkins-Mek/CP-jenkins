@@ -305,38 +305,56 @@ SCHEMA_EOF
     """
 }
 
-def registerSchema() {
-    def requestBodyMap = (params.SCHEMA_TYPE == 'AVRO') ?
-        [schema: params.SCHEMA_CONTENT] :
-        [schemaType: params.SCHEMA_TYPE, schema: params.SCHEMA_CONTENT]
+def registerSchema(schemaSubject) {
+    try {
+        // Prepare the schema payload based on schema type
+        def schemaType = params.SCHEMA_TYPE.replace('_SCHEMA', '').toUpperCase()
+        def escapedSchema = params.SCHEMA_DEFINITION.replace('"', '\\"').replace('\n', '\\n').replace('\r', '')
+        
+        def requestBodyMap = [:]
+        requestBodyMap.schema = escapedSchema
+        
+        // Add schemaType field for non-Avro schemas
+        if (schemaType != 'AVRO') {
+            requestBodyMap.schemaType = schemaType
+        }
+        
+        def requestBody = JsonOutput.toJson(requestBodyMap)
+        
+        echo "📦 Registering schema for subject: ${schemaSubject}"
+        echo "📦 Schema type: ${schemaType}"
+        
+        def response = sh(
+            script: """
+                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+                exec -T schema-registry bash -c '
+                    curl -s -w "\\n%{http_code}" -X POST \\
+                    -H "Content-Type: application/vnd.schemaregistry.v1+json" \\
+                    --data '${requestBody}' \\
+                    ${params.SCHEMA_REGISTRY_URL}/subjects/${schemaSubject}/versions
+                '
+            """,
+            returnStdout: true
+        ).trim()
 
-    def requestBody = JsonOutput.toJson(requestBodyMap)
+        def lines = response.split('\n')
+        def httpCode = lines[-1]
+        def responseBody = lines.size() > 1 ? lines[0..-2].join('\n') : ''
 
-    echo "📦 Final request body: ${requestBody}"
+        echo "📤 Registration response: ${responseBody}"
 
-    def response = sh(
-        script: """
-            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T schema-registry bash -c '
-                curl -s -w "\\n%{http_code}" -X POST \\
-                -H "Content-Type: application/vnd.schemaregistry.v1+json" \\
-                --data '${requestBody}' \\
-                ${params.SCHEMA_REGISTRY_URL}/subjects/${params.SUBJECT_NAME}/versions
-            '
-        """,
-        returnStdout: true
-    ).trim()
-
-    def lines = response.split('\n')
-    def httpCode = lines[-1]
-    def responseBody = lines.size() > 1 ? lines[0..-2].join('\n') : ''
-
-    echo "📤 Registration response: ${responseBody}"
-
-    if (httpCode.startsWith('2')) {
-        echo "✅ Schema registered successfully (HTTP ${httpCode})"
-    } else {
-        error("❌ Schema registration failed (HTTP ${httpCode}): ${responseBody}")
+        if (httpCode.startsWith('2')) {
+            echo "✅ Schema registered successfully (HTTP ${httpCode})"
+            if (responseBody.contains('"id"')) {
+                def schemaId = responseBody.replaceAll('.*"id":(\\d+).*', '$1')
+                echo "✅ Schema ID: ${schemaId}"
+            }
+        } else {
+            error("❌ Schema registration failed (HTTP ${httpCode}): ${responseBody}")
+        }
+        
+    } catch (Exception e) {
+        error("❌ Schema registration failed: ${e.getMessage()}")
     }
 }
 
@@ -361,13 +379,6 @@ def validateExistingSchema(schemaSubject) {
     } catch (Exception e) {
         error("❌ Schema validation failed: ${e.getMessage()}")
     }
-}
-
-def prepareSchemaPayload() {
-    def schemaType = params.SCHEMA_TYPE.toLowerCase().replace('_schema', '').toUpperCase()
-    def escapedSchema = params.SCHEMA_DEFINITION.replace('"', '\\"').replace('\n', '\\n')
-    def schemaTypeField = (schemaType != 'AVRO') ? ", \\\"schemaType\\\": \\\"${schemaType}\\\"" : ""
-    return "{\\\"schema\\\": \\\"${escapedSchema}\\\"${schemaTypeField}}"
 }
 
 def prepareMessageDataFromFile() {
