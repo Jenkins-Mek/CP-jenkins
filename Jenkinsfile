@@ -3,7 +3,7 @@ properties([
         string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name (required)'),
         string(name: 'CONSUMER_GROUP_ID', defaultValue: 'jenkins-simple-consumer', description: 'Consumer group ID'),
         string(name: 'MAX_MESSAGES', defaultValue: '100', description: 'Max messages to consume (0 = unlimited)'),
-        choice(name: 'OFFSET_RESET', choices: ['latest', 'earliest'], defaultValue: 'latest', description: 'Where to start consuming'),
+        choice(name: 'OFFSET_RESET', choices: ['latest', 'earliest'], description: 'Where to start consuming'),
         string(name: 'TIMEOUT_SECONDS', defaultValue: '30', description: 'Consumer timeout in seconds')
     ])
 ])
