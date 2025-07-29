@@ -312,17 +312,17 @@ def registerSchema(schemaSubject) {
         def requestBodyMap = [:]
         requestBodyMap.schema = rawSchema
 
-        
+
         // Add schemaType field for non-Avro schemas
         if (schemaType != 'AVRO') {
             requestBodyMap.schemaType = schemaType
         }
-        
+
         def requestBody = JsonOutput.toJson(requestBodyMap)
-        
+
         echo "📦 Registering schema for subject: ${schemaSubject}"
         echo "📦 Schema type: ${schemaType}"
-        
+
         def response = sh(
             script: """
                 docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
