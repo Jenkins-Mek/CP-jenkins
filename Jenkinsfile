@@ -2,7 +2,8 @@ properties([
     parameters([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
         string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://localhost:8081', description: 'Schema Registry URL'),
-        string(name: 'SUBJECT_NAME', defaultValue: '', description: 'Subject name (e.g., user-topic-value)'),
+        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Topic name (e.g., test-topic, user-topic)'),
+        choice(name: 'SCHEMA_FOR', choices: ['value', 'key'], description: 'Schema for key or value'),
         choice(name: 'SCHEMA_TYPE', choices: ['AVRO', 'JSON', 'PROTOBUF'], description: 'Schema type'),
         text(name: 'SCHEMA_CONTENT', defaultValue: '', description: 'Schema content (JSON for Avro/JSON, proto definition for Protobuf)')
     ])
@@ -12,18 +13,40 @@ pipeline {
     agent any
 
     stages {
+        stage('List Available Topics') {
+            steps {
+                script {
+                    listTopics()
+                }
+            }
+        }
+
         stage('Validate Input') {
             steps {
                 script {
-                    if (!params.SUBJECT_NAME?.trim()) {
-                        error("SUBJECT_NAME is required")
+                    if (!params.TOPIC_NAME?.trim()) {
+                        error("TOPIC_NAME is required")
                     }
                     if (!params.SCHEMA_CONTENT?.trim()) {
                         error("SCHEMA_CONTENT is required")
                     }
+                    
+                    // Generate subject name from topic and schema type
+                    env.SUBJECT_NAME = "${params.TOPIC_NAME}-${params.SCHEMA_FOR}"
+                    
                     echo "✅ Input validation passed"
-                    echo "📋 Subject: ${params.SUBJECT_NAME}"
+                    echo "📋 Topic: ${params.TOPIC_NAME}"
+                    echo "📋 Subject: ${env.SUBJECT_NAME}"
                     echo "📝 Schema Type: ${params.SCHEMA_TYPE}"
+                    echo "🔑 Schema For: ${params.SCHEMA_FOR}"
+                }
+            }
+        }
+
+        stage('Check Topic Exists') {
+            steps {
+                script {
+                    checkTopicExists()
                 }
             }
         }
@@ -43,16 +66,77 @@ pipeline {
                 }
             }
         }
+
+        stage('Show Consumer Commands') {
+            steps {
+                script {
+                    showConsumerCommands()
+                }
+            }
+        }
     }
 
     post {
         success {
-            echo "✅ Schema registered successfully for subject: ${params.SUBJECT_NAME}"
+            echo "✅ Schema registered successfully for subject: ${env.SUBJECT_NAME}"
         }
         failure {
-            echo "❌ Schema registration failed for subject: ${params.SUBJECT_NAME}"
+            echo "❌ Schema registration failed for subject: ${env.SUBJECT_NAME}"
         }
     }
+}
+
+def listTopics() {
+    echo "📋 Listing available topics..."
+    def topics = sh(
+        script: """
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            exec -T broker bash -c '
+                kafka-topics --list --bootstrap-server localhost:9092
+            '
+        """,
+        returnStdout: true
+    ).trim()
+    
+    echo "Available topics:"
+    topics.split('\n').each { topic ->
+        echo "  - ${topic}"
+    }
+}
+
+def checkTopicExists() {
+    echo "🔍 Checking if topic '${params.TOPIC_NAME}' exists..."
+    def topics = sh(
+        script: """
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            exec -T broker bash -c '
+                kafka-topics --list --bootstrap-server localhost:9092
+            '
+        """,
+        returnStdout: true
+    ).trim()
+    
+    if (!topics.split('\n').contains(params.TOPIC_NAME)) {
+        echo "⚠️ Topic '${params.TOPIC_NAME}' does not exist. Creating topic..."
+        createTopic()
+    } else {
+        echo "✅ Topic '${params.TOPIC_NAME}' exists"
+    }
+}
+
+def createTopic() {
+    def response = sh(
+        script: """
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            exec -T broker bash -c '
+                kafka-topics --create --topic ${params.TOPIC_NAME} --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1
+            '
+        """,
+        returnStdout: true
+    ).trim()
+    
+    echo "📝 Topic creation response: ${response}"
+    echo "✅ Topic '${params.TOPIC_NAME}' created successfully"
 }
 
 def registerSchema() {
@@ -72,7 +156,7 @@ def registerSchema() {
                 curl -s -w "\\n%{http_code}" -X POST \\
                 -H "Content-Type: application/vnd.schemaregistry.v1+json" \\
                 --data '"'"'${requestBody}'"'"' \\
-                ${params.SCHEMA_REGISTRY_URL}/subjects/${params.SUBJECT_NAME}/versions
+                ${params.SCHEMA_REGISTRY_URL}/subjects/${env.SUBJECT_NAME}/versions
             '
         """,
         returnStdout: true
@@ -96,7 +180,7 @@ def verifySchemaRegistration() {
         script: """
             docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
             exec -T schema-registry bash -c '
-                curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${params.SUBJECT_NAME}/versions/latest
+                curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${env.SUBJECT_NAME}/versions/latest
             '
         """,
         returnStdout: true
@@ -118,4 +202,52 @@ def verifySchemaRegistration() {
     } else {
         error("❌ Schema verification failed: ${response}")
     }
+}
+
+def showConsumerCommands() {
+    echo "\n🚀 Consumer Commands for your registered schema:"
+    echo "=" * 60
+    
+    if (params.SCHEMA_TYPE == 'AVRO') {
+        echo "📝 Avro Consumer Command:"
+        echo """
+docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+    exec -T broker bash -c "
+        kafka-avro-console-consumer --bootstrap-server localhost:9092 \\
+        --topic ${params.TOPIC_NAME} --from-beginning \\
+        --property schema.registry.url=${params.SCHEMA_REGISTRY_URL}
+    "
+        """
+    } else if (params.SCHEMA_TYPE == 'JSON') {
+        echo "📝 JSON Schema Consumer Command:"
+        echo """
+docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+    exec -T broker bash -c "
+        kafka-json-schema-console-consumer --bootstrap-server localhost:9092 \\
+        --topic ${params.TOPIC_NAME} --from-beginning \\
+        --property schema.registry.url=${params.SCHEMA_REGISTRY_URL}
+    "
+        """
+    } else if (params.SCHEMA_TYPE == 'PROTOBUF') {
+        echo "📝 Protobuf Consumer Command:"
+        echo """
+docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+    exec -T broker bash -c "
+        kafka-protobuf-console-consumer --bootstrap-server localhost:9092 \\
+        --topic ${params.TOPIC_NAME} --from-beginning \\
+        --property schema.registry.url=${params.SCHEMA_REGISTRY_URL}
+    "
+        """
+    }
+    
+    echo "\n📝 Regular Console Consumer (without schema validation):"
+    echo """
+docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+    exec -T broker bash -c "
+        kafka-console-consumer --bootstrap-server localhost:9092 \\
+        --topic ${params.TOPIC_NAME} --from-beginning
+    "
+    """
+    
+    echo "=" * 60
 }
