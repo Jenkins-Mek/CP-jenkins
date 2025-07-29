@@ -4,7 +4,7 @@ properties([
     parameters([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory'),
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'localhost:9092', description: 'Kafka bootstrap server'),
-        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], defaultValue: 'SASL_PLAINTEXT', description: 'Security protocol'),
+        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], description: 'Security protocol'),
         string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name'),
         choice(name: 'INPUT_MODE', choices: ['Simple', 'Advanced'], defaultValue: 'Simple', description: 'Choose input method'),
 
