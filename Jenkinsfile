@@ -37,6 +37,19 @@ pipeline {
             }
         }
 
+        stage('Setup Client Config') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', 
+                                                   usernameVariable: 'KAFKA_USER', 
+                                                   passwordVariable: 'KAFKA_PASS')]) {
+                        // Create client configuration first
+                        createKafkaClientConfig(env.KAFKA_USER, env.KAFKA_PASS)
+                    }
+                }
+            }
+        }
+
         stage('Check Topic') {
             steps {
                 script {
@@ -52,20 +65,13 @@ pipeline {
         stage('Consume Messages') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', 
-                                                   usernameVariable: 'KAFKA_USER', 
-                                                   passwordVariable: 'KAFKA_PASS')]) {
-                        // Create client configuration
-                        createKafkaClientConfig(env.KAFKA_USER, env.KAFKA_PASS)
-                        
-                        def startTime = System.currentTimeMillis()
-                        def messages = consumeMessages()
-                        def endTime = System.currentTimeMillis()
-                        def duration = endTime - startTime
-                        
-                        saveMessages(messages, duration)
-                        generateStats(messages, duration)
-                    }
+                    def startTime = System.currentTimeMillis()
+                    def messages = consumeMessages()
+                    def endTime = System.currentTimeMillis()
+                    def duration = endTime - startTime
+                    
+                    saveMessages(messages, duration)
+                    generateStats(messages, duration)
                 }
             }
         }
@@ -95,14 +101,15 @@ def checkTopicExists() {
     try {
         def result = sh(
             script: """
-                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml exec -T broker bash -c '
-                    # Clear all JMX and monitoring related environment variables
-                    unset KAFKA_OPTS JMX_PORT KAFKA_JMX_OPTS KAFKA_HEAP_OPTS
-                    export KAFKA_OPTS=""
-                    export JMX_PORT=""
-                    
-                    kafka-topics --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} --list | grep -x "${params.TOPIC_NAME}"
-                '
+                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml exec -T broker bash -c "
+                    export KAFKA_OPTS=''
+                    export JMX_PORT=''
+                    export KAFKA_JMX_OPTS=''
+                    unset JMX_PORT
+                    unset KAFKA_JMX_OPTS
+                    unset KAFKA_OPTS
+                    kafka-topics --list --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} --command-config ${env.CLIENT_CONFIG_FILE} | grep -x '${params.TOPIC_NAME}'
+                " 2>/dev/null
             """,
             returnStdout: true
         ).trim()
