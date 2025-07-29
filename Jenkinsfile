@@ -96,7 +96,10 @@ pipeline {
                             error("❌ No valid configs to apply in Simple mode.")
                         }
 
-                        configList = configs.collect { k, v -> "${k}=${escapeConfigValue(v)}" }.join(',')
+                        configList = configs.collect { k, v ->
+                            def escapedValue = v.contains(',') ? "[${v}]" : v
+                            "${k}=${escapedValue}"
+                        }.join(',')
                     }
 
                     echo "🛠 Config changes to apply: ${configList}"
