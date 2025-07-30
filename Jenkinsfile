@@ -143,7 +143,7 @@ pipeline {
 def produceSchemaMessages(topicName, username, password) {
     try {
         def producerCommand = getSchemaProducerCommand(params.SCHEMA_TYPE)
-        def saslConfig = "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"${username}\" password=\"${password}\";"
+        def saslConfig = "org.apache.kafka.common.security.plain.PlainLoginModule required username=\\\"${username}\\\" password=\\\"${password}\\\";"
         
         // Generate message data based on count
         def messageCount = params.MESSAGE_COUNT.toInteger()
@@ -153,6 +153,9 @@ def produceSchemaMessages(topicName, username, password) {
             messages.add(messageData)
         }
         def messageContent = messages.join('\n')
+        
+        // Escape the schema definition for shell
+        def escapedSchema = params.SCHEMA_DEFINITION.replaceAll('"', '\\\\"')
         
         def produceOutput = sh(
             script: """
@@ -164,7 +167,7 @@ def produceSchemaMessages(topicName, username, password) {
                 --producer-property security.protocol=${params.SECURITY_PROTOCOL} \\
                 --producer-property sasl.mechanism=PLAIN \\
                 --producer-property "sasl.jaas.config=${saslConfig}" \\
-                --property "value.schema=${params.SCHEMA_DEFINITION}" <<EOF
+                --property "value.schema=${escapedSchema}" <<'EOF'
 ${messageContent}
 EOF
             """,
