@@ -166,7 +166,7 @@ def executeConsumerWithTimeout(composeDir, schemaRegistryContainer, timeoutSecon
                 --property print.timestamp=true \\
                 --property print.key=true \\
                 --property key.separator=' | ' \\
-                2>/dev/null | grep -E '^[0-9].*\\{|^\\{' || true
+                2>/dev/null | grep '^{' || echo "No messages found"
             
             echo "✅ Consumer finished"
         """,
