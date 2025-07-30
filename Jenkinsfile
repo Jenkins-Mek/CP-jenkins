@@ -1,6 +1,7 @@
 properties([
     parameters([
         string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name (required)'),
+        choice(name: 'MESSAGE_FORMAT', choices: ['AVRO', 'JSON_SCHEMA', 'PROTOBUF'], description: 'Message format (defaults to AVRO)'),
         string(name: 'CONSUMER_GROUP_ID', defaultValue: '', description: 'Consumer group ID (optional - auto-generated if empty)'),
         string(name: 'MAX_MESSAGES', defaultValue: '10', description: 'Max messages to consume (defaults to 10)'),
         choice(name: 'OFFSET_RESET', choices: ['latest', 'earliest'], description: 'Where to start consuming (defaults to latest)'),
@@ -17,8 +18,8 @@ pipeline {
     agent any
     
     environment {
-        CLIENT_CONFIG_FILE = '/tmp/avro-consumer.properties'
-        MESSAGES_FILE = 'consumed-avro-messages.txt'
+        CLIENT_CONFIG_FILE = '/tmp/consumer.properties'
+        MESSAGES_FILE = 'consumed-messages.txt'
         STATS_FILE = 'consumption-stats.json'
     }
 
@@ -34,10 +35,11 @@ pipeline {
                     env.SCHEMA_REGISTRY_CONTAINER = params.SCHEMA_REGISTRY_CONTAINER?.trim() ?: 'schema-registry'
                     env.SECURITY_PROTOCOL = params.SECURITY_PROTOCOL?.trim() ?: 'SASL_PLAINTEXT'
                     env.OFFSET_RESET = params.OFFSET_RESET?.trim() ?: 'latest'
+                    env.MESSAGE_FORMAT = params.MESSAGE_FORMAT?.trim() ?: 'AVRO'
                     
                     // Generate consumer group if not provided
                     if (!params.CONSUMER_GROUP_ID?.trim()) {
-                        env.CONSUMER_GROUP_ID = "jenkins-avro-consumer-${System.currentTimeMillis()}"
+                        env.CONSUMER_GROUP_ID = "jenkins-consumer-${env.MESSAGE_FORMAT.toLowerCase()}-${System.currentTimeMillis()}"
                         echo "🔄 Auto-generated Consumer Group: ${env.CONSUMER_GROUP_ID}"
                     } else {
                         env.CONSUMER_GROUP_ID = params.CONSUMER_GROUP_ID.trim()
@@ -57,6 +59,7 @@ pipeline {
                     }
                     
                     echo "✅ Topic: ${params.TOPIC_NAME}"
+                    echo "📋 Message Format: ${env.MESSAGE_FORMAT}"
                     echo "📊 Consumer Group: ${env.CONSUMER_GROUP_ID}"
                     echo "⏰ Timeout: ${env.TIMEOUT_SECONDS}s"
                     echo "🔒 Security Protocol: ${env.SECURITY_PROTOCOL}"
@@ -85,11 +88,11 @@ pipeline {
             }
         }
 
-        stage('Consume Avro Messages') {
+        stage('Consume Messages') {
             steps {
                 script {
                     def startTime = System.currentTimeMillis()
-                    def messages = consumeAvroMessages()
+                    def messages = consumeMessages()
                     def endTime = System.currentTimeMillis()
                     def duration = endTime - startTime
                     
@@ -102,10 +105,10 @@ pipeline {
     post {
         success {
             archiveArtifacts artifacts: "${env.MESSAGES_FILE}, ${env.STATS_FILE}", allowEmptyArchive: true
-            echo "✅ Avro message consumption completed!"
+            echo "✅ ${env.MESSAGE_FORMAT} message consumption completed!"
         }
         failure {
-            echo "❌ Avro message consumption failed"
+            echo "❌ ${env.MESSAGE_FORMAT} message consumption failed"
         }
         always {
             script {
@@ -115,7 +118,7 @@ pipeline {
     }
 }
 
-def consumeAvroMessages() {
+def consumeMessages() {
     def maxMsgs = env.MAX_MESSAGES.toInteger()
     def timeoutSeconds = env.TIMEOUT_SECONDS.toInteger()
     def composeDir = env.COMPOSE_DIR
@@ -147,23 +150,19 @@ def executeConsumerWithTimeout(composeDir, schemaRegistryContainer, timeoutSecon
     // Build security properties
     def securityProps = buildSecurityProperties(username, password)
     
-    // Method 1: Use timeout with max-messages
+    // Choose the appropriate consumer based on message format
+    def consumerCommand = buildConsumerCommand(kafkaServer, topicName, maxMsgs, offsetFlag, 
+                                             schemaRegistryUrl, securityProps)
+    
     def result = sh(
         script: """
             set -e
-            echo "🚀 Starting Avro consumer for topic: ${topicName}"
+            echo "🚀 Starting ${env.MESSAGE_FORMAT} consumer for topic: ${topicName}"
             echo "📊 Max messages: ${maxMsgs}, Timeout: ${timeoutSeconds}s"
             
             # Use timeout command to limit execution time
-            timeout ${timeoutSeconds}s docker exec ${schemaRegistryContainer} kafka-avro-console-consumer \\
-                --bootstrap-server ${kafkaServer} \\
-                --topic ${topicName} \\
-                --max-messages ${maxMsgs} \\
-                ${offsetFlag} \\
-                --property schema.registry.url=${schemaRegistryUrl} \\
-                --group ${env.CONSUMER_GROUP_ID} \\
-                ${securityProps} \\
-                2>/dev/null | grep '^{' || echo "No messages found"
+            timeout ${timeoutSeconds}s docker exec ${schemaRegistryContainer} ${consumerCommand} \\
+                2>/dev/null | grep -E '^\\{|^\\[|^[^#🚀📊✅⚠️]' || echo "No messages found"
             
             echo "✅ Consumer finished"
         """,
@@ -171,6 +170,51 @@ def executeConsumerWithTimeout(composeDir, schemaRegistryContainer, timeoutSecon
     )
 
     return result.trim()
+}
+
+def buildConsumerCommand(kafkaServer, topicName, maxMsgs, offsetFlag, schemaRegistryUrl, securityProps) {
+    switch(env.MESSAGE_FORMAT) {
+        case 'AVRO':
+            return """kafka-avro-console-consumer \\
+                --bootstrap-server ${kafkaServer} \\
+                --topic ${topicName} \\
+                --max-messages ${maxMsgs} \\
+                ${offsetFlag} \\
+                --property schema.registry.url=${schemaRegistryUrl} \\
+                --group ${env.CONSUMER_GROUP_ID} \\
+                ${securityProps}"""
+                
+        case 'JSON_SCHEMA':
+            return """kafka-json-schema-console-consumer \\
+                --bootstrap-server ${kafkaServer} \\
+                --topic ${topicName} \\
+                --max-messages ${maxMsgs} \\
+                ${offsetFlag} \\
+                --property schema.registry.url=${schemaRegistryUrl} \\
+                --group ${env.CONSUMER_GROUP_ID} \\
+                ${securityProps}"""
+                
+        case 'PROTOBUF':
+            return """kafka-protobuf-console-consumer \\
+                --bootstrap-server ${kafkaServer} \\
+                --topic ${topicName} \\
+                --max-messages ${maxMsgs} \\
+                ${offsetFlag} \\
+                --property schema.registry.url=${schemaRegistryUrl} \\
+                --group ${env.CONSUMER_GROUP_ID} \\
+                ${securityProps}"""
+                
+        default:
+            echo "⚠️ Unknown message format: ${env.MESSAGE_FORMAT}, defaulting to AVRO"
+            return """kafka-avro-console-consumer \\
+                --bootstrap-server ${kafkaServer} \\
+                --topic ${topicName} \\
+                --max-messages ${maxMsgs} \\
+                ${offsetFlag} \\
+                --property schema.registry.url=${schemaRegistryUrl} \\
+                --group ${env.CONSUMER_GROUP_ID} \\
+                ${securityProps}"""
+    }
 }
 
 def buildSecurityProperties(username, password) {
@@ -250,7 +294,7 @@ EOF'
 def saveMessages(messages, duration) {
     def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
     
-    // Filter out system messages and keep only JSON messages
+    // Filter out system messages and keep only actual message content
     def messageLines = messages.split('\n')
         .findAll { line -> 
             def trimmed = line.trim()
@@ -258,20 +302,25 @@ def saveMessages(messages, duration) {
                    !trimmed.contains('Consumer finished') &&
                    !trimmed.contains('WARN') &&
                    !trimmed.contains('ERROR') &&
-                   !trimmed.contains('Starting Avro consumer') &&
+                   !trimmed.contains('Starting') &&
+                   !trimmed.contains('consumer for topic') &&
                    !trimmed.contains('Max messages:') &&
                    !trimmed.startsWith('#') &&
                    !trimmed.startsWith('🚀') &&
                    !trimmed.startsWith('📊') &&
                    !trimmed.startsWith('✅') &&
-                   (trimmed.startsWith('{') || trimmed.contains('|')) // JSON or has our key-value separator
+                   !trimmed.startsWith('⚠️') &&
+                   (trimmed.startsWith('{') || 
+                    trimmed.startsWith('[') || 
+                    trimmed.contains('|')) // JSON, arrays, or key-value separator
         }
     
     def messageCount = messageLines.size()
     
-    def content = """# Avro Kafka Consumer Report
+    def content = """# ${env.MESSAGE_FORMAT} Kafka Consumer Report
 # Generated: ${timestamp}
 # Topic: ${params.TOPIC_NAME}
+# Message Format: ${env.MESSAGE_FORMAT}
 # Consumer Group: ${env.CONSUMER_GROUP_ID}
 # Messages Retrieved: ${messageCount}
 # Max Messages Requested: ${env.MAX_MESSAGES}
@@ -283,22 +332,29 @@ def saveMessages(messages, duration) {
 """
 
     if (messageCount == 0) {
-        content += """No Avro messages found.
+        content += """No ${env.MESSAGE_FORMAT} messages found.
 
 Possible reasons:
 - Topic is empty
 - No new messages since last consumption (if using 'latest' offset)
 - Messages already consumed by this consumer group
-- Consumer timeout reached before any messages arrived
+- Consumer timeout reached before any messages arrived"""
+        
+        if (env.MESSAGE_FORMAT in ['AVRO', 'JSON_SCHEMA', 'PROTOBUF']) {
+            content += """
 - Schema Registry connection issues
-- Topic contains non-Avro messages
+- Topic contains messages in different format than ${env.MESSAGE_FORMAT}
+- Schema not found or incompatible"""
+        }
+        
+        content += """
 
 Try using 'earliest' offset to read from the beginning of the topic.
 
 """
     } else {
         content += """${'='*60}
-AVRO MESSAGES (${messageCount}/${env.MAX_MESSAGES})
+${env.MESSAGE_FORMAT} MESSAGES (${messageCount}/${env.MAX_MESSAGES})
 ${'='*60}
 
 """
@@ -316,7 +372,7 @@ Value: ${parts[2]}
                     content += "[${index + 1}] ${message}\n\n"
                 }
             } else {
-                // Assume it's a JSON message without timestamp/key
+                // Message without timestamp/key separator
                 content += "[${index + 1}] ${message}\n\n"
             }
         }
@@ -327,11 +383,12 @@ Value: ${parts[2]}
     }
     
     writeFile file: env.MESSAGES_FILE, text: content
-    echo "💾 Saved ${messageCount} Avro messages to ${env.MESSAGES_FILE}"
+    echo "💾 Saved ${messageCount} ${env.MESSAGE_FORMAT} messages to ${env.MESSAGES_FILE}"
     
     // Create stats file
     def stats = [
         topic: params.TOPIC_NAME,
+        messageFormat: env.MESSAGE_FORMAT,
         consumerGroup: env.CONSUMER_GROUP_ID,
         messageCount: messageCount,
         maxMessages: env.MAX_MESSAGES.toInteger(),
@@ -343,5 +400,5 @@ Value: ${parts[2]}
     ]
     
     writeFile file: env.STATS_FILE, text: groovy.json.JsonOutput.toJson(stats)
-    echo "📊 Consumption stats: ${messageCount} messages in ${duration}ms"
+    echo "📊 Consumption stats: ${messageCount} ${env.MESSAGE_FORMAT} messages in ${duration}ms"
 }
