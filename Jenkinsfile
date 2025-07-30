@@ -159,13 +159,10 @@ def executeConsumerWithTimeout(composeDir, schemaRegistryContainer, timeoutSecon
                 --bootstrap-server ${kafkaServer} \\
                 --topic ${topicName} \\
                 --max-messages ${maxMsgs} \\
-                ${offsetFlag} \\
+                --from-beginning \\
                 --property schema.registry.url=${schemaRegistryUrl} \\
                 --group ${env.CONSUMER_GROUP_ID} \\
                 ${securityProps} \\
-                --property print.timestamp=true \\
-                --property print.key=true \\
-                --property key.separator=' | ' \\
                 2>/dev/null | grep '^{' || echo "No messages found"
             
             echo "✅ Consumer finished"
