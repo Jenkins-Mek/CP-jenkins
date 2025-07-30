@@ -2,13 +2,13 @@ properties([
     parameters([
         string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name (required)'),
         string(name: 'CONSUMER_GROUP_ID', defaultValue: '', description: 'Consumer group ID (optional - auto-generated if empty)'),
-        string(name: 'MAX_MESSAGES', defaultValue: '', description: 'Max messages to consume (optional - unlimited if empty)'),
-        choice(name: 'OFFSET_RESET', choices: ['', 'latest', 'earliest'], description: 'Where to start consuming (optional - defaults to latest)'),
-        choice(name: 'SECURITY_PROTOCOL', choices: ['', 'SASL_PLAINTEXT', 'SASL_SSL', 'PLAINTEXT'], description: 'Security protocol (optional - defaults to SASL_PLAINTEXT)'),
+        string(name: 'MAX_MESSAGES', defaultValue: '10', description: 'Max messages to consume (defaults to 10)'),
+        choice(name: 'OFFSET_RESET', choices: ['latest', 'earliest'], description: 'Where to start consuming (defaults to latest)'),
+        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL', 'PLAINTEXT'], description: 'Security protocol (defaults to SASL_PLAINTEXT)'),
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: '', description: 'Kafka bootstrap server (optional - defaults to broker:29093)'),
         string(name: 'SCHEMA_REGISTRY_URL', defaultValue: '', description: 'Schema Registry URL (optional - defaults to http://schema-registry:8081)'),
         string(name: 'COMPOSE_DIR', defaultValue: '', description: 'Docker compose directory (optional - defaults to /confluent/cp-mysetup/cp-all-in-one)'),
-        string(name: 'TIMEOUT_SECONDS', defaultValue: '', description: 'Consumer timeout in seconds (optional - defaults to 30)'),
+        string(name: 'TIMEOUT_SECONDS', defaultValue: '30', description: 'Consumer timeout in seconds (defaults to 30)'),
         string(name: 'SCHEMA_REGISTRY_CONTAINER', defaultValue: '', description: 'Schema Registry container name (optional - defaults to schema-registry)')
     ])
 ])
@@ -43,10 +43,10 @@ pipeline {
                         env.CONSUMER_GROUP_ID = params.CONSUMER_GROUP_ID.trim()
                     }
                     
-                    // Handle max messages
+                    // Handle max messages - default to 10 if not specified
                     if (!params.MAX_MESSAGES?.trim()) {
-                        env.MAX_MESSAGES = '0' // 0 means unlimited
-                        echo "📝 Max Messages: Unlimited"
+                        env.MAX_MESSAGES = '10'
+                        echo "📝 Max Messages: ${env.MAX_MESSAGES} (default)"
                     } else {
                         env.MAX_MESSAGES = params.MAX_MESSAGES.trim()
                         echo "📝 Max Messages: ${env.MAX_MESSAGES}"
@@ -117,43 +117,58 @@ pipeline {
 
 def consumeAvroMessages() {
     def maxMsgs = env.MAX_MESSAGES.toInteger()
-    def maxMsgFlag = maxMsgs > 0 ? "--max-messages ${maxMsgs}" : ""
     def timeoutSeconds = env.TIMEOUT_SECONDS.toInteger()
     def composeDir = env.COMPOSE_DIR
     def kafkaServer = env.KAFKA_SERVER
     def schemaRegistryUrl = env.SCHEMA_REGISTRY_URL
     def schemaRegistryContainer = env.SCHEMA_REGISTRY_CONTAINER
     def offsetFlag = env.OFFSET_RESET == 'earliest' ? '--from-beginning' : ''
+    def topicName = params.TOPIC_NAME
     
     if (env.SECURITY_PROTOCOL in ['SASL_PLAINTEXT', 'SASL_SSL']) {
         withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', 
                                          usernameVariable: 'KAFKA_USER', 
                                          passwordVariable: 'KAFKA_PASS')]) {
             
-            def securityProps = buildSecurityProperties(env.KAFKA_USER, env.KAFKA_PASS)
-            return executeConsumer(composeDir, schemaRegistryContainer, timeoutSeconds, kafkaServer, 
-                                 schemaRegistryUrl, offsetFlag, maxMsgFlag, securityProps)
+            return executeConsumerWithTimeout(composeDir, schemaRegistryContainer, timeoutSeconds, 
+                                            kafkaServer, schemaRegistryUrl, offsetFlag, maxMsgs, 
+                                            topicName, env.KAFKA_USER, env.KAFKA_PASS)
         }
     } else {
-        def securityProps = buildSecurityProperties('', '')
-        return executeConsumer(composeDir, schemaRegistryContainer, timeoutSeconds, kafkaServer, 
-                             schemaRegistryUrl, offsetFlag, maxMsgFlag, securityProps)
+        return executeConsumerWithTimeout(composeDir, schemaRegistryContainer, timeoutSeconds, 
+                                        kafkaServer, schemaRegistryUrl, offsetFlag, maxMsgs, 
+                                        topicName, '', '')
     }
 }
 
-def executeConsumer(composeDir, schemaRegistryContainer, timeoutSeconds, kafkaServer, 
-                   schemaRegistryUrl, offsetFlag, maxMsgFlag, securityProps) {
+def executeConsumerWithTimeout(composeDir, schemaRegistryContainer, timeoutSeconds, kafkaServer, 
+                              schemaRegistryUrl, offsetFlag, maxMsgs, topicName, username, password) {
+    
+    // Build security properties
+    def securityProps = buildSecurityProperties(username, password)
+    
+    // Method 1: Use timeout with max-messages
     def result = sh(
         script: """
-            docker exec -i schema-registry kafka-avro-console-consumer \\
-                --bootstrap-server broker:29093 \\
-                --topic user-date \\
-                --from-beginning \\
-                --property schema.registry.url=http://schema-registry:8081 \\
-                --consumer-property security.protocol=SASL_PLAINTEXT \\
-                --consumer-property sasl.mechanism=PLAIN \\
-                --consumer-property sasl.jaas.config='org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="admin-secret";' \\
-                2>/dev/null | grep '^{'
+            set -e
+            echo "🚀 Starting Avro consumer for topic: ${topicName}"
+            echo "📊 Max messages: ${maxMsgs}, Timeout: ${timeoutSeconds}s"
+            
+            # Use timeout command to limit execution time
+            timeout ${timeoutSeconds}s docker exec ${schemaRegistryContainer} kafka-avro-console-consumer \\
+                --bootstrap-server ${kafkaServer} \\
+                --topic ${topicName} \\
+                --max-messages ${maxMsgs} \\
+                ${offsetFlag} \\
+                --property schema.registry.url=${schemaRegistryUrl} \\
+                --group ${env.CONSUMER_GROUP_ID} \\
+                ${securityProps} \\
+                --property print.timestamp=true \\
+                --property print.key=true \\
+                --property key.separator=' | ' \\
+                2>/dev/null | grep -E '^[0-9].*\\{|^\\{' || true
+            
+            echo "✅ Consumer finished"
         """,
         returnStdout: true
     )
@@ -170,7 +185,7 @@ def buildSecurityProperties(username, password) {
                             --consumer-property sasl.mechanism=PLAIN \\
                             --consumer-property sasl.jaas.config='org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";'"""
             } else {
-                echo "⚠️ SASL protocol selected but no credentials provided"
+                echo "⚠️ SASL protocol selected but no credentials provided, using PLAINTEXT"
                 return "--consumer-property security.protocol=PLAINTEXT"
             }
         case 'PLAINTEXT':
@@ -190,6 +205,7 @@ def cleanupClientConfig() {
         """
     } catch (Exception e) {
         // Ignore cleanup errors
+        echo "⚠️ Cleanup warning: ${e.message}"
     }
 }
 
@@ -245,7 +261,12 @@ def saveMessages(messages, duration) {
                    !trimmed.contains('Consumer finished') &&
                    !trimmed.contains('WARN') &&
                    !trimmed.contains('ERROR') &&
+                   !trimmed.contains('Starting Avro consumer') &&
+                   !trimmed.contains('Max messages:') &&
                    !trimmed.startsWith('#') &&
+                   !trimmed.startsWith('🚀') &&
+                   !trimmed.startsWith('📊') &&
+                   !trimmed.startsWith('✅') &&
                    (trimmed.startsWith('{') || trimmed.contains('|')) // JSON or has our key-value separator
         }
     
@@ -256,9 +277,11 @@ def saveMessages(messages, duration) {
 # Topic: ${params.TOPIC_NAME}
 # Consumer Group: ${env.CONSUMER_GROUP_ID}
 # Messages Retrieved: ${messageCount}
+# Max Messages Requested: ${env.MAX_MESSAGES}
 # Duration: ${duration}ms
 # Offset Reset: ${env.OFFSET_RESET}
 # Schema Registry: ${env.SCHEMA_REGISTRY_URL}
+# Timeout: ${env.TIMEOUT_SECONDS}s
 
 """
 
@@ -267,16 +290,18 @@ def saveMessages(messages, duration) {
 
 Possible reasons:
 - Topic is empty
+- No new messages since last consumption (if using 'latest' offset)
 - Messages already consumed by this consumer group
-- Offset setting (try 'earliest' to read from beginning)
-- Consumer timeout reached
+- Consumer timeout reached before any messages arrived
 - Schema Registry connection issues
 - Topic contains non-Avro messages
+
+Try using 'earliest' offset to read from the beginning of the topic.
 
 """
     } else {
         content += """${'='*60}
-AVRO MESSAGES
+AVRO MESSAGES (${messageCount}/${env.MAX_MESSAGES})
 ${'='*60}
 
 """
@@ -298,21 +323,28 @@ Value: ${parts[2]}
                 content += "[${index + 1}] ${message}\n\n"
             }
         }
+        
+        if (messageCount == env.MAX_MESSAGES.toInteger()) {
+            content += "\n⚠️ Maximum message limit reached. There may be more messages available.\n"
+        }
     }
     
     writeFile file: env.MESSAGES_FILE, text: content
-    echo "Saved ${messageCount} Avro messages to ${env.MESSAGES_FILE}"
+    echo "💾 Saved ${messageCount} Avro messages to ${env.MESSAGES_FILE}"
     
     // Create stats file
     def stats = [
         topic: params.TOPIC_NAME,
         consumerGroup: env.CONSUMER_GROUP_ID,
         messageCount: messageCount,
+        maxMessages: env.MAX_MESSAGES.toInteger(),
         duration: duration,
         timestamp: timestamp,
         schemaRegistry: env.SCHEMA_REGISTRY_URL,
-        offsetReset: env.OFFSET_RESET
+        offsetReset: env.OFFSET_RESET,
+        timeoutSeconds: env.TIMEOUT_SECONDS.toInteger()
     ]
     
     writeFile file: env.STATS_FILE, text: groovy.json.JsonOutput.toJson(stats)
+    echo "📊 Consumption stats: ${messageCount} messages in ${duration}ms"
 }
