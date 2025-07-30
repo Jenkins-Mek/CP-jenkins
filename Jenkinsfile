@@ -305,6 +305,7 @@ def saveMessages(messages, duration) {
                    !trimmed.contains('Starting') &&
                    !trimmed.contains('consumer for topic') &&
                    !trimmed.contains('Max messages:') &&
+                   !trimmed.contains('INFO') &&
                    !trimmed.startsWith('#') &&
                    !trimmed.startsWith('🚀') &&
                    !trimmed.startsWith('📊') &&
