@@ -54,18 +54,6 @@ pipeline {
             }
         }
 
-        stage('Check Topic') {
-            steps {
-                script {
-                    def topicExists = checkTopicExists()
-                    if (!topicExists) {
-                        error("❌ Topic '${params.TOPIC_NAME}' does not exist")
-                    }
-                    echo "✅ Topic verified"
-                }
-            }
-        }
-
         stage('Consume Messages') {
             steps {
                 script {
@@ -94,32 +82,6 @@ pipeline {
                 cleanupClientConfig()
             }
         }
-    }
-}
-
-def checkTopicExists() {
-    try {
-        def composeDir = env.COMPOSE_DIR ?: params.COMPOSE_DIR
-        def kafkaServer = env.KAFKA_SERVER ?: params.KAFKA_BOOTSTRAP_SERVER
-        
-        def result = sh(
-            script: """
-                docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml exec -T broker bash -c "
-                    export KAFKA_OPTS=''
-                    export JMX_PORT=''
-                    export KAFKA_JMX_OPTS=''
-                    unset JMX_PORT
-                    unset KAFKA_JMX_OPTS
-                    unset KAFKA_OPTS
-                    kafka-topics --list --bootstrap-server ${kafkaServer} --command-config ${env.CLIENT_CONFIG_FILE} | grep -x '${params.TOPIC_NAME}'
-                " 2>/dev/null
-            """,
-            returnStdout: true
-        ).trim()
-        return result == params.TOPIC_NAME
-    } catch (Exception e) {
-        echo "⚠️ Could not verify topic existence: ${e.message}"
-        return false
     }
 }
 
