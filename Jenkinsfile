@@ -159,7 +159,7 @@ def executeConsumerWithTimeout(composeDir, schemaRegistryContainer, timeoutSecon
                 --bootstrap-server ${kafkaServer} \\
                 --topic ${topicName} \\
                 --max-messages ${maxMsgs} \\
-                --from-beginning \\
+                ${offsetFlag} \\
                 --property schema.registry.url=${schemaRegistryUrl} \\
                 --group ${env.CONSUMER_GROUP_ID} \\
                 ${securityProps} \\
