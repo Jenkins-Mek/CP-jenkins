@@ -160,13 +160,14 @@ def consumeAvroMessages() {
         script: """
             docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml \\
             exec -T ${env.CONTAINER_NAME} bash -c '
-                # Set environment variables and suppress SLF4J warnings
-                export KAFKA_OPTS=""
+                # Set environment variables and suppress logging
+                export KAFKA_OPTS="-Dorg.slf4j.simpleLogger.defaultLogLevel=ERROR"
                 export JMX_PORT=""
                 export KAFKA_JMX_OPTS=""
                 export KAFKA_HEAP_OPTS=""
+                export KAFKA_LOG4J_OPTS="-Dlog4j.configuration=file:/dev/null"
                 
-                # Consume Avro messages (suppress SLF4J warnings in stderr)
+                # Consume Avro messages
                 timeout ${timeoutSeconds}s kafka-avro-console-consumer \\
                     --bootstrap-server ${kafkaServer} \\
                     --topic ${params.TOPIC_NAME} \\
@@ -183,7 +184,7 @@ def consumeAvroMessages() {
                     --property print.key=true \\
                     --property print.timestamp=true \\
                     --property key.separator=" | " \\
-                    --timeout-ms 10000 2> >(grep -v "SLF4J:" >&2) || echo "Avro Consumer finished"
+                    --timeout-ms 10000 2>/dev/null || echo "Avro Consumer finished"
             '
         """,
         returnStdout: true
@@ -203,7 +204,7 @@ def buildSecurityProperties() {
             case 'SASL_SSL':
                 securityProps = """--consumer-property security.protocol=${params.SECURITY_PROTOCOL} \\
                     --consumer-property sasl.mechanism=PLAIN \\
-                    --consumer-property sasl.jaas.config='org.apache.kafka.common.security.plain.PlainLoginModule required username="${env.KAFKA_USER}" password="${env.KAFKA_PASS}";'"""
+                    --consumer-property 'sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${env.KAFKA_USER}" password="${env.KAFKA_PASS}";'"""
                 break
             case 'PLAINTEXT':
                 securityProps = "--consumer-property security.protocol=PLAINTEXT"
@@ -211,7 +212,7 @@ def buildSecurityProperties() {
             default:
                 securityProps = """--consumer-property security.protocol=SASL_PLAINTEXT \\
                     --consumer-property sasl.mechanism=PLAIN \\
-                    --consumer-property sasl.jaas.config='org.apache.kafka.common.security.plain.PlainLoginModule required username="${env.KAFKA_USER}" password="${env.KAFKA_PASS}";'"""
+                    --consumer-property 'sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${env.KAFKA_USER}" password="${env.KAFKA_PASS}";'"""
                 break
         }
     }
@@ -230,6 +231,7 @@ def saveAvroMessages(messages, duration) {
                    !trimmed.contains('Avro Consumer finished') &&
                    !trimmed.contains('WARN') &&
                    !trimmed.contains('ERROR') &&
+                   !trimmed.contains('INFO') &&
                    !trimmed.startsWith('#') &&
                    !trimmed.contains('SLF4J') &&
                    !trimmed.contains('Class path contains multiple') &&
@@ -237,6 +239,18 @@ def saveAvroMessages(messages, duration) {
                    !trimmed.contains('See http://www.slf4j.org') &&
                    !trimmed.contains('Actual binding is of type') &&
                    !trimmed.contains("Can't simultaneously specify") &&
+                   !trimmed.contains('KafkaAvroDeserializerConfig values') &&
+                   !trimmed.contains('ConsumerConfig values') &&
+                   !trimmed.contains('initializing Kafka metrics') &&
+                   !trimmed.contains('App info kafka.consumer') &&
+                   !trimmed.contains('Unknown error when running') &&
+                   !trimmed.contains('org.apache.kafka') &&
+                   !trimmed.contains('at org.apache.kafka') &&
+                   !trimmed.contains('Caused by:') &&
+                   !trimmed.contains('Failed to construct') &&
+                   !trimmed.contains('Failed to create new NetworkClient') &&
+                   !trimmed.contains('Login module control flag') &&
+                   !trimmed.startsWith('[2025-') &&
                    trimmed.length() > 0
         }
     
