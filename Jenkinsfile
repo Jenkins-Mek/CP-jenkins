@@ -9,7 +9,7 @@ properties([
         string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://schema-registry:8081', description: 'Schema Registry URL'),
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker compose directory'),
         string(name: 'TIMEOUT_SECONDS', defaultValue: '30', description: 'Consumer timeout in seconds'),
-        choice(name: 'OUTPUT_FORMAT', choices: ['json-only', 'all-messages', 'filtered'], description: 'Message output format')
+
     ])
 ])
 
@@ -35,7 +35,6 @@ pipeline {
                     echo "Max Messages: ${params.MAX_MESSAGES}"
                     echo "Kafka Server: ${params.KAFKA_BOOTSTRAP_SERVER}"
                     echo "Schema Registry: ${params.SCHEMA_REGISTRY_URL}"
-                    echo "Output Format: ${params.OUTPUT_FORMAT}"
                 }
             }
         }
@@ -80,7 +79,6 @@ def consumeAvroMessages() {
     }
     
     def securityProps = buildSecurityProps()
-    def outputFilter = buildOutputFilter()
     
     def result = sh(
         script: """
@@ -93,7 +91,7 @@ def consumeAvroMessages() {
                 --consumer-property group.id=${params.CONSUMER_GROUP_ID} \\
                 ${securityProps} \\
                 ${maxMsgFlag} \\
-                ${outputFilter} || echo "CONSUMER_FINISHED"
+                2>/dev/null | grep '^{' || echo "CONSUMER_FINISHED"
         """,
         returnStdout: true
     )
@@ -128,46 +126,18 @@ def buildSecurityProps() {
     return securityProps
 }
 
-def buildOutputFilter() {
-    switch(params.OUTPUT_FORMAT) {
-        case 'json-only':
-            return "2>/dev/null | grep '^{'"
-        case 'all-messages':
-            return "2>&1"
-        case 'filtered':
-            return "2>/dev/null | grep -E '^(\\{|\\[)'"
-        default:
-            return "2>/dev/null | grep '^{'"
-    }
-}
-
 def saveAvroMessages(rawOutput, duration) {
     def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
     
-    // Clean up the output based on format choice
-    def messageLines = []
-    if (params.OUTPUT_FORMAT == 'all-messages') {
-        // Keep everything but filter out known noise
-        messageLines = rawOutput.split('\n')
-            .findAll { line -> 
-                def trimmed = line.trim()
-                return trimmed && 
-                       !trimmed.contains('CONSUMER_FINISHED') &&
-                       !trimmed.startsWith('SLF4J:') &&
-                       !trimmed.contains('Class path contains multiple') &&
-                       !trimmed.contains('log4j:WARN') &&
-                       trimmed.length() > 0
-            }
-    } else {
-        // For json-only and filtered, the output should already be clean
-        messageLines = rawOutput.split('\n')
-            .findAll { line -> 
-                def trimmed = line.trim()
-                return trimmed && 
-                       !trimmed.contains('CONSUMER_FINISHED') &&
-                       trimmed.length() > 0
-            }
-    }
+    // Clean JSON messages only
+    def messageLines = rawOutput.split('\n')
+        .findAll { line -> 
+            def trimmed = line.trim()
+            return trimmed && 
+                   !trimmed.contains('CONSUMER_FINISHED') &&
+                   trimmed.startsWith('{') &&
+                   trimmed.length() > 2
+        }
     
     def messageCount = messageLines.size()
     
@@ -180,26 +150,25 @@ def saveAvroMessages(rawOutput, duration) {
 # Duration: ${duration}ms
 # Offset Reset: ${params.OFFSET_RESET}
 # Security Protocol: ${params.SECURITY_PROTOCOL}
-# Output Format: ${params.OUTPUT_FORMAT}
 
 """
 
     if (messageCount == 0) {
-        content += """No messages found.
+        content += """No JSON messages found.
 
 Possible reasons:
 - Topic is empty
 - Messages already consumed by this consumer group
 - Using 'latest' offset and no new messages
 - Consumer timeout reached
-- Messages don't match the output filter
+- Messages are not in JSON format
 
-Try using 'earliest' offset, different consumer group ID, or 'all-messages' output format.
+Try using 'earliest' offset or different consumer group ID.
 
 """
     } else {
         content += """${'='*60}
-CONSUMED MESSAGES
+JSON MESSAGES
 ${'='*60}
 
 """
@@ -216,12 +185,14 @@ ${'='*60}
         messageCount: messageCount,
         durationMs: duration,
         offsetReset: params.OFFSET_RESET,
-        securityProtocol: params.SECURITY_PROTOCOL,
-        outputFormat: params.OUTPUT_FORMAT
+        securityProtocol: params.SECURITY_PROTOCOL
     ]
     
+    // Fix the JsonBuilder instantiation
+    def jsonBuilder = new groovy.json.JsonBuilder(stats)
+    
     writeFile file: env.MESSAGES_FILE, text: content
-    writeFile file: env.STATS_FILE, text: groovy.json.JsonBuilder(stats).toPrettyString()
+    writeFile file: env.STATS_FILE, text: jsonBuilder.toPrettyString()
     
     echo "Saved ${messageCount} messages to ${env.MESSAGES_FILE}"
     echo "Statistics saved to ${env.STATS_FILE}"
