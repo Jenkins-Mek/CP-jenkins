@@ -8,7 +8,8 @@ properties([
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'broker:29093', description: 'Kafka bootstrap server'),
         string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://schema-registry:8081', description: 'Schema Registry URL'),
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker compose directory'),
-        string(name: 'TIMEOUT_SECONDS', defaultValue: '30', description: 'Consumer timeout in seconds')
+        string(name: 'TIMEOUT_SECONDS', defaultValue: '30', description: 'Consumer timeout in seconds'),
+        choice(name: 'OUTPUT_FORMAT', choices: ['json-only', 'all-messages', 'filtered'], description: 'Message output format')
     ])
 ])
 
@@ -26,14 +27,15 @@ pipeline {
             steps {
                 script {
                     if (!params.TOPIC_NAME?.trim()) {
-                        error("❌ TOPIC_NAME is required")
+                        error("TOPIC_NAME is required")
                     }
-                    echo "✅ Topic: ${params.TOPIC_NAME}"
-                    echo "📊 Consumer Group: ${params.CONSUMER_GROUP_ID}"
-                    echo "⏰ Timeout: ${params.TIMEOUT_SECONDS}s"
-                    echo "📝 Max Messages: ${params.MAX_MESSAGES}"
-                    echo "🌐 Kafka Server: ${params.KAFKA_BOOTSTRAP_SERVER}"
-                    echo "📋 Schema Registry: ${params.SCHEMA_REGISTRY_URL}"
+                    echo "Topic: ${params.TOPIC_NAME}"
+                    echo "Consumer Group: ${params.CONSUMER_GROUP_ID}"
+                    echo "Timeout: ${params.TIMEOUT_SECONDS}s"
+                    echo "Max Messages: ${params.MAX_MESSAGES}"
+                    echo "Kafka Server: ${params.KAFKA_BOOTSTRAP_SERVER}"
+                    echo "Schema Registry: ${params.SCHEMA_REGISTRY_URL}"
+                    echo "Output Format: ${params.OUTPUT_FORMAT}"
                 }
             }
         }
@@ -42,7 +44,7 @@ pipeline {
             steps {
                 script {
                     def startTime = System.currentTimeMillis()
-                    def messages = consumeAvroMessagesSimple()
+                    def messages = consumeAvroMessages()
                     def endTime = System.currentTimeMillis()
                     def duration = endTime - startTime
                     
@@ -55,31 +57,30 @@ pipeline {
     post {
         success {
             archiveArtifacts artifacts: "${env.MESSAGES_FILE}, ${env.STATS_FILE}", allowEmptyArchive: true
-            echo "✅ Avro message consumption completed!"
+            echo "Avro message consumption completed successfully"
         }
         failure {
-            echo "❌ Avro message consumption failed"
+            echo "Avro message consumption failed"
         }
         always {
-            echo "🧹 Pipeline completed"
+            echo "Pipeline execution completed"
         }
     }
 }
 
-def consumeAvroMessagesSimple() {
+def consumeAvroMessages() {
     def maxMsgs = params.MAX_MESSAGES.toInteger()
     def maxMsgFlag = maxMsgs > 0 ? "--max-messages ${maxMsgs}" : ""
     def timeoutSeconds = params.TIMEOUT_SECONDS.toInteger()
     def composeDir = params.COMPOSE_DIR
     
-    // Use the offset reset choice - convert to appropriate flag
     def offsetFlag = ""
     if (params.OFFSET_RESET == 'earliest') {
         offsetFlag = "--from-beginning"
     }
     
-    // Build security properties based on your working command
-    def securityProps = buildSecurityPropsSimple()
+    def securityProps = buildSecurityProps()
+    def outputFilter = buildOutputFilter()
     
     def result = sh(
         script: """
@@ -91,7 +92,8 @@ def consumeAvroMessagesSimple() {
                 --property schema.registry.url=${params.SCHEMA_REGISTRY_URL} \\
                 --consumer-property group.id=${params.CONSUMER_GROUP_ID} \\
                 ${securityProps} \\
-                ${maxMsgFlag} || echo "Consumer finished"
+                ${maxMsgFlag} \\
+                ${outputFilter} || echo "CONSUMER_FINISHED"
         """,
         returnStdout: true
     )
@@ -99,7 +101,7 @@ def consumeAvroMessagesSimple() {
     return result
 }
 
-def buildSecurityPropsSimple() {
+def buildSecurityProps() {
     def securityProps = ""
     
     withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', 
@@ -116,7 +118,6 @@ def buildSecurityPropsSimple() {
                 securityProps = "--consumer-property security.protocol=PLAINTEXT"
                 break
             default:
-                // Default to SASL_PLAINTEXT like your working command
                 securityProps = """--consumer-property security.protocol=SASL_PLAINTEXT \\
                 --consumer-property sasl.mechanism=PLAIN \\
                 --consumer-property 'sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${env.KAFKA_USER}" password="${env.KAFKA_PASS}";'"""
@@ -127,19 +128,46 @@ def buildSecurityPropsSimple() {
     return securityProps
 }
 
+def buildOutputFilter() {
+    switch(params.OUTPUT_FORMAT) {
+        case 'json-only':
+            return "2>/dev/null | grep '^{'"
+        case 'all-messages':
+            return "2>&1"
+        case 'filtered':
+            return "2>/dev/null | grep -E '^(\\{|\\[)'"
+        default:
+            return "2>/dev/null | grep '^{'"
+    }
+}
+
 def saveAvroMessages(rawOutput, duration) {
     def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
     
-    // Simple filtering - remove obvious noise but keep it minimal
-    def messageLines = rawOutput.split('\n')
-        .findAll { line -> 
-            def trimmed = line.trim()
-            return trimmed && 
-                   !trimmed.contains('Consumer finished') &&
-                   !trimmed.startsWith('SLF4J:') &&
-                   !trimmed.contains('Class path contains multiple') &&
-                   trimmed.length() > 0
-        }
+    // Clean up the output based on format choice
+    def messageLines = []
+    if (params.OUTPUT_FORMAT == 'all-messages') {
+        // Keep everything but filter out known noise
+        messageLines = rawOutput.split('\n')
+            .findAll { line -> 
+                def trimmed = line.trim()
+                return trimmed && 
+                       !trimmed.contains('CONSUMER_FINISHED') &&
+                       !trimmed.startsWith('SLF4J:') &&
+                       !trimmed.contains('Class path contains multiple') &&
+                       !trimmed.contains('log4j:WARN') &&
+                       trimmed.length() > 0
+            }
+    } else {
+        // For json-only and filtered, the output should already be clean
+        messageLines = rawOutput.split('\n')
+            .findAll { line -> 
+                def trimmed = line.trim()
+                return trimmed && 
+                       !trimmed.contains('CONSUMER_FINISHED') &&
+                       trimmed.length() > 0
+            }
+    }
     
     def messageCount = messageLines.size()
     
@@ -152,24 +180,26 @@ def saveAvroMessages(rawOutput, duration) {
 # Duration: ${duration}ms
 # Offset Reset: ${params.OFFSET_RESET}
 # Security Protocol: ${params.SECURITY_PROTOCOL}
+# Output Format: ${params.OUTPUT_FORMAT}
 
 """
 
     if (messageCount == 0) {
-        content += """No Avro messages found.
+        content += """No messages found.
 
 Possible reasons:
 - Topic is empty
 - Messages already consumed by this consumer group
 - Using 'latest' offset and no new messages
 - Consumer timeout reached
+- Messages don't match the output filter
 
-Try using 'earliest' offset or a different consumer group ID.
+Try using 'earliest' offset, different consumer group ID, or 'all-messages' output format.
 
 """
     } else {
         content += """${'='*60}
-AVRO MESSAGES (RAW OUTPUT)
+CONSUMED MESSAGES
 ${'='*60}
 
 """
@@ -178,7 +208,6 @@ ${'='*60}
         }
     }
     
-    // Simple statistics
     def stats = [
         timestamp: timestamp,
         topic: params.TOPIC_NAME,
@@ -187,12 +216,13 @@ ${'='*60}
         messageCount: messageCount,
         durationMs: duration,
         offsetReset: params.OFFSET_RESET,
-        securityProtocol: params.SECURITY_PROTOCOL
+        securityProtocol: params.SECURITY_PROTOCOL,
+        outputFormat: params.OUTPUT_FORMAT
     ]
     
     writeFile file: env.MESSAGES_FILE, text: content
     writeFile file: env.STATS_FILE, text: groovy.json.JsonBuilder(stats).toPrettyString()
     
-    echo "📊 Saved ${messageCount} messages to ${env.MESSAGES_FILE}"
-    echo "📈 Statistics saved to ${env.STATS_FILE}"
+    echo "Saved ${messageCount} messages to ${env.MESSAGES_FILE}"
+    echo "Statistics saved to ${env.STATS_FILE}"
 }
