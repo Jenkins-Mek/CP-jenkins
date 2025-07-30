@@ -145,37 +145,19 @@ def executeConsumer(composeDir, schemaRegistryContainer, timeoutSeconds, kafkaSe
                    schemaRegistryUrl, offsetFlag, maxMsgFlag, securityProps) {
     def result = sh(
         script: """
-            docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml exec -T ${schemaRegistryContainer} bash -c '
-                # Completely disable JMX to avoid port conflicts
-                unset KAFKA_OPTS JMX_PORT KAFKA_JMX_OPTS KAFKA_HEAP_OPTS
-                export KAFKA_OPTS=""
-                export JMX_PORT=""
-                export KAFKA_JMX_OPTS=""
-                export KAFKA_HEAP_OPTS=""
-
-                # Consume Avro messages with timeout and filtering
-                timeout ${timeoutSeconds}s kafka-avro-console-consumer \\
-                    --bootstrap-server ${kafkaServer} \\
-                    --topic ${params.TOPIC_NAME} \\
-                    ${offsetFlag} \\
-                    --property schema.registry.url=${schemaRegistryUrl} \\
-                    --property print.key=true \\
-                    --property print.timestamp=true \\
-                    --property key.separator=" | " \\
-                    --consumer-property group.id=${env.CONSUMER_GROUP_ID} \\
-                    --consumer-property auto.offset.reset=${env.OFFSET_RESET} \\
-                    --consumer-property enable.auto.commit=true \\
-                    --consumer-property auto.commit.interval.ms=1000 \\
-                    --consumer-property session.timeout.ms=30000 \\
-                    --consumer-property heartbeat.interval.ms=3000 \\
-                    ${securityProps} \\
-                    ${maxMsgFlag} \\
-                    2>/dev/null | grep "^{" || echo "Consumer finished"
-            '
+            docker exec -i schema-registry kafka-avro-console-consumer \\
+                --bootstrap-server broker:29093 \\
+                --topic user-date \\
+                --from-beginning \\
+                --property schema.registry.url=http://schema-registry:8081 \\
+                --consumer-property security.protocol=SASL_PLAINTEXT \\
+                --consumer-property sasl.mechanism=PLAIN \\
+                --consumer-property sasl.jaas.config='org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="admin-secret";' \\
+                2>/dev/null | grep '^{'
         """,
         returnStdout: true
     )
-    
+
     return result.trim()
 }
 
