@@ -1,15 +1,15 @@
 properties([
     parameters([
         string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name (required)'),
-        string(name: 'CONSUMER_GROUP_ID', defaultValue: 'jenkins-avro-consumer', description: 'Consumer group ID'),
-        string(name: 'MAX_MESSAGES', defaultValue: '100', description: 'Max messages to consume (0 = unlimited)'),
-        choice(name: 'OFFSET_RESET', choices: ['latest', 'earliest'], description: 'Where to start consuming'),
-        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL', 'PLAINTEXT'], description: 'Security protocol'),
-        string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'broker:29093', description: 'Kafka bootstrap server'),
-        string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://schema-registry:8081', description: 'Schema Registry URL'),
-        string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker compose directory'),
-        string(name: 'TIMEOUT_SECONDS', defaultValue: '30', description: 'Consumer timeout in seconds'),
-        string(name: 'SCHEMA_REGISTRY_CONTAINER', defaultValue: 'schema-registry', description: 'Schema Registry container name')
+        string(name: 'CONSUMER_GROUP_ID', defaultValue: '', description: 'Consumer group ID (optional - auto-generated if empty)'),
+        string(name: 'MAX_MESSAGES', defaultValue: '', description: 'Max messages to consume (optional - unlimited if empty)'),
+        choice(name: 'OFFSET_RESET', choices: ['', 'latest', 'earliest'], description: 'Where to start consuming (optional - defaults to latest)'),
+        choice(name: 'SECURITY_PROTOCOL', choices: ['', 'SASL_PLAINTEXT', 'SASL_SSL', 'PLAINTEXT'], description: 'Security protocol (optional - defaults to SASL_PLAINTEXT)'),
+        string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: '', description: 'Kafka bootstrap server (optional - defaults to broker:29093)'),
+        string(name: 'SCHEMA_REGISTRY_URL', defaultValue: '', description: 'Schema Registry URL (optional - defaults to http://schema-registry:8081)'),
+        string(name: 'COMPOSE_DIR', defaultValue: '', description: 'Docker compose directory (optional - defaults to /confluent/cp-mysetup/cp-all-in-one)'),
+        string(name: 'TIMEOUT_SECONDS', defaultValue: '', description: 'Consumer timeout in seconds (optional - defaults to 30)'),
+        string(name: 'SCHEMA_REGISTRY_CONTAINER', defaultValue: '', description: 'Schema Registry container name (optional - defaults to schema-registry)')
     ])
 ])
 
@@ -26,18 +26,41 @@ pipeline {
         stage('Validate Input') {
             steps {
                 script {
-                    // Set environment variables with defaults
-                    env.COMPOSE_DIR = params.COMPOSE_DIR ?: '/confluent/cp-mysetup/cp-all-in-one'
-                    env.KAFKA_SERVER = params.KAFKA_BOOTSTRAP_SERVER ?: 'broker:29093'
-                    env.SCHEMA_REGISTRY_URL = params.SCHEMA_REGISTRY_URL ?: 'http://schema-registry:8081'
+                    // Set environment variables with smart defaults
+                    env.COMPOSE_DIR = params.COMPOSE_DIR?.trim() ?: '/confluent/cp-mysetup/cp-all-in-one'
+                    env.KAFKA_SERVER = params.KAFKA_BOOTSTRAP_SERVER?.trim() ?: 'broker:29093'
+                    env.SCHEMA_REGISTRY_URL = params.SCHEMA_REGISTRY_URL?.trim() ?: 'http://schema-registry:8081'
+                    env.TIMEOUT_SECONDS = params.TIMEOUT_SECONDS?.trim() ?: '30'
+                    env.SCHEMA_REGISTRY_CONTAINER = params.SCHEMA_REGISTRY_CONTAINER?.trim() ?: 'schema-registry'
+                    env.SECURITY_PROTOCOL = params.SECURITY_PROTOCOL?.trim() ?: 'SASL_PLAINTEXT'
+                    env.OFFSET_RESET = params.OFFSET_RESET?.trim() ?: 'latest'
+                    
+                    // Generate consumer group if not provided
+                    if (!params.CONSUMER_GROUP_ID?.trim()) {
+                        env.CONSUMER_GROUP_ID = "jenkins-avro-consumer-${System.currentTimeMillis()}"
+                        echo "🔄 Auto-generated Consumer Group: ${env.CONSUMER_GROUP_ID}"
+                    } else {
+                        env.CONSUMER_GROUP_ID = params.CONSUMER_GROUP_ID.trim()
+                    }
+                    
+                    // Handle max messages
+                    if (!params.MAX_MESSAGES?.trim()) {
+                        env.MAX_MESSAGES = '0' // 0 means unlimited
+                        echo "📝 Max Messages: Unlimited"
+                    } else {
+                        env.MAX_MESSAGES = params.MAX_MESSAGES.trim()
+                        echo "📝 Max Messages: ${env.MAX_MESSAGES}"
+                    }
                     
                     if (!params.TOPIC_NAME?.trim()) {
                         error("❌ TOPIC_NAME is required")
                     }
+                    
                     echo "✅ Topic: ${params.TOPIC_NAME}"
-                    echo "📊 Consumer Group: ${params.CONSUMER_GROUP_ID}"
-                    echo "⏰ Timeout: ${params.TIMEOUT_SECONDS}s"
-                    echo "📝 Max Messages: ${params.MAX_MESSAGES}"
+                    echo "📊 Consumer Group: ${env.CONSUMER_GROUP_ID}"
+                    echo "⏰ Timeout: ${env.TIMEOUT_SECONDS}s"
+                    echo "🔒 Security Protocol: ${env.SECURITY_PROTOCOL}"
+                    echo "📍 Offset Reset: ${env.OFFSET_RESET}"
                     echo "🏠 Compose Dir: ${env.COMPOSE_DIR}"
                     echo "🌐 Kafka Server: ${env.KAFKA_SERVER}"
                     echo "🔗 Schema Registry: ${env.SCHEMA_REGISTRY_URL}"
@@ -48,24 +71,16 @@ pipeline {
         stage('Setup Client Config') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', 
-                                                   usernameVariable: 'KAFKA_USER', 
-                                                   passwordVariable: 'KAFKA_PASS')]) {
-                        // Create client configuration first
-                        createKafkaClientConfig(env.KAFKA_USER, env.KAFKA_PASS)
+                    if (env.SECURITY_PROTOCOL in ['SASL_PLAINTEXT', 'SASL_SSL']) {
+                        withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', 
+                                                       usernameVariable: 'KAFKA_USER', 
+                                                       passwordVariable: 'KAFKA_PASS')]) {
+                            createKafkaClientConfig(env.KAFKA_USER, env.KAFKA_PASS)
+                        }
+                    } else {
+                        // For PLAINTEXT, create config without credentials
+                        createKafkaClientConfig('', '')
                     }
-                }
-            }
-        }
-
-        stage('Check Topic') {
-            steps {
-                script {
-                    def topicExists = checkTopicExists()
-                    if (!topicExists) {
-                        error("❌ Topic '${params.TOPIC_NAME}' does not exist")
-                    }
-                    echo "✅ Topic verified"
                 }
             }
         }
@@ -100,106 +115,93 @@ pipeline {
     }
 }
 
-def checkTopicExists() {
-    try {
-        def composeDir = env.COMPOSE_DIR ?: params.COMPOSE_DIR
-        def kafkaServer = env.KAFKA_SERVER ?: params.KAFKA_BOOTSTRAP_SERVER
-        def schemaRegistryContainer = params.SCHEMA_REGISTRY_CONTAINER ?: 'schema-registry'
-        
-        def result = sh(
-            script: """
-                docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml exec -T ${schemaRegistryContainer} bash -c "
-                    export KAFKA_OPTS=''
-                    export JMX_PORT=''
-                    export KAFKA_JMX_OPTS=''
-                    unset JMX_PORT
-                    unset KAFKA_JMX_OPTS
-                    unset KAFKA_OPTS
-                    kafka-topics --list --bootstrap-server ${kafkaServer} --command-config ${env.CLIENT_CONFIG_FILE} | grep -x '${params.TOPIC_NAME}'
-                " 2>/dev/null
-            """,
-            returnStdout: true
-        ).trim()
-        return result == params.TOPIC_NAME
-    } catch (Exception e) {
-        echo "⚠️ Could not verify topic existence: ${e.message}"
-        return false
+def consumeAvroMessages() {
+    def maxMsgs = env.MAX_MESSAGES.toInteger()
+    def maxMsgFlag = maxMsgs > 0 ? "--max-messages ${maxMsgs}" : ""
+    def timeoutSeconds = env.TIMEOUT_SECONDS.toInteger()
+    def composeDir = env.COMPOSE_DIR
+    def kafkaServer = env.KAFKA_SERVER
+    def schemaRegistryUrl = env.SCHEMA_REGISTRY_URL
+    def schemaRegistryContainer = env.SCHEMA_REGISTRY_CONTAINER
+    def offsetFlag = env.OFFSET_RESET == 'earliest' ? '--from-beginning' : ''
+    
+    if (env.SECURITY_PROTOCOL in ['SASL_PLAINTEXT', 'SASL_SSL']) {
+        withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', 
+                                         usernameVariable: 'KAFKA_USER', 
+                                         passwordVariable: 'KAFKA_PASS')]) {
+            
+            def securityProps = buildSecurityProperties(env.KAFKA_USER, env.KAFKA_PASS)
+            return executeConsumer(composeDir, schemaRegistryContainer, timeoutSeconds, kafkaServer, 
+                                 schemaRegistryUrl, offsetFlag, maxMsgFlag, securityProps)
+        }
+    } else {
+        def securityProps = buildSecurityProperties('', '')
+        return executeConsumer(composeDir, schemaRegistryContainer, timeoutSeconds, kafkaServer, 
+                             schemaRegistryUrl, offsetFlag, maxMsgFlag, securityProps)
     }
 }
 
-def consumeAvroMessages() {
-    def maxMsgs = params.MAX_MESSAGES.toInteger()
-    def maxMsgFlag = maxMsgs > 0 ? "--max-messages ${maxMsgs}" : ""
-    def timeoutSeconds = params.TIMEOUT_SECONDS.toInteger()
-    def composeDir = env.COMPOSE_DIR ?: params.COMPOSE_DIR
-    def kafkaServer = env.KAFKA_SERVER ?: params.KAFKA_BOOTSTRAP_SERVER
-    def schemaRegistryUrl = env.SCHEMA_REGISTRY_URL ?: params.SCHEMA_REGISTRY_URL
-    def schemaRegistryContainer = params.SCHEMA_REGISTRY_CONTAINER ?: 'schema-registry'
-    def offsetFlag = params.OFFSET_RESET == 'earliest' ? '--from-beginning' : ''
-    
-    withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', 
-                                     usernameVariable: 'KAFKA_USER', 
-                                     passwordVariable: 'KAFKA_PASS')]) {
-        
-        def securityProps = buildSecurityProperties(env.KAFKA_USER, env.KAFKA_PASS)
-        
-        def result = sh(
-            script: """
-                docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml exec -T ${schemaRegistryContainer} bash -c '
-                    # Completely disable JMX to avoid port conflicts
-                    unset KAFKA_OPTS JMX_PORT KAFKA_JMX_OPTS KAFKA_HEAP_OPTS
-                    export KAFKA_OPTS=""
-                    export JMX_PORT=""
-                    export KAFKA_JMX_OPTS=""
-                    export KAFKA_HEAP_OPTS=""
+def executeConsumer(composeDir, schemaRegistryContainer, timeoutSeconds, kafkaServer, 
+                   schemaRegistryUrl, offsetFlag, maxMsgFlag, securityProps) {
+    def result = sh(
+        script: """
+            docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml exec -T ${schemaRegistryContainer} bash -c '
+                # Completely disable JMX to avoid port conflicts
+                unset KAFKA_OPTS JMX_PORT KAFKA_JMX_OPTS KAFKA_HEAP_OPTS
+                export KAFKA_OPTS=""
+                export JMX_PORT=""
+                export KAFKA_JMX_OPTS=""
+                export KAFKA_HEAP_OPTS=""
 
-                    # Consume Avro messages with timeout and filtering
-                    timeout ${timeoutSeconds}s kafka-avro-console-consumer \\
-                        --bootstrap-server ${kafkaServer} \\
-                        --topic ${params.TOPIC_NAME} \\
-                        ${offsetFlag} \\
-                        --property schema.registry.url=${schemaRegistryUrl} \\
-                        --property print.key=true \\
-                        --property print.timestamp=true \\
-                        --property key.separator=" | " \\
-                        --consumer-property group.id=${params.CONSUMER_GROUP_ID} \\
-                        --consumer-property auto.offset.reset=${params.OFFSET_RESET} \\
-                        --consumer-property enable.auto.commit=true \\
-                        --consumer-property auto.commit.interval.ms=1000 \\
-                        --consumer-property session.timeout.ms=30000 \\
-                        --consumer-property heartbeat.interval.ms=3000 \\
-                        ${securityProps} \\
-                        ${maxMsgFlag} \\
-                        2>/dev/null | grep "^{" || echo "Consumer finished"
-                '
-            """,
-            returnStdout: true
-        )
-        
-        return result.trim()
-    }
+                # Consume Avro messages with timeout and filtering
+                timeout ${timeoutSeconds}s kafka-avro-console-consumer \\
+                    --bootstrap-server ${kafkaServer} \\
+                    --topic ${params.TOPIC_NAME} \\
+                    ${offsetFlag} \\
+                    --property schema.registry.url=${schemaRegistryUrl} \\
+                    --property print.key=true \\
+                    --property print.timestamp=true \\
+                    --property key.separator=" | " \\
+                    --consumer-property group.id=${env.CONSUMER_GROUP_ID} \\
+                    --consumer-property auto.offset.reset=${env.OFFSET_RESET} \\
+                    --consumer-property enable.auto.commit=true \\
+                    --consumer-property auto.commit.interval.ms=1000 \\
+                    --consumer-property session.timeout.ms=30000 \\
+                    --consumer-property heartbeat.interval.ms=3000 \\
+                    ${securityProps} \\
+                    ${maxMsgFlag} \\
+                    2>/dev/null | grep "^{" || echo "Consumer finished"
+            '
+        """,
+        returnStdout: true
+    )
+    
+    return result.trim()
 }
 
 def buildSecurityProperties(username, password) {
-    switch(params.SECURITY_PROTOCOL) {
+    switch(env.SECURITY_PROTOCOL) {
         case 'SASL_PLAINTEXT':
         case 'SASL_SSL':
-            return """--consumer-property security.protocol=${params.SECURITY_PROTOCOL} \\
-                        --consumer-property sasl.mechanism=PLAIN \\
-                        --consumer-property sasl.jaas.config='org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";'"""
+            if (username && password) {
+                return """--consumer-property security.protocol=${env.SECURITY_PROTOCOL} \\
+                            --consumer-property sasl.mechanism=PLAIN \\
+                            --consumer-property sasl.jaas.config='org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";'"""
+            } else {
+                echo "⚠️ SASL protocol selected but no credentials provided"
+                return "--consumer-property security.protocol=PLAINTEXT"
+            }
         case 'PLAINTEXT':
             return "--consumer-property security.protocol=PLAINTEXT"
         default:
-            return """--consumer-property security.protocol=SASL_PLAINTEXT \\
-                        --consumer-property sasl.mechanism=PLAIN \\
-                        --consumer-property sasl.jaas.config='org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";'"""
+            return "--consumer-property security.protocol=PLAINTEXT"
     }
 }
 
 def cleanupClientConfig() {
     try {
-        def composeDir = env.COMPOSE_DIR ?: params.COMPOSE_DIR
-        def schemaRegistryContainer = params.SCHEMA_REGISTRY_CONTAINER ?: 'schema-registry'
+        def composeDir = env.COMPOSE_DIR
+        def schemaRegistryContainer = env.SCHEMA_REGISTRY_CONTAINER
         sh """
             docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml \\
             exec -T ${schemaRegistryContainer} bash -c "rm -f ${env.CLIENT_CONFIG_FILE}" 2>/dev/null || true
@@ -210,19 +212,25 @@ def cleanupClientConfig() {
 }
 
 def createKafkaClientConfig(username, password) {
-    def composeDir = env.COMPOSE_DIR ?: params.COMPOSE_DIR
-    def kafkaServer = env.KAFKA_SERVER ?: params.KAFKA_BOOTSTRAP_SERVER
-    def schemaRegistryContainer = params.SCHEMA_REGISTRY_CONTAINER ?: 'schema-registry'
+    def composeDir = env.COMPOSE_DIR
+    def kafkaServer = env.KAFKA_SERVER
+    def schemaRegistryContainer = env.SCHEMA_REGISTRY_CONTAINER
     
     def securityConfig = ""
-    switch(params.SECURITY_PROTOCOL) {
+    switch(env.SECURITY_PROTOCOL) {
         case 'SASL_PLAINTEXT':
         case 'SASL_SSL':
-            securityConfig = """
-security.protocol=${params.SECURITY_PROTOCOL}
+            if (username && password) {
+                securityConfig = """
+security.protocol=${env.SECURITY_PROTOCOL}
 sasl.mechanism=PLAIN
 sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
 """
+            } else {
+                securityConfig = """
+security.protocol=PLAINTEXT
+"""
+            }
             break
         case 'PLAINTEXT':
             securityConfig = """
@@ -231,9 +239,7 @@ security.protocol=PLAINTEXT
             break
         default:
             securityConfig = """
-security.protocol=SASL_PLAINTEXT
-sasl.mechanism=PLAIN
-sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
+security.protocol=PLAINTEXT
 """
             break
     }
@@ -266,10 +272,10 @@ def saveMessages(messages, duration) {
     def content = """# Avro Kafka Consumer Report
 # Generated: ${timestamp}
 # Topic: ${params.TOPIC_NAME}
-# Consumer Group: ${params.CONSUMER_GROUP_ID}
+# Consumer Group: ${env.CONSUMER_GROUP_ID}
 # Messages Retrieved: ${messageCount}
 # Duration: ${duration}ms
-# Offset Reset: ${params.OFFSET_RESET}
+# Offset Reset: ${env.OFFSET_RESET}
 # Schema Registry: ${env.SCHEMA_REGISTRY_URL}
 
 """
@@ -318,12 +324,12 @@ Value: ${parts[2]}
     // Create stats file
     def stats = [
         topic: params.TOPIC_NAME,
-        consumerGroup: params.CONSUMER_GROUP_ID,
+        consumerGroup: env.CONSUMER_GROUP_ID,
         messageCount: messageCount,
         duration: duration,
         timestamp: timestamp,
         schemaRegistry: env.SCHEMA_REGISTRY_URL,
-        offsetReset: params.OFFSET_RESET
+        offsetReset: env.OFFSET_RESET
     ]
     
     writeFile file: env.STATS_FILE, text: groovy.json.JsonOutput.toJson(stats)
