@@ -147,24 +147,33 @@ def consumeAvroMessages() {
     
     def securityProps = buildSecurityProperties()
     
+    // Use either --from-beginning OR auto.offset.reset, not both
+    def offsetFlag = ""
+    def offsetProperty = ""
+    if (params.OFFSET_RESET == 'earliest') {
+        offsetFlag = "--from-beginning"
+    } else {
+        offsetProperty = "--consumer-property auto.offset.reset=${params.OFFSET_RESET}"
+    }
+    
     def result = sh(
         script: """
             docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml \\
             exec -T ${env.CONTAINER_NAME} bash -c '
-                # Set environment variables
+                # Set environment variables and suppress SLF4J warnings
                 export KAFKA_OPTS=""
                 export JMX_PORT=""
                 export KAFKA_JMX_OPTS=""
                 export KAFKA_HEAP_OPTS=""
                 
-                # Consume Avro messages
+                # Consume Avro messages (suppress SLF4J warnings in stderr)
                 timeout ${timeoutSeconds}s kafka-avro-console-consumer \\
                     --bootstrap-server ${kafkaServer} \\
                     --topic ${params.TOPIC_NAME} \\
-                    --from-beginning \\
+                    ${offsetFlag} \\
                     --property schema.registry.url=${env.SCHEMA_REGISTRY_URL} \\
                     --consumer-property group.id=${params.CONSUMER_GROUP_ID} \\
-                    --consumer-property auto.offset.reset=${params.OFFSET_RESET} \\
+                    ${offsetProperty} \\
                     --consumer-property enable.auto.commit=true \\
                     --consumer-property auto.commit.interval.ms=1000 \\
                     --consumer-property session.timeout.ms=30000 \\
@@ -174,7 +183,7 @@ def consumeAvroMessages() {
                     --property print.key=true \\
                     --property print.timestamp=true \\
                     --property key.separator=" | " \\
-                    --timeout-ms 10000 2>/dev/null || echo "Avro Consumer finished"
+                    --timeout-ms 10000 2> >(grep -v "SLF4J:" >&2) || echo "Avro Consumer finished"
             '
         """,
         returnStdout: true
@@ -223,6 +232,11 @@ def saveAvroMessages(messages, duration) {
                    !trimmed.contains('ERROR') &&
                    !trimmed.startsWith('#') &&
                    !trimmed.contains('SLF4J') &&
+                   !trimmed.contains('Class path contains multiple') &&
+                   !trimmed.contains('Found binding in') &&
+                   !trimmed.contains('See http://www.slf4j.org') &&
+                   !trimmed.contains('Actual binding is of type') &&
+                   !trimmed.contains("Can't simultaneously specify") &&
                    trimmed.length() > 0
         }
     
