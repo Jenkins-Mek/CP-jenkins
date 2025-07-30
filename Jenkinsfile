@@ -8,7 +8,8 @@ properties([
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'broker:29093', description: 'Kafka bootstrap server'),
         string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://schema-registry:8081', description: 'Schema Registry URL'),
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker compose directory'),
-        string(name: 'TIMEOUT_SECONDS', defaultValue: '30', description: 'Consumer timeout in seconds')
+        string(name: 'TIMEOUT_SECONDS', defaultValue: '30', description: 'Consumer timeout in seconds'),
+        booleanParam(name: 'VERBOSE_OUTPUT', defaultValue: false, description: 'Include debug information in output')
     ])
 ])
 
@@ -18,6 +19,7 @@ pipeline {
     environment {
         MESSAGES_FILE = 'consumed-avro-messages.txt'
         STATS_FILE = 'avro-consumption-stats.json'
+        DEBUG_FILE = 'avro-consumer-debug.log'
         CONTAINER_NAME = 'schema-registry'
     }
 
@@ -40,6 +42,7 @@ pipeline {
                     echo "🏠 Compose Dir: ${env.COMPOSE_DIR}"
                     echo "🌐 Kafka Server: ${env.KAFKA_SERVER}"
                     echo "📋 Schema Registry: ${env.SCHEMA_REGISTRY_URL}"
+                    echo "🔍 Verbose Output: ${params.VERBOSE_OUTPUT}"
                 }
             }
         }
@@ -73,11 +76,11 @@ pipeline {
             steps {
                 script {
                     def startTime = System.currentTimeMillis()
-                    def messages = consumeAvroMessages()
+                    def consumeResult = consumeAvroMessagesEnhanced()
                     def endTime = System.currentTimeMillis()
                     def duration = endTime - startTime
                     
-                    saveAvroMessages(messages, duration)
+                    saveAvroMessages(consumeResult.messages, consumeResult.debugInfo, duration)
                 }
             }
         }
@@ -85,7 +88,13 @@ pipeline {
 
     post {
         success {
-            archiveArtifacts artifacts: "${env.MESSAGES_FILE}, ${env.STATS_FILE}", allowEmptyArchive: true
+            script {
+                def artifacts = "${env.MESSAGES_FILE}, ${env.STATS_FILE}"
+                if (params.VERBOSE_OUTPUT) {
+                    artifacts += ", ${env.DEBUG_FILE}"
+                }
+                archiveArtifacts artifacts: artifacts, allowEmptyArchive: true
+            }
             echo "✅ Avro message consumption completed!"
         }
         failure {
@@ -93,7 +102,6 @@ pipeline {
         }
         always {
             script {
-                // No cleanup needed for avro consumer
                 echo "🧹 Cleanup completed"
             }
         }
@@ -107,7 +115,7 @@ def checkSchemaRegistry() {
             script: """
                 docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml \\
                 exec -T ${env.CONTAINER_NAME} bash -c "
-                    curl -s ${env.SCHEMA_REGISTRY_URL}/subjects || echo 'FAILED'
+                    curl -s --connect-timeout 10 --max-time 15 ${env.SCHEMA_REGISTRY_URL}/subjects || echo 'FAILED'
                 " 2>/dev/null
             """,
             returnStdout: true
@@ -126,7 +134,7 @@ def checkTopicSchema() {
             script: """
                 docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml \\
                 exec -T ${env.CONTAINER_NAME} bash -c "
-                    curl -s ${env.SCHEMA_REGISTRY_URL}/subjects/${params.TOPIC_NAME}-value/versions/latest 2>/dev/null || echo 'NOT_FOUND'
+                    curl -s --connect-timeout 10 --max-time 15 ${env.SCHEMA_REGISTRY_URL}/subjects/${params.TOPIC_NAME}-value/versions/latest 2>/dev/null || echo 'NOT_FOUND'
                 "
             """,
             returnStdout: true
@@ -138,7 +146,7 @@ def checkTopicSchema() {
     }
 }
 
-def consumeAvroMessages() {
+def consumeAvroMessagesEnhanced() {
     def maxMsgs = params.MAX_MESSAGES.toInteger()
     def maxMsgFlag = maxMsgs > 0 ? "--max-messages ${maxMsgs}" : ""
     def timeoutSeconds = params.TIMEOUT_SECONDS.toInteger()
@@ -160,15 +168,13 @@ def consumeAvroMessages() {
         script: """
             docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml \\
             exec -T ${env.CONTAINER_NAME} bash -c '
-                # Set environment variables and suppress logging
-                export KAFKA_OPTS="-Dorg.slf4j.simpleLogger.defaultLogLevel=ERROR"
-                export JMX_PORT=""
-                export KAFKA_JMX_OPTS=""
-                export KAFKA_HEAP_OPTS=""
-                export KAFKA_LOG4J_OPTS="-Dlog4j.configuration=file:/dev/null"
+                # Generate unique file names to avoid conflicts
+                TIMESTAMP=\$(date +%s%N)
+                MESSAGES_FILE="/tmp/kafka_messages_\${TIMESTAMP}"
+                DEBUG_FILE="/tmp/kafka_debug_\${TIMESTAMP}"
                 
-                # Consume Avro messages
-                timeout ${timeoutSeconds}s kafka-avro-console-consumer \\
+                # Consume Avro messages with enhanced logging control
+                (timeout ${timeoutSeconds}s kafka-avro-console-consumer \\
                     --bootstrap-server ${kafkaServer} \\
                     --topic ${params.TOPIC_NAME} \\
                     ${offsetFlag} \\
@@ -179,18 +185,69 @@ def consumeAvroMessages() {
                     --consumer-property auto.commit.interval.ms=1000 \\
                     --consumer-property session.timeout.ms=30000 \\
                     --consumer-property heartbeat.interval.ms=3000 \\
+                    --consumer-property fetch.min.bytes=1 \\
+                    --consumer-property fetch.max.wait.ms=5000 \\
                     ${securityProps} \\
                     ${maxMsgFlag} \\
                     --property print.key=true \\
                     --property print.timestamp=true \\
                     --property key.separator=" | " \\
-                    --timeout-ms 10000 2>/dev/null || echo "Avro Consumer finished"
+                    --timeout-ms 10000 \\
+                    2>\$DEBUG_FILE || echo "CONSUMER_FINISHED") | \\
+                    grep -v -E "^[[:space:]]*\$" | \\
+                    grep -v -E "(WARN|ERROR|INFO|DEBUG|TRACE)" | \\
+                    grep -v -E "(SLF4J|org\\.|java\\.|kafka\\.|avro\\.)" | \\
+                    grep -v -E "(Class path|binding|config|metrics)" | \\
+                    grep -v -E "(NetworkClient|Login|Failed|Exception|Caused)" | \\
+                    grep -v -E "\\[20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]" | \\
+                    grep -v -E "^#" | \\
+                    grep -v -E "CONSUMER_FINISHED" > \$MESSAGES_FILE
+                
+                # Output results with delimiter
+                echo "===MESSAGES_START==="
+                cat \$MESSAGES_FILE 2>/dev/null || echo ""
+                echo "===MESSAGES_END==="
+                echo "===DEBUG_START==="
+                if [ "${params.VERBOSE_OUTPUT}" = "true" ]; then
+                    cat \$DEBUG_FILE 2>/dev/null || echo "No debug info available"
+                else
+                    echo "Debug output disabled (enable VERBOSE_OUTPUT to see)"
+                fi
+                echo "===DEBUG_END==="
+                
+                # Cleanup temp files
+                rm -f \$MESSAGES_FILE \$DEBUG_FILE
             '
         """,
         returnStdout: true
     )
     
-    return result.trim()
+    // Parse the result to separate messages and debug info
+    def lines = result.split('\n')
+    def messages = []
+    def debugInfo = []
+    def currentSection = 'none'
+    
+    lines.each { line ->
+        if (line == '===MESSAGES_START===') {
+            currentSection = 'messages'
+        } else if (line == '===MESSAGES_END===') {
+            currentSection = 'none'
+        } else if (line == '===DEBUG_START===') {
+            currentSection = 'debug'
+        } else if (line == '===DEBUG_END===') {
+            currentSection = 'none'
+        } else if (currentSection == 'messages' && line.trim()) {
+            messages.add(line)
+        } else if (currentSection == 'debug') {
+            debugInfo.add(line)
+        }
+    }
+    
+    return [
+        messages: messages.join('\n'),
+        debugInfo: debugInfo.join('\n')
+    ]
 }
 
 def buildSecurityProperties() {
@@ -202,6 +259,7 @@ def buildSecurityProperties() {
         switch(params.SECURITY_PROTOCOL) {
             case 'SASL_PLAINTEXT':
             case 'SASL_SSL':
+                // Use single quotes to prevent shell interpretation issues
                 securityProps = """--consumer-property security.protocol=${params.SECURITY_PROTOCOL} \\
                     --consumer-property sasl.mechanism=PLAIN \\
                     --consumer-property 'sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${env.KAFKA_USER}" password="${env.KAFKA_PASS}";'"""
@@ -220,40 +278,11 @@ def buildSecurityProperties() {
     return securityProps
 }
 
-def saveAvroMessages(messages, duration) {
+def saveAvroMessages(messages, debugInfo, duration) {
     def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
     
-    // Filter out system messages and keep only actual Kafka messages
-    def messageLines = messages.split('\n')
-        .findAll { line -> 
-            def trimmed = line.trim()
-            return trimmed && 
-                   !trimmed.contains('Avro Consumer finished') &&
-                   !trimmed.contains('WARN') &&
-                   !trimmed.contains('ERROR') &&
-                   !trimmed.contains('INFO') &&
-                   !trimmed.startsWith('#') &&
-                   !trimmed.contains('SLF4J') &&
-                   !trimmed.contains('Class path contains multiple') &&
-                   !trimmed.contains('Found binding in') &&
-                   !trimmed.contains('See http://www.slf4j.org') &&
-                   !trimmed.contains('Actual binding is of type') &&
-                   !trimmed.contains("Can't simultaneously specify") &&
-                   !trimmed.contains('KafkaAvroDeserializerConfig values') &&
-                   !trimmed.contains('ConsumerConfig values') &&
-                   !trimmed.contains('initializing Kafka metrics') &&
-                   !trimmed.contains('App info kafka.consumer') &&
-                   !trimmed.contains('Unknown error when running') &&
-                   !trimmed.contains('org.apache.kafka') &&
-                   !trimmed.contains('at org.apache.kafka') &&
-                   !trimmed.contains('Caused by:') &&
-                   !trimmed.contains('Failed to construct') &&
-                   !trimmed.contains('Failed to create new NetworkClient') &&
-                   !trimmed.contains('Login module control flag') &&
-                   !trimmed.startsWith('[2025-') &&
-                   trimmed.length() > 0
-        }
-    
+    // Process messages - they should already be clean from the enhanced consumer
+    def messageLines = messages ? messages.split('\n').findAll { it.trim() } : []
     def messageCount = messageLines.size()
     
     def content = """# Kafka Avro Consumer Report
@@ -265,6 +294,7 @@ def saveAvroMessages(messages, duration) {
 # Duration: ${duration}ms
 # Offset Reset: ${params.OFFSET_RESET}
 # Security Protocol: ${params.SECURITY_PROTOCOL}
+# Verbose Output: ${params.VERBOSE_OUTPUT}
 
 """
 
@@ -273,11 +303,18 @@ def saveAvroMessages(messages, duration) {
 
 Possible reasons:
 - Topic is empty or contains no Avro messages
-- Messages already consumed by this consumer group
-- Offset setting (try 'earliest' to read from beginning)
-- Consumer timeout reached
-- Schema incompatibility issues
+- Messages already consumed by this consumer group (try different group ID)
+- Offset setting ('earliest' reads from beginning, 'latest' reads new messages only)
+- Consumer timeout reached before messages arrived
+- Schema incompatibility or deserialization issues
 - Topic doesn't use Avro serialization
+- Network connectivity issues with Kafka or Schema Registry
+
+To troubleshoot:
+1. Enable VERBOSE_OUTPUT parameter to see debug information
+2. Try with OFFSET_RESET='earliest' and a new CONSUMER_GROUP_ID
+3. Verify topic has messages: kafka-topics --describe --topic ${params.TOPIC_NAME}
+4. Check Schema Registry connectivity and topic schema registration
 
 """
     } else {
@@ -287,45 +324,71 @@ ${'='*60}
 
 """
         messageLines.eachWithIndex { message, index ->
-            // Check if message has the key separator format
-            if (message.contains(' | ')) {
-                def parts = message.split(' \\| ', 3)
+            def cleanMessage = message.trim()
+            if (cleanMessage.contains(' | ')) {
+                // Parse structured message with timestamp, key, and value
+                def parts = cleanMessage.split(' \\| ', 3)
                 if (parts.length >= 3) {
-                    content += """[${index + 1}] ${parts[0]}
-Key: ${parts[1] == 'null' ? '(no key)' : parts[1]}
-Avro Value: ${parts[2]}
+                    def timestamp_part = parts[0]
+                    def key_part = parts[1] == 'null' ? '(no key)' : parts[1]
+                    def value_part = parts[2]
+                    
+                    content += """[${index + 1}] Timestamp: ${timestamp_part}
+Key: ${key_part}
+Avro Value: ${value_part}
 
 """
                 } else {
-                    content += "[${index + 1}] ${message}\n\n"
+                    content += "[${index + 1}] ${cleanMessage}\n\n"
                 }
             } else {
                 // Message without separator, likely just the value
                 content += """[${index + 1}] 
-Avro Value: ${message}
+Avro Value: ${cleanMessage}
 
 """
             }
         }
     }
     
-    // Generate statistics
+    // Generate comprehensive statistics
     def stats = [
         timestamp: timestamp,
         topic: params.TOPIC_NAME,
         consumerGroup: params.CONSUMER_GROUP_ID,
         schemaRegistry: env.SCHEMA_REGISTRY_URL,
+        kafkaBootstrapServer: env.KAFKA_SERVER,
         messageCount: messageCount,
         durationMs: duration,
         offsetReset: params.OFFSET_RESET,
         securityProtocol: params.SECURITY_PROTOCOL,
         maxMessages: params.MAX_MESSAGES,
-        timeoutSeconds: params.TIMEOUT_SECONDS
+        timeoutSeconds: params.TIMEOUT_SECONDS,
+        verboseOutput: params.VERBOSE_OUTPUT,
+        composeDir: env.COMPOSE_DIR
     ]
     
     writeFile file: env.MESSAGES_FILE, text: content
     writeFile file: env.STATS_FILE, text: groovy.json.JsonBuilder(stats).toPrettyString()
     
+    // Save debug information if verbose output is enabled
+    if (params.VERBOSE_OUTPUT && debugInfo) {
+        def debugContent = """# Kafka Avro Consumer Debug Log
+# Generated: ${timestamp}
+# Topic: ${params.TOPIC_NAME}
+
+${debugInfo}
+"""
+        writeFile file: env.DEBUG_FILE, text: debugContent
+        echo "🐛 Debug information saved to ${env.DEBUG_FILE}"
+    }
+    
     echo "📊 Saved ${messageCount} Avro messages to ${env.MESSAGES_FILE}"
     echo "📈 Statistics saved to ${env.STATS_FILE}"
+    
+    if (messageCount > 0) {
+        echo "✅ Successfully consumed ${messageCount} Avro messages in ${duration}ms"
+    } else {
+        echo "⚠️ No messages consumed - check debug output or enable verbose mode for troubleshooting"
+    }
 }
