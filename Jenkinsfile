@@ -24,8 +24,6 @@ pipeline {
 
     environment {
         PRODUCER_OUTPUT_FILE = 'schema-producer-results.txt'
-        MESSAGE_DATA_FILE = '/tmp/producer-messages.json'
-        SCHEMA_FILE = '/tmp/schema-definition.json'
     }
 
     stages {
@@ -95,13 +93,10 @@ pipeline {
         stage('Prepare Message Data') {
             steps {
                 script {
-                    if (params.USE_FILE_INPUT) {
-                        echo "Using file input: ${params.INPUT_FILE_PATH}"
-                        prepareMessageDataFromFile()
-                    } else {
-                        echo "Using parameter input data"
-                        prepareMessageDataFromParameter()
-                    }
+                    echo "Message data will be provided via heredoc"
+                    echo "Message Count: ${params.MESSAGE_COUNT}"
+                    echo "Sample Message: ${params.MESSAGE_DATA}"
+                    
                     if (params.VALIDATE_SCHEMA_COMPATIBILITY) {
                         validateMessageAgainstSchema()
                     }
@@ -150,6 +145,15 @@ def produceSchemaMessages(topicName, username, password) {
         def producerCommand = getSchemaProducerCommand(params.SCHEMA_TYPE)
         def saslConfig = "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"${username}\" password=\"${password}\";"
         
+        // Generate message data based on count
+        def messageCount = params.MESSAGE_COUNT.toInteger()
+        def messageData = params.MESSAGE_DATA.trim()
+        def messages = []
+        for (int i = 0; i < messageCount; i++) {
+            messages.add(messageData)
+        }
+        def messageContent = messages.join('\n')
+        
         def produceOutput = sh(
             script: """
                 docker compose --project-directory '${params.COMPOSE_DIR}' -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
@@ -159,23 +163,19 @@ def produceSchemaMessages(topicName, username, password) {
                 --property schema.registry.url=${params.SCHEMA_REGISTRY_URL} \\
                 --producer-property security.protocol=${params.SECURITY_PROTOCOL} \\
                 --producer-property sasl.mechanism=PLAIN \\
-                --producer-property sasl.jaas.config='${saslConfig}' \\
-                --property value.schema='${params.SCHEMA_DEFINITION}' < ${env.MESSAGE_DATA_FILE}
+                --producer-property "sasl.jaas.config=${saslConfig}" \\
+                --property "value.schema=${params.SCHEMA_DEFINITION}" <<EOF
+${messageContent}
+EOF
             """,
             returnStdout: true
         ).trim()
 
-        def messageCount = sh(
-            script: """
-                docker compose --project-directory '${params.COMPOSE_DIR}' -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
-                exec -T schema-registry wc -l < ${env.MESSAGE_DATA_FILE}
-            """,
-            returnStdout: true
-        ).trim()
-
-        return """Successfully produced ${messageCount} schema-based messages to topic: ${topicName}
+        return """Schema-based message production completed.
+Topic: ${topicName}
 Schema Type: ${params.SCHEMA_TYPE}
 Schema Subject: ${getSchemaSubject()}
+Message Count: ${messageCount}
 Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
 Security Protocol: ${params.SECURITY_PROTOCOL}
 
@@ -339,9 +339,11 @@ def prepareMessageDataFromParameter() {
             echo "Preparing ${messageCount} schema-based messages..."
             rm -f "${env.MESSAGE_DATA_FILE}"
             for i in \$(seq 1 ${messageCount}); do
-                echo "${messageData}" >> "${env.MESSAGE_DATA_FILE}"
+                echo "'"${messageData}"'" >> "${env.MESSAGE_DATA_FILE}"
             done
             echo "Message data file prepared with ${messageCount} messages"
+            echo "File exists check:"
+            ls -la "${env.MESSAGE_DATA_FILE}"
             echo "Sample content:"
             head -3 "${env.MESSAGE_DATA_FILE}"
         '
@@ -355,7 +357,7 @@ def validateMessageAgainstSchema() {
         exec -T schema-registry bash -c '
             echo "Performing basic JSON format validation..."
             if command -v jq >/dev/null 2>&1; then
-                head -1 ${env.MESSAGE_DATA_FILE} | jq . >/dev/null
+                echo "'"${params.MESSAGE_DATA}"'" | jq . >/dev/null
                 if [ \$? -eq 0 ]; then
                     echo "Message data appears to be valid JSON format"
                 else
@@ -418,12 +420,6 @@ Input File Path: ${params.INPUT_FILE_PATH}
 }
 
 def cleanupFiles() {
-    try {
-        sh """
-            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T schema-registry bash -c "rm -f ${env.MESSAGE_DATA_FILE} ${env.SCHEMA_FILE}" 2>/dev/null || true
-        """
-    } catch (Exception e) {
-        // Ignore cleanup errors
-    }
+    // No temporary files to clean up when using heredoc
+    echo "No cleanup needed - using heredoc approach"
 }
