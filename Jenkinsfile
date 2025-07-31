@@ -703,8 +703,8 @@ pipeline {
                                 ],
                                 propagate: false,
                                 wait: true
-                            
-                            copyArtifacts projectName: 'org-cp-tools/CP-jenkins/list-topics',
+
+                            copyArtifacts projectName: 'org-cp-tools/CP-jenkins/describe-topic',
                                     buildNumber: "${DescribeTopicsJob.number}",
                                     filter: 'kafka-topics-describe.txt',
                                     target: '.'
