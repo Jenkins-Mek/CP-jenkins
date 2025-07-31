@@ -560,11 +560,6 @@ properties([
                                     <p style="margin: 5px 0 15px 0; color: #006400;">This operation will list all registered schemas in the Schema Registry with their subjects, versions, and compatibility settings.</p>
                                     <table style="width: 100%; border-collapse: collapse;">
                                         <tr>
-                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                <label style="font-weight: bold; color: #006400;">Filter by Subject</label>
-                                            </td>
-                                        </tr>
-                                        <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #006400;">Include Details</label>
                                             </td>
