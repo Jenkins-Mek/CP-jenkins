@@ -865,8 +865,8 @@ pipeline {
                             def listSchemasJob = build job: 'org-cp-tools/CP-jenkins/list-schema',
                                 parameters: [
                                     string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
-                                    string(name: 'SCHEMA_REGISTRY_URL', value: "$(env.SCHEMA_REGISTRY_URL)"),
-                                    booleanParam(name: 'INCLUDE_VERSIONS', value: "$(env.SHOW_VERSIONS)")
+                                    string(name: 'SCHEMA_REGISTRY_URL', value: "${env.SCHEMA_REGISTRY_URL}"),
+                                    booleanParam(name: 'INCLUDE_VERSIONS', value: "${env.SHOW_VERSIONS}")
                                 ],
                                 propagate: false,
                                 wait: true
