@@ -652,6 +652,22 @@ pipeline {
                             env.INCLUDE_INTERNAL = values.contains('true') ? 'true' : 'false'
                             echo "Listing all topics (Include internal: ${env.INCLUDE_INTERNAL})"
                             break
+                        case 'ALTER_TOPIC':
+                            env.TOPIC_NAME = values[0]
+                            env.RETENTION_DAYS = values[1] ?: '7'
+                            env.CLEANUP_POLICY = values[2] ?: 'delete'
+                            env.SEGMENT_BYTES = values[3] ?: '1073741824'
+                            env.MIN_INSYNC_REPLICAS = values[4] ?: '1'
+                            env.MAX_MESSAGE_BYTES = values[5] ?: '1000000'
+                            echo """
+                            Altering topic: ${env.TOPIC_NAME}
+                                  - Retention Days: ${env.RETENTION_DAYS}
+                                  - Cleanup Policy: ${env.CLEANUP_POLICY}
+                                  - Segment Bytes: ${env.SEGMENT_BYTES}
+                                  - Min In-Sync Replicas: ${env.MIN_INSYNC_REPLICAS}
+                                  - Max Message Bytes: ${env.MAX_MESSAGE_BYTES}
+                            """
+                            break
                     }
                 }
             }
@@ -763,10 +779,15 @@ pipeline {
                             build job: 'org-cp-tools/CP-jenkins/alter-topic',
                                 parameters: [
                                     string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
-                                    string(name: 'CONFIGS', value: "${env.CONFIGS}"),
                                     string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
                                     string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
-                                    string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}")
+                                    string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
+                                    string(name: 'RETENTION_DAYS', value: "${env.RETENTION_DAYS}"),
+                                    string(name: 'CLEANUP_POLICY', value: "${env.CLEANUP_POLICY}"),
+                                    string(name: 'SEGMENT_BYTES', value: "${env.SEGMENT_BYTES}"),
+                                    string(name: 'MIN_INSYNC_REPLICAS', value: "${env.MIN_INSYNC_REPLICAS}"),
+                                    string(name: 'MAX_MESSAGE_BYTES', value: "${env.MAX_MESSAGE_BYTES}")
+
                                 ],
                                 propagate: false,
                                 wait: true
