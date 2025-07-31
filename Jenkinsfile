@@ -19,17 +19,15 @@ properties([
                     sandbox: true,
                     script: '''
                         return [
+                            "LIST_TOPICS:selected",
                             "CREATE_TOPIC",
                             "ALTER_TOPIC",
-                            "DELETE_TOPIC",
-                            "DESCRIBE_TOPIC",
-                            "LIST_TOPICS:selected",
                             "PRODUCER",
                             "CONSUMER",
+                            "LIST_SCHEMA",
                             "REGISTER_SCHEMA",
-                            "DELETE_SCHEMA",
                             "DESCRIBE_SCHEMA",
-                            "LIST_SCHEMA"
+                            "DELETE_SCHEMA"
                         ]
                     '''
                 ]
@@ -592,6 +590,7 @@ pipeline {
         KAFKA_BOOTSTRAP_SERVER = 'localhost:9092'
         SECURITY_PROTOCOL = 'SASL_PLAINTEXT'
         TOPICS_LIST_FILE = 'kafka-topics-list.txt'
+        TOPIC_DESCRIPTION_FILE = 'kafka-topics-describe.txt'
         CLIENT_CONFIG_FILE = '/tmp/client.properties'
     }
 
@@ -835,12 +834,31 @@ pipeline {
     post {
         success {
             script {
-                if (params.OPERATION == 'LIST_TOPICS') {
-                    archiveArtifacts artifacts: "${env.TOPICS_LIST_FILE}",
-                                   fingerprint: true,
-                                   allowEmptyArchive: true
-                    echo "📦 Topics list archived as artifact"
+                // Map of operations to their corresponding files
+                def operationFiles = [
+                    'LIST_TOPICS': env.TOPICS_LIST_FILE,
+                    'DESCRIBE_TOPIC': env.TOPIC_DESCRIPTION_FILE,
+                ]
+
+                def currentFile = operationFiles[params.OPERATION]
+
+                if (currentFile) {
+                    // Display content in console and archive
+                    if (fileExists(currentFile)) {
+                        echo "📄 ${params.OPERATION} Results:"
+                        echo "=" * 60
+                        echo readFile(currentFile)
+                        echo "=" * 60
+
+                        archiveArtifacts artifacts: currentFile,
+                                       fingerprint: true,
+                                       allowEmptyArchive: true
+                        echo "📦 Results archived as artifact: ${currentFile}"
+                    } else {
+                        echo "⚠️ Warning: Output file ${currentFile} not found"
+                    }
                 }
+
                 echo "✅ Kafka topic operation '${params.OPERATION}' completed successfully"
             }
         }
