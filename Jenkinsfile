@@ -673,6 +673,11 @@ pipeline {
                                 ],
                                 propagate: false,
                                 wait: true
+
+                            copyArtifacts projectName: 'org-cp-tools/CP-jenkins/list-topics',
+                                    buildNumber: "${listTopicsJob.number}",
+                                    filter: 'kafka-topics-list.txt',
+                                    target: '.'
                             break
 
                         case 'CREATE_TOPIC':
@@ -844,7 +849,6 @@ pipeline {
                 def currentFile = operationFiles[params.OPERATION]
 
                 if (currentFile) {
-                    // Display content in console and archive
                     if (fileExists(currentFile)) {
                         echo "📄 ${params.OPERATION} Results:"
                         echo "=" * 60
