@@ -142,7 +142,7 @@ properties([
                                                 <select name='value' style="width: 200px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">
                                                     <option value='delete' selected>delete</option>
                                                     <option value='compact'>compact</option>
-                                                    <option value='delete,compact'>delete,compact</option>
+                                                    <option value='delete,compact'>delete|compact</option>
                                                 </select>
                                                 <div style="font-size: 12px; color: #856404; margin-top: 3px;">Topic cleanup policy</div>
                                             </td>
@@ -655,7 +655,7 @@ pipeline {
                         case 'ALTER_TOPIC':
                             env.TOPIC_NAME = values[0]
                             env.RETENTION_DAYS = values[1] ?: '7'
-                            env.CLEANUP_POLICY = values[2] ?: 'delete'
+                            env.CLEANUP_POLICY = values[2].replace('|', ',') ?: 'delete'
                             env.SEGMENT_BYTES = values[3] ?: '1073741824'
                             env.MIN_INSYNC_REPLICAS = values[4] ?: '1'
                             env.MAX_MESSAGE_BYTES = values[5] ?: '1000000'
