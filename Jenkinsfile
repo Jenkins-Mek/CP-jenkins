@@ -121,32 +121,57 @@ properties([
                                                 <label style="font-weight: bold; color: #4c2a85;">Topic Name *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <input name='value' type='text' value='user-events' style="width: 300px; padding: 5px; border: 1px solid #c5a3ff; border-radius: 3px;">
+                                                <input name='value' type='text' value='${params.TOPIC_NAME ?: 'user-events'}' style="width: 300px; padding: 5px; border: 1px solid #c5a3ff; border-radius: 3px;">
                                                 <div style="font-size: 12px; color: #4c2a85; margin-top: 3px;">Enter the name of the topic to modify</div>
                                             </td>
                                         </tr>
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #4c2a85;">New Partition Count</label>
+                                                <label style="font-weight: bold; color: #4c2a85;">Retention Days</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <input name='value' type='number' value='3' min='1' max='50' style="width: 150px; padding: 5px; border: 1px solid #c5a3ff; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #4c2a85; margin-top: 3px;">Note: You can only increase partition count, not decrease</div>
+                                                <input name='value' type='number' value='${params.RETENTION_DAYS ?: '7'}' min='1' style="width: 150px; padding: 5px; border: 1px solid #c5a3ff; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #4c2a85; margin-top: 3px;">How many days messages are retained in the topic</div>
                                             </td>
                                         </tr>
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #4c2a85;">Retention Period (hours)</label>
+                                                <label style="font-weight: bold; color: #4c2a85;">Cleanup Policy</label>
                                             </td>
                                             <td style="padding: 8px;">
                                                 <select name='value' style="width: 200px; padding: 5px; border: 1px solid #c5a3ff; border-radius: 3px;">
-                                                    <option value='24'>24 hours (1 day)</option>
-                                                    <option value='168' selected>168 hours (7 days)</option>
-                                                    <option value='720'>720 hours (30 days)</option>
-                                                    <option value='8760'>8760 hours (1 year)</option>
-                                                    <option value='-1'>Unlimited</option>
+                                                    <option value='delete' ${params.CLEANUP_POLICY == 'delete' ? 'selected' : ''}>delete</option>
+                                                    <option value='compact' ${params.CLEANUP_POLICY == 'compact' ? 'selected' : ''}>compact</option>
+                                                    <option value='delete,compact' ${params.CLEANUP_POLICY == 'delete,compact' ? 'selected' : ''}>delete,compact</option>
                                                 </select>
-                                                <div style="font-size: 12px; color: #4c2a85; margin-top: 3px;">How long messages are retained in the topic</div>
+                                                <div style="font-size: 12px; color: #4c2a85; margin-top: 3px;">Topic cleanup policy</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #4c2a85;">Segment Bytes</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='${params.SEGMENT_BYTES ?: '1073741824'}' placeholder="e.g. 1073741824" style="width: 200px; padding: 5px; border: 1px solid #c5a3ff; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #4c2a85; margin-top: 3px;">Segment size in bytes (default: 1GB)</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #4c2a85;">Min In-Sync Replicas</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='number' value='${params.MIN_INSYNC_REPLICAS ?: '1'}' min='1' style="width: 150px; padding: 5px; border: 1px solid #c5a3ff; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #4c2a85; margin-top: 3px;">Minimum in-sync replicas required</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #4c2a85;">Max Message Bytes</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='${params.MAX_MESSAGE_BYTES ?: '1000000'}' placeholder="e.g. 1000000" style="width: 200px; padding: 5px; border: 1px solid #c5a3ff; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #4c2a85; margin-top: 3px;">Maximum message size in bytes (default: 1MB)</div>
                                             </td>
                                         </tr>
                                     </table>
