@@ -68,6 +68,90 @@ properties([
                                     </div>
                                 </div>
                             """
+                        } else if (OPERATION == 'DELETE_SCHEMA') {
+                            return """
+                                <div style="background-color: #ffe6e6; padding: 15px; border-radius: 5px; border-left: 4px solid #ff4444;">
+                                    <h4 style="margin: 0 0 15px 0; color: #cc0000;">📋🗑️ Delete Schema</h4>
+                                    <div style="background-color: #ffffff; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #ffcccc;">
+                                        <strong style="color: #cc0000;">⚠️ WARNING:</strong> Deleting a schema can break existing producers and consumers. Ensure no active applications are using this schema.
+                                    </div>
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: bold; color: #cc0000;">Subject Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='' placeholder='Enter schema subject to delete' style="width: 300px; padding: 5px; border: 1px solid #ffcccc; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">Schema subject name to delete</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #cc0000;">Delete Mode</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #ffcccc; border-radius: 3px;">
+                                                    <option value='soft' selected>Soft Delete (Mark as deleted)</option>
+                                                    <option value='hard'>Hard Delete (Permanent removal)</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">Soft delete allows recovery, hard delete is permanent</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #cc0000;">Version</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #ffcccc; border-radius: 3px;">
+                                                    <option value='all' selected>All Versions</option>
+                                                    <option value='latest'>Latest Only</option>
+                                                    <option value='specific'>Specific Version</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">Which versions to delete</div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            """
+                        } else if (OPERATION == 'LIST_SCHEMA') {
+                            return """
+                                <div style="background-color: #f0fff0; padding: 15px; border-radius: 5px; border-left: 4px solid #32cd32;">
+                                    <h4 style="margin: 0; color: #006400;">📋📝 List Schemas</h4>
+                                    <p style="margin: 5px 0 15px 0; color: #006400;">This operation will list all registered schemas in the Schema Registry with their subjects, versions, and compatibility settings.</p>
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: bold; color: #006400;">Filter by Subject</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='' placeholder='Optional: filter by subject pattern' style="width: 300px; padding: 5px; border: 1px solid #90ee90; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #006400; margin-top: 3px;">Leave empty to list all subjects, or use pattern like 'user-*'</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #006400;">Include Details</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <div style="margin-top: 5px;">
+                                                    <label style="color: #006400; display: block; margin-bottom: 5px;">
+                                                        <input type="checkbox" name="value" value="show_versions" checked style="margin-right: 5px;">
+                                                        Show all versions for each subject
+                                                    </label>
+                                                    <label style="color: #006400; display: block; margin-bottom: 5px;">
+                                                        <input type="checkbox" name="value" value="show_compatibility" checked style="margin-right: 5px;">
+                                                        Show compatibility settings
+                                                    </label>
+                                                    <label style="color: #006400; display: block;">
+                                                        <input type="checkbox" name="value" value="show_schema_content" style="margin-right: 5px;">
+                                                        Show schema content (latest version only)
+                                                    </label>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            """
                         } else if (OPERATION == 'CREATE_TOPIC') {
                             return """
                                 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
@@ -113,6 +197,47 @@ properties([
                                     </table>
                                 </div>
                             """
+                        } else if (OPERATION == 'ALTER_TOPIC') {
+                            return """
+                                <div style="background-color: #e2e3ff; padding: 15px; border-radius: 5px; border-left: 4px solid #6f42c1;">
+                                    <h4 style="margin: 0 0 15px 0; color: #4c2a85;">⚙️ Alter Topic Configuration</h4>
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: bold; color: #4c2a85;">Topic Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='user-events' style="width: 300px; padding: 5px; border: 1px solid #c5a3ff; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #4c2a85; margin-top: 3px;">Enter the name of the topic to modify</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #4c2a85;">New Partition Count</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='number' value='3' min='1' max='50' style="width: 150px; padding: 5px; border: 1px solid #c5a3ff; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #4c2a85; margin-top: 3px;">Note: You can only increase partition count, not decrease</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #4c2a85;">Retention Period (hours)</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #c5a3ff; border-radius: 3px;">
+                                                    <option value='24'>24 hours (1 day)</option>
+                                                    <option value='168' selected>168 hours (7 days)</option>
+                                                    <option value='720'>720 hours (30 days)</option>
+                                                    <option value='8760'>8760 hours (1 year)</option>
+                                                    <option value='-1'>Unlimited</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #4c2a85; margin-top: 3px;">How long messages are retained in the topic</div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            """
                         } else if (OPERATION == 'DESCRIBE_TOPIC') {
                             return """
                                 <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
@@ -150,157 +275,252 @@ properties([
                                     </table>
                                 </div>
                             """
-                        } else if (OPERATION == 'ALTER_CONFIGS') {
-                           return """
-                               <div style="background-color: #e2e3ff; padding: 15px; border-radius: 5px; border-left: 4px solid #6f42c1;">
-                                   <h4 style="margin: 0 0 15px 0; color: #4b0082;">🛠️ Alter Configs</h4>
-                                   <table style="width: 100%;">
-                                       <tr>
-                                           <td style="padding: 8px; width: 200px;"><label style="font-weight: bold;">Topic Name *</label></td>
-                                           <td style="padding: 8px;"><input name='value' type='text' value='' placeholder='Enter topic name' style="width: 300px;"></td>
-                                       </tr>
-                                       <tr>
-                                           <td style="padding: 8px;"><label style="font-weight: bold;">Config Key *</label></td>
-                                           <td style="padding: 8px;"><input name='value' type='text' value='' placeholder='e.g., retention.ms'></td>
-                                       </tr>
-                                       <tr>
-                                           <td style="padding: 8px;"><label style="font-weight: bold;">Config Value *</label></td>
-                                           <td style="padding: 8px;"><input name='value' type='text' value='' placeholder='e.g., 604800000'></td>
-                                       </tr>
-                                   </table>
-                              </div>
-                           """
-                       } else if (OPERATION == 'DESCRIBE_CONFIGS') {
-                           return """
-                                <div style="background-color: #fefefe; padding: 15px; border-radius: 5px; border-left: 4px solid #6c757d;">
-                                    <h4 style="margin: 0 0 10px 0; color: #343a40;">🔧 Describe Configs</h4>
-                                    <p style="margin-bottom: 10px;">Displays configuration details for a topic.</p>
-                                    <label style="font-weight: bold;">Topic Name *</label>
-                                   <input name='value' type='text' value='' placeholder='Enter topic name' style="width: 300px; display: block; margin-top: 5px;">
-                                </div>
-                            """
-                        } else if (OPERATION == 'TOPIC_STATS') {
-                           return """
-                               <div style="background-color: #f0f0f0; padding: 15px; border-radius: 5px; border-left: 4px solid #17a2b8;">
-                                   <h4 style="margin: 0; color: #0c5460;">📊 Topic Stats</h4>
-                                   <p style="margin-top: 5px;">Show consumer/producer metrics, message rate, and size.</p>
-                                   <label style="font-weight: bold;">Topic Name *</label><br/>
-                                   <input name='value' type='text' value='' style="width: 300px;">
-                              </div>
-                           """
-                        } else if (OPERATION == 'TOPIC_EXISTS') {
-                           return """
-                                <div style="background-color: #e2f0d9; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
-                                    <h4 style="margin: 0 0 10px 0; color: #155724;">✅ Topic Exists Check</h4>
-                                  <p>Checks if the given topic exists on the cluster.</p>
-                                  <label style="font-weight: bold;">Topic Name *</label><br/>
-                                  <input name='value' type='text' placeholder='e.g., user-events' style="width: 300px;">
-                               </div>
-                          """
-                        } else if (OPERATION == 'REASSIGN_PARTITIONS') {
-                          return """
-                             <div style="background-color: #fff5e6; padding: 15px; border-radius: 5px; border-left: 4px solid #fd7e14;">
-                                 <h4 style="margin: 0 0 10px 0; color: #856404;">🔄 Reassign Partitions</h4>
-                                 <p>This will trigger a reassignment of partitions across brokers.</p>
-                                 <label style="font-weight: bold;">Topic Name *</label><br/>
-                                    <input name='value' type='text' placeholder='e.g., user-events' style="width: 300px;">
-                                </div>
-                           """
-                        } else if (OPERATION == 'PURGE_RECORDS') {
-                           return """
-                                <div style="background-color: #fdecea; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
-                                   <h4 style="margin: 0 0 10px 0; color: #721c24;">🧹 Purge Records</h4>
-                                   <p>Remove all records from the earliest offset up to a specified offset.</p>
-                                    <label style="font-weight: bold;">Topic Name *</label><br/>
-                                   <input name='value' type='text' placeholder='e.g., user-events' style="width: 300px;"><br/>
-                                    <label style="font-weight: bold;">Partition *</label><br/>
-                                   <input name='value' type='text' placeholder='e.g., 0'><br/>
-                                   <label style="font-weight: bold;">Offset *</label><br/>
-                                    <input name='value' type='text' placeholder='e.g., 100'>
-                               </div>
-                            """
-                        } else if (OPERATION == 'DUMP_LOG') {
-                           return """
-                               <div style="background-color: #e8f0fe; padding: 15px; border-radius: 5px; border-left: 4px solid #007bff;">
-                                   <h4 style="margin: 0 0 10px 0; color: #004085;">📦 Dump Log</h4>
-                                   <p>Dumps raw log segments for a given topic/partition for debugging.</p>
-                                   <label style="font-weight: bold;">Topic Name *</label><br/>
-                                   <input name='value' type='text' placeholder='e.g., logs-topic' style="width: 300px;"><br/>
-                                   <label style="font-weight: bold;">Partition *</label><br/>
-                                   <input name='value' type='text' placeholder='e.g., 0'>
-                               </div>
-                           """
-                        }                        } else if (OPERATION == 'PRODUCER') {
+                        } else if (OPERATION == 'PRODUCER') {
                             return """
-                                <div style="background-color: #e9f7ef; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
-                                    <h4 style="margin: 0 0 10px 0; color: #155724;">📝 Producer</h4>
-                                    <p>Send messages to a Kafka topic.</p>
-                                    <label style="font-weight: bold;">Topic Name *</label><br/>
-                                    <input name='value' type='text' placeholder='Enter topic name' style="width: 300px;"><br/>
-                                    <label style="font-weight: bold;">Message *</label><br/>
-                                    <textarea name='value' rows="4" style="width: 300px;" placeholder='Enter message content'></textarea>
+                                <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
+                                    <h4 style="margin: 0 0 15px 0; color: #155724;">📤 Kafka Producer</h4>
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: bold; color: #155724;">Topic Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='user-events' style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Topic to send messages to</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Message Key</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='user_123' style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Optional key for message partitioning</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Message Count</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
+                                                    <option value='1' selected>1 message</option>
+                                                    <option value='10'>10 messages</option>
+                                                    <option value='100'>100 messages</option>
+                                                    <option value='1000'>1000 messages</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Number of test messages to produce</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Message Format</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
+                                                    <option value='json' selected>JSON</option>
+                                                    <option value='avro'>Avro</option>
+                                                    <option value='string'>Plain Text</option>
+                                                    <option value='binary'>Binary</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Format of the message payload</div>
+                                            </td>
+                                        </tr>
+                                    </table>
                                 </div>
                             """
                         } else if (OPERATION == 'CONSUMER') {
                             return """
-                                <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
-                                    <h4 style="margin: 0 0 10px 0; color: #856404;">📥 Consumer</h4>
-                                    <p>Consume messages from a Kafka topic.</p>
-                                    <label style="font-weight: bold;">Topic Name *</label><br/>
-                                    <input name='value' type='text' placeholder='Enter topic name' style="width: 300px;"><br/>
-                                    <label style="font-weight: bold;">Consumer Group</label><br/>
-                                    <input name='value' type='text' placeholder='Enter consumer group (optional)' style="width: 300px;">
+                                <div style="background-color: #cce5ff; padding: 15px; border-radius: 5px; border-left: 4px solid #007bff;">
+                                    <h4 style="margin: 0 0 15px 0; color: #004085;">📥 Kafka Consumer</h4>
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: bold; color: #004085;">Topic Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='user-events' style="width: 300px; padding: 5px; border: 1px solid #b3d7ff; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #004085; margin-top: 3px;">Topic to consume messages from</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #004085;">Consumer Group</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='test-consumer-group' style="width: 300px; padding: 5px; border: 1px solid #b3d7ff; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #004085; margin-top: 3px;">Consumer group ID for offset management</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #004085;">Start Position</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #b3d7ff; border-radius: 3px;">
+                                                    <option value='earliest'>From beginning</option>
+                                                    <option value='latest' selected>From latest</option>
+                                                    <option value='committed'>From last committed</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #004085; margin-top: 3px;">Where to start consuming from</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #004085;">Max Messages</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='number' value='10' min='1' max='1000' style="width: 150px; padding: 5px; border: 1px solid #b3d7ff; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #004085; margin-top: 3px;">Maximum number of messages to consume</div>
+                                            </td>
+                                        </tr>
+                                    </table>
                                 </div>
                             """
                         } else if (OPERATION == 'PRODUCER_SCHEMA') {
                             return """
-                                <div style="background-color: #e8f0fe; padding: 15px; border-radius: 5px; border-left: 4px solid #007bff;">
-                                    <h4 style="margin: 0 0 10px 0; color: #004085;">📝 Producer with Schema</h4>
-                                    <p>Produce messages with schema validation.</p>
-                                    <label style="font-weight: bold;">Topic Name *</label><br/>
-                                    <input name='value' type='text' placeholder='Enter topic name' style="width: 300px;"><br/>
-                                    <label style="font-weight: bold;">Schema ID *</label><br/>
-                                    <input name='value' type='text' placeholder='Enter schema ID' style="width: 300px;"><br/>
-                                    <label style="font-weight: bold;">Message *</label><br/>
-                                    <textarea name='value' rows="4" style="width: 300px;" placeholder='Enter message content'></textarea>
+                                <div style="background-color: #e7f3ff; padding: 15px; border-radius: 5px; border-left: 4px solid #0066cc;">
+                                    <h4 style="margin: 0 0 15px 0; color: #003d7a;">📤📋 Schema-based Producer</h4>
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: bold; color: #003d7a;">Topic Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='user-events-avro' style="width: 300px; padding: 5px; border: 1px solid #b3d4fc; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #003d7a; margin-top: 3px;">Topic configured for schema registry</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #003d7a;">Schema Subject *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='user-events-value' style="width: 300px; padding: 5px; border: 1px solid #b3d4fc; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #003d7a; margin-top: 3px;">Schema registry subject name</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #003d7a;">Schema Version</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #b3d4fc; border-radius: 3px;">
+                                                    <option value='latest' selected>Latest</option>
+                                                    <option value='1'>Version 1</option>
+                                                    <option value='2'>Version 2</option>
+                                                    <option value='3'>Version 3</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #003d7a; margin-top: 3px;">Schema version to use for serialization</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #003d7a;">Message Count</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='number' value='10' min='1' max='1000' style="width: 150px; padding: 5px; border: 1px solid #b3d4fc; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #003d7a; margin-top: 3px;">Number of schema-compliant messages to produce</div>
+                                            </td>
+                                        </tr>
+                                    </table>
                                 </div>
                             """
                         } else if (OPERATION == 'CONSUMER_SCHEMA') {
                             return """
-                                <div style="background-color: #f0f9ff; padding: 15px; border-radius: 5px; border-left: 4px solid #66b2ff;">
-                                    <h4 style="margin: 0 0 10px 0; color: #004085;">📥 Consumer with Schema</h4>
-                                    <p>Consume messages with schema validation.</p>
-                                    <label style="font-weight: bold;">Topic Name *</label><br/>
-                                    <input name='value' type='text' placeholder='Enter topic name' style="width: 300px;"><br/>
-                                    <label style="font-weight: bold;">Consumer Group</label><br/>
-                                    <input name='value' type='text' placeholder='Enter consumer group (optional)' style="width: 300px;">
+                                <div style="background-color: #f0f8ff; padding: 15px; border-radius: 5px; border-left: 4px solid #4169e1;">
+                                    <h4 style="margin: 0 0 15px 0; color: #191970;">📥📋 Schema-based Consumer</h4>
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: bold; color: #191970;">Topic Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='user-events-avro' style="width: 300px; padding: 5px; border: 1px solid #b6c7ff; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #191970; margin-top: 3px;">Topic with schema-serialized messages</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #191970;">Consumer Group</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='schema-consumer-group' style="width: 300px; padding: 5px; border: 1px solid #b6c7ff; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #191970; margin-top: 3px;">Consumer group for schema-based consumption</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #191970;">Schema Subject</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='user-events-value' style="width: 300px; padding: 5px; border: 1px solid #b6c7ff; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #191970; margin-top: 3px;">Schema subject for deserialization</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #191970;">Max Messages</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='number' value='10' min='1' max='1000' style="width: 150px; padding: 5px; border: 1px solid #b6c7ff; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #191970; margin-top: 3px;">Maximum messages to consume and deserialize</div>
+                                            </td>
+                                        </tr>
+                                    </table>
                                 </div>
                             """
                         } else if (OPERATION == 'REGISTER_SCHEMA') {
                             return """
-                                <div style="background-color: #e9ecef; padding: 15px; border-radius: 5px; border-left: 4px solid #6c757d;">
-                                    <h4 style="margin: 0 0 10px 0; color: #495057;">📄 Register Schema</h4>
-                                    <p>Register a new schema to the registry.</p>
-                                    <label style="font-weight: bold;">Schema Name *</label><br/>
-                                    <input name='value' type='text' placeholder='Enter schema name' style="width: 300px;"><br/>
-                                    <label style="font-weight: bold;">Schema Definition *</label><br/>
-                                    <textarea name='value' rows="6" style="width: 300px;" placeholder='Enter schema JSON'></textarea>
-                                </div>
-                            """
-                        } else if (OPERATION == 'DELETE_SCHEMA') {
-                            return """
-                                <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
-                                    <h4 style="margin: 0 0 10px 0; color: #721c24;">🗑️ Delete Schema</h4>
-                                    <p>Delete a schema from the registry.</p>
-                                    <label style="font-weight: bold;">Schema Name *</label><br/>
-                                    <input name='value' type='text' placeholder='Enter schema name' style="width: 300px;">
-                                </div>
-                            """
-                        } else if (OPERATION == 'LIST_SCHEMA') {
-                            return """
-                                <div style="background-color: #e2e3ff; padding: 15px; border-radius: 5px; border-left: 4px solid #6f42c1;">
-                                    <h4 style="margin: 0 0 10px 0; color: #4b0082;">📋 List Schemas</h4>
-                                    <p>List all schemas available in the registry.</p>
+                                <div style="background-color: #f8f0ff; padding: 15px; border-radius: 5px; border-left: 4px solid #8a2be2;">
+                                    <h4 style="margin: 0 0 15px 0; color: #4b0082;">📋➕ Register New Schema</h4>
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: bold; color: #4b0082;">Subject Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='user-events-value' style="width: 300px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Schema subject name (typically: topic-name-value)</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #4b0082;">Schema Type</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;">
+                                                    <option value='AVRO' selected>AVRO</option>
+                                                    <option value='JSON'>JSON Schema</option>
+                                                    <option value='PROTOBUF'>Protocol Buffers</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Schema format type</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #4b0082;">Compatibility Mode</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;">
+                                                    <option value='BACKWARD' selected>Backward</option>
+                                                    <option value='FORWARD'>Forward</option>
+                                                    <option value='FULL'>Full</option>
+                                                    <option value='NONE'>None</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Schema evolution compatibility</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #4b0082;">Schema File Path *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='schemas/user-events.avsc' style="width: 300px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Path to schema definition file in repository</div>
+                                            </td>
+                                        </tr>
+                                    </table>
                                 </div>
                             """
                         } else {
