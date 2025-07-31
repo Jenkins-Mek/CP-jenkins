@@ -563,10 +563,6 @@ properties([
                                             <td style="padding: 8px; vertical-align: top; width: 200px;">
                                                 <label style="font-weight: bold; color: #006400;">Filter by Subject</label>
                                             </td>
-                                            <td style="padding: 8px;">
-                                                <input name='value' type='text' value='' placeholder='Optional: filter by subject pattern' style="width: 300px; padding: 5px; border: 1px solid #90ee90; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #006400; margin-top: 3px;">Leave empty to list all subjects, or use pattern like 'user-*'</div>
-                                            </td>
                                         </tr>
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
@@ -577,14 +573,6 @@ properties([
                                                     <label style="color: #006400; display: block; margin-bottom: 5px;">
                                                         <input type="checkbox" name="value" value="show_versions" checked style="margin-right: 5px;">
                                                         Show all versions for each subject
-                                                    </label>
-                                                    <label style="color: #006400; display: block; margin-bottom: 5px;">
-                                                        <input type="checkbox" name="value" value="show_compatibility" checked style="margin-right: 5px;">
-                                                        Show compatibility settings
-                                                    </label>
-                                                    <label style="color: #006400; display: block;">
-                                                        <input type="checkbox" name="value" value="show_schema_content" style="margin-right: 5px;">
-                                                        Show schema content (latest version only)
                                                     </label>
                                                 </div>
                                             </td>
@@ -615,6 +603,7 @@ pipeline {
         COMPOSE_DIR = '/confluent/cp-mysetup/cp-all-in-one'
         CONNECTION_TYPE = 'local-confluent'
         KAFKA_BOOTSTRAP_SERVER = 'localhost:9092'
+        SCHEMA_REGISTRY_URL = 'http://localhost:8081'
         SECURITY_PROTOCOL = 'SASL_PLAINTEXT'
         TOPICS_LIST_FILE = 'kafka-topics-list.txt'
         TOPIC_DESCRIPTION_FILE = 'kafka-topics-describe.txt'
@@ -668,6 +657,10 @@ pipeline {
                                   - Min In-Sync Replicas: ${env.MIN_INSYNC_REPLICAS}
                                   - Max Message Bytes: ${env.MAX_MESSAGE_BYTES}
                             """
+                            break
+                        case 'LIST_SCHEMA':
+                            env.SHOW_VERSIONS = values.contains('true') ? 'true' : 'false'
+                            echo "Listing all schemas (Show versions: ${env.SHOW_VERSIONS})"
                             break
                     }
                 }
@@ -869,12 +862,19 @@ pipeline {
 
                         case 'LIST_SCHEMA':
                             echo "==== Calling List Schema job ===="
-                            build job: 'org-cp-tools/CP-jenkins/list-schema',
+                            def listSchemasJob = build job: 'org-cp-tools/CP-jenkins/list-schema',
                                 parameters: [
                                     string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}")
+                                    string(name: 'SCHEMA_REGISTRY_URL', value: "$(env.SCHEMA_REGISTRY_UR)"),
+                                    booleanParam(name: 'INCLUDE_VERSIONS', value: "$(env.SHOW_VERSIONS)")
                                 ],
                                 propagate: false,
                                 wait: true
+
+                            copyArtifacts projectName: 'org-cp-tools/CP-jenkins/list-schema',
+                                    buildNumber: "${listSchemasJob.number}",
+                                    filter: 'schema-subjects-list.txt',
+                                    target: '.'
                             break
 
 
