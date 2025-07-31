@@ -624,7 +624,7 @@ pipeline {
                             echo "Topic: ${env.TOPIC_NAME}"
                             break
                         case 'LIST_TOPICS':
-                            env.INCLUDE_INTERNAL = values.contains(true) ? 'true' : 'false'
+                            env.INCLUDE_INTERNAL = values.contains('true') ? 'true' : 'false'
                             echo "Listing all topics (Include internal: ${env.INCLUDE_INTERNAL})"
                             break
                     }
