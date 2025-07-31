@@ -2,14 +2,17 @@ properties([
     parameters([
         [$class: 'ChoiceParameter',
             choiceType: 'PT_SINGLE_SELECT',
+            description: 'What topic operation do you want to perform?',
+            filterLength: 1,
+            filterable: false,
             name: 'OPERATION',
-            description: 'Select a Kafka operation to perform',
             script: [
                 $class: 'GroovyScript',
                 fallbackScript: [
                     classpath: [],
                     sandbox: true,
-                    script: '''return ['ERROR: Unable to load operations']'''
+                    script:
+                        '''return ['ERROR: Unable to load operations']'''
                 ],
                 script: [
                     classpath: [],
@@ -35,83 +38,214 @@ properties([
         ],
         [$class: 'DynamicReferenceParameter',
             choiceType: 'ET_FORMATTED_HTML',
-            name: 'TOOL_OPTIONS',
-            description: 'Configuration Options for Selected Tool',
+            description: 'Topic Configuration Options',
+            name: 'TOPIC_OPTIONS',
+            omitValueField: false,
             referencedParameters: 'OPERATION',
             script: [
                 $class: 'GroovyScript',
                 fallbackScript: [
                     classpath: [],
                     sandbox: true,
-                    script: '''return ['ERROR: Unable to render tool options']'''
+                    script:
+                        '''return['TOPIC_MANAGEMENT:ERROR']'''
                 ],
                 script: [
                     classpath: [],
                     sandbox: true,
-                    script: '''
-                        switch(OPERATION) {
-                            case "LIST_TOPICS":
-                                return """<div style='padding:10px; background:#e8f5e9; border-left:4px solid #4caf50;'>
-                                    <h4>📋 List Topics</h4>
-                                    <label><input type='checkbox' name='include_internal' value='true'/> Include internal topics</label>
-                                </div>"""
-                            case "CREATE_TOPIC":
-                                return """<div style='padding:10px; background:#f1f1f1;'>
-                                    <h4>🚀 Create Topic</h4>
-                                    <input name='topic_name' placeholder='Topic name' type='text'/>
-                                    <input name='partitions' placeholder='Partitions (e.g., 3)' type='number'/>
-                                    <input name='replication' placeholder='Replication factor (e.g., 1)' type='number'/>
-                                </div>"""
-                            case "ALTER_TOPIC":
-                                return """<div style='padding:10px; background:#f1f1f1;'>
-                                    <h4>🛠 Alter Topic</h4>
-                                    <input name='topic_name' placeholder='Topic to alter' type='text'/>
-                                    <input name='configs' placeholder='Config (e.g., retention.ms=60000)' type='text'/>
-                                </div>"""
-                            case "DELETE_TOPIC":
-                                return """<div style='padding:10px; background:#f8d7da; border-left:4px solid #dc3545;'>
-                                    <h4>⚠️ Delete Topic</h4>
-                                    <input name='topic_name' placeholder='Topic name to delete' type='text'/>
-                                    <label><input type='checkbox' name='confirm' required/> Confirm delete</label>
-                                </div>"""
-                            case "DESCRIBE_TOPIC":
-                                return """<div style='padding:10px; background:#fff3cd; border-left:4px solid #ffc107;'>
-                                    <h4>🔍 Describe Topic</h4>
-                                    <input name='topic_name' placeholder='Topic name' type='text'/>
-                                </div>"""
-                            case "PRODUCER":
-                            case "CONSUMER":
-                                return """<div style='padding:10px; background:#e3f2fd;'>
-                                    <h4>${OPERATION == "PRODUCER" ? "📝 Produce" : "📥 Consume"} Messages</h4>
-                                    <input name='topic_name' placeholder='Topic name' type='text'/>
-                                </div>"""
-                            case "PRODUCER_SCHEMA":
-                            case "CONSUMER_SCHEMA":
-                                return """<div style='padding:10px; background:#ede7f6;'>
-                                    <h4>${OPERATION == "PRODUCER_SCHEMA" ? "📝 Produce Schema-based" : "📥 Consume Schema-based"} Messages</h4>
-                                    <input name='topic_name' placeholder='Topic name' type='text'/>
-                                    <input name='schema_id' placeholder='Schema ID' type='text'/>
-                                </div>"""
-                            case "REGISTER_SCHEMA":
-                                return """<div style='padding:10px; background:#fff;'>
-                                    <h4>📦 Register Schema</h4>
-                                    <input name='subject' placeholder='Subject (e.g., my-topic-value)' type='text'/>
-                                    <textarea name='schema' placeholder='Paste schema JSON here' rows='5' style='width:100%;'></textarea>
-                                </div>"""
-                            case "DELETE_SCHEMA":
-                                return """<div style='padding:10px; background:#ffebee; border-left:4px solid #d32f2f;'>
-                                    <h4>🗑 Delete Schema</h4>
-                                    <input name='subject' placeholder='Subject name' type='text'/>
-                                </div>"""
-                            case "LIST_SCHEMA":
-                                return """<div style='padding:10px; background:#e8f5e9;'>
-                                    <h4>📄 List Registered Schemas</h4>
-                                    <p>No additional input required</p>
-                                </div>"""
-                            default:
-                                return "<div><p>Please select a Kafka tool above.</p></div>"
-                        }
-                    '''
+                    script:
+                        '''
+                        if (OPERATION == 'LIST_TOPICS'){
+                            return """
+                                <div style="background-color: #e8f5e8; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
+                                    <h4 style="margin: 0; color: #155724;">📋 List All Topics</h4>
+                                    <p style="margin: 5px 0 0 0; color: #155724;">This operation will list all available Kafka topics with detailed information including count, names, partitions, and replication factors.</p>
+                                    <div style="margin-top: 10px;">
+                                        <label style="font-weight: bold; color: #155724;">
+                                            <input type="checkbox" name="value" value="include_internal" style="margin-right: 5px;">
+                                            Include internal topics (starting with _)
+                                        </label>
+                                    </div>
+                                </div>
+                            """
+                        } else if (OPERATION == 'CREATE_TOPIC') {
+                            return """
+                                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
+                                    <h4 style="margin: 0 0 15px 0; color: #495057;">🚀 Create New Topic</h4>
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: bold; color: #495057;">Topic Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='user-events' style="width: 300px; padding: 5px; border: 1px solid #ced4da; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #6c757d; margin-top: 3px;">Use alphanumeric characters, dots, underscores, and hyphens</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #495057;">Partitions *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #ced4da; border-radius: 3px;">
+                                                    <option value='1' selected>1 (Development)</option>
+                                                    <option value='3'>3 (Small workload)</option>
+                                                    <option value='6'>6 (Medium workload)</option>
+                                                    <option value='12'>12 (High workload)</option>
+                                                    <option value='24'>24 (Very high workload)</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #6c757d; margin-top: 3px;">More partitions = better parallelism but more overhead</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #495057;">Replication Factor *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #ced4da; border-radius: 3px;">
+                                                    <option value='1' selected>1 (Development - No redundancy)</option>
+                                                    <option value='2'>2 (Staging - Basic redundancy)</option>
+                                                    <option value='3'>3 (Production - High availability)</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #6c757d; margin-top: 3px;">Production should use 3 for fault tolerance</div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            """
+                        } else if (OPERATION == 'DESCRIBE_TOPIC') {
+                            return """
+                                <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
+                                    <h4 style="margin: 0 0 15px 0; color: #856404;">🔍 Describe Topic</h4>
+                                    <table style="width: 100%;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: bold; color: #856404;">Topic Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='user-events' style="width: 300px; padding: 5px; border: 1px solid #ffeaa7; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #856404; margin-top: 3px;">Enter the name of an existing topic to get its details</div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            """
+                        } else if (OPERATION == 'DELETE_TOPIC') {
+                            return """
+                                <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
+                                    <h4 style="margin: 0 0 15px 0; color: #721c24;">⚠️ Delete Topic</h4>
+                                    <div style="background-color: #ffffff; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #f5c6cb;">
+                                        <strong style="color: #721c24;">⚠️ WARNING:</strong> This action will permanently delete the topic and all its data. This cannot be undone!
+                                    </div>
+                                    <table style="width: 100%;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: bold; color: #721c24;">Topic Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='' placeholder='Enter topic name to delete' style="width: 300px; padding: 5px; border: 1px solid #f5c6cb; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #721c24; margin-top: 3px;">You will be asked to confirm the deletion before it proceeds</div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            """
+                        } else {
+                            return """
+                                <div style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; border-left: 4px solid #17a2b8;">
+                                    <h4 style="margin: 0; color: #0c5460;">Select an Operation</h4>
+                                    <p style="margin: 5px 0 0 0; color: #0c5460;">Please choose a topic operation from the dropdown above.</p>
+                                </div>
+                            """
+                        } else if (OPERATION == 'ALTER_CONFIGS') {
+                           return """
+                               <div style="background-color: #e2e3ff; padding: 15px; border-radius: 5px; border-left: 4px solid #6f42c1;">
+                                   <h4 style="margin: 0 0 15px 0; color: #4b0082;">🛠️ Alter Configs</h4>
+                                   <table style="width: 100%;">
+                                       <tr>
+                                           <td style="padding: 8px; width: 200px;"><label style="font-weight: bold;">Topic Name *</label></td>
+                                           <td style="padding: 8px;"><input name='value' type='text' value='' placeholder='Enter topic name' style="width: 300px;"></td>
+                                       </tr>
+                                       <tr>
+                                           <td style="padding: 8px;"><label style="font-weight: bold;">Config Key *</label></td>
+                                           <td style="padding: 8px;"><input name='value' type='text' value='' placeholder='e.g., retention.ms'></td>
+                                       </tr>
+                                       <tr>
+                                           <td style="padding: 8px;"><label style="font-weight: bold;">Config Value *</label></td>
+                                           <td style="padding: 8px;"><input name='value' type='text' value='' placeholder='e.g., 604800000'></td>
+                                       </tr>
+                                   </table>
+                              </div>
+                           """
+                       } else if (OPERATION == 'DESCRIBE_CONFIGS') {
+                           return """
+                                <div style="background-color: #fefefe; padding: 15px; border-radius: 5px; border-left: 4px solid #6c757d;">
+                                    <h4 style="margin: 0 0 10px 0; color: #343a40;">🔧 Describe Configs</h4>
+                                    <p style="margin-bottom: 10px;">Displays configuration details for a topic.</p>
+                                    <label style="font-weight: bold;">Topic Name *</label>
+                                   <input name='value' type='text' value='' placeholder='Enter topic name' style="width: 300px; display: block; margin-top: 5px;">
+                                </div>
+                            """
+                        } else if (OPERATION == 'TOPIC_STATS') {
+                           return """
+                               <div style="background-color: #f0f0f0; padding: 15px; border-radius: 5px; border-left: 4px solid #17a2b8;">
+                                   <h4 style="margin: 0; color: #0c5460;">📊 Topic Stats</h4>
+                                   <p style="margin-top: 5px;">Show consumer/producer metrics, message rate, and size.</p>
+                                   <label style="font-weight: bold;">Topic Name *</label><br/>
+                                   <input name='value' type='text' value='' style="width: 300px;">
+                              </div>
+                           """
+                        } else if (OPERATION == 'TOPIC_EXISTS') {
+                           return """
+                                <div style="background-color: #e2f0d9; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
+                                    <h4 style="margin: 0 0 10px 0; color: #155724;">✅ Topic Exists Check</h4>
+                                  <p>Checks if the given topic exists on the cluster.</p>
+                                  <label style="font-weight: bold;">Topic Name *</label><br/>
+                                  <input name='value' type='text' placeholder='e.g., user-events' style="width: 300px;">
+                               </div>
+                          """
+                      } else if (OPERATION == 'REASSIGN_PARTITIONS') {
+                          return """
+                             <div style="background-color: #fff5e6; padding: 15px; border-radius: 5px; border-left: 4px solid #fd7e14;">
+                                 <h4 style="margin: 0 0 10px 0; color: #856404;">🔄 Reassign Partitions</h4>
+                                 <p>This will trigger a reassignment of partitions across brokers.</p>
+                                 <label style="font-weight: bold;">Topic Name *</label><br/>
+                                    <input name='value' type='text' placeholder='e.g., user-events' style="width: 300px;">
+                                </div>
+                           """
+                        } else if (OPERATION == 'PURGE_RECORDS') {
+                           return """
+                                <div style="background-color: #fdecea; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
+                                   <h4 style="margin: 0 0 10px 0; color: #721c24;">🧹 Purge Records</h4>
+                                   <p>Remove all records from the earliest offset up to a specified offset.</p>
+                                    <label style="font-weight: bold;">Topic Name *</label><br/>
+                                   <input name='value' type='text' placeholder='e.g., user-events' style="width: 300px;"><br/>
+                                    <label style="font-weight: bold;">Partition *</label><br/>
+                                   <input name='value' type='text' placeholder='e.g., 0'><br/>
+                                   <label style="font-weight: bold;">Offset *</label><br/>
+                                    <input name='value' type='text' placeholder='e.g., 100'>
+                               </div>
+                            """
+                       } else if (OPERATION == 'DUMP_LOG') {
+                           return """
+                               <div style="background-color: #e8f0fe; padding: 15px; border-radius: 5px; border-left: 4px solid #007bff;">
+                                   <h4 style="margin: 0 0 10px 0; color: #004085;">📦 Dump Log</h4>
+                                   <p>Dumps raw log segments for a given topic/partition for debugging.</p>
+                                   <label style="font-weight: bold;">Topic Name *</label><br/>
+                                   <input name='value' type='text' placeholder='e.g., logs-topic' style="width: 300px;"><br/>
+                                   <label style="font-weight: bold;">Partition *</label><br/>
+                                   <input name='value' type='text' placeholder='e.g., 0'>
+                               </div>
+                           """
+                       } else {
+                           return """
+                              <div style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; border-left: 4px solid #17a2b8;">
+                                  <h4 style="margin: 0; color: #0c5460;">Select an Operation</h4>
+                                  <p style="margin: 5px 0 0 0; color: #0c5460;">Please choose a topic operation from the dropdown above.</p>
+                              </div>
+                          """
+                      }
+                     '''
                 ]
             ]
         ]
