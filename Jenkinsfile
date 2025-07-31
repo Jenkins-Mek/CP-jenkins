@@ -262,6 +262,103 @@ pipeline {
                                 propagate: true,
                                 wait: true
                             break
+                        case 'ALTER_TOPIC':
+                            echo "==== Calling Alter Topic job ===="
+                            build job: 'org-cp-tools/CP-jenkins/alter-topic',
+                                parameters: [
+                                    string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
+                                    string(name: 'CONFIGS', value: "${env.CONFIGS}"),
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
+                                    string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}")
+                                ],
+                                propagate: false,
+                                wait: true
+                            break
+
+                        case 'PRODUCER':
+                            echo "==== Calling Producer job ===="
+                            build job: 'org-cp-tools/CP-jenkins/producer',
+                                parameters: [
+                                    string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}")
+                                ],
+                                propagate: false,
+                                wait: true
+                            break
+
+                        case 'CONSUMER':
+                            echo "==== Calling Consumer job ===="
+                            build job: 'org-cp-tools/CP-jenkins/consumer',
+                                parameters: [
+                                    string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}")
+                                ],
+                                propagate: false,
+                                wait: true
+                            break
+
+                        case 'PRODUCER_SCHEMA':
+                            echo "==== Calling Producer Schema job ===="
+                            build job: 'org-cp-tools/CP-jenkins/producer-schema',
+                                parameters: [
+                                    string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
+                                    string(name: 'SCHEMA_ID', value: "${env.SCHEMA_ID}"),
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}")
+                                ],
+                                propagate: false,
+                                wait: true
+                            break
+
+                        case 'CONSUMER_SCHEMA':
+                            echo "==== Calling Consumer Schema job ===="
+                            build job: 'org-cp-tools/CP-jenkins/consumer-schema',
+                                parameters: [
+                                    string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
+                                    string(name: 'SCHEMA_ID', value: "${env.SCHEMA_ID}"),
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}")
+                                ],
+                                propagate: false,
+                                wait: true
+                            break
+
+                        case 'REGISTER_SCHEMA':
+                            echo "==== Calling Register Schema job ===="
+                            build job: 'org-cp-tools/CP-jenkins/register-schema',
+                                parameters: [
+                                    string(name: 'SUBJECT', value: "${env.SUBJECT}"),
+                                    text(name: 'SCHEMA', value: "${env.SCHEMA}"),
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}")
+                                ],
+                                propagate: false,
+                                wait: true
+                            break
+
+                        case 'DELETE_SCHEMA':
+                            echo "==== Calling Delete Schema job ===="
+                            build job: 'org-cp-tools/CP-jenkins/delete-schema',
+                                parameters: [
+                                    string(name: 'SUBJECT', value: "${env.SUBJECT}"),
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}")
+                                ],
+                                propagate: false,
+                                wait: true
+                            break
+
+                        case 'LIST_SCHEMA':
+                            echo "==== Calling List Schema job ===="
+                            build job: 'org-cp-tools/CP-jenkins/list-schema',
+                                parameters: [
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}")
+                                ],
+                                propagate: false,
+                                wait: true
+                            break
+
 
                         default:
                             error "❌ Unknown operation: ${params.OPERATION}"
