@@ -889,7 +889,7 @@ pipeline {
                 def operationFiles = [
                     'LIST_TOPICS': env.TOPICS_LIST_FILE,
                     'DESCRIBE_TOPIC': env.TOPIC_DESCRIPTION_FILE,
-                    'LIST_SCHEMAs': env.SCHEMA_LIST_FILE,
+                    'LIST_SCHEMA': env.SCHEMA_LIST_FILE,
                 ]
 
                 def currentFile = operationFiles[params.OPERATION]
