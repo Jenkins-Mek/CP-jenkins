@@ -694,7 +694,7 @@ pipeline {
 
                         case 'DESCRIBE_TOPIC':
                             echo "==== Calling Describe Topic job ===="
-                            build job: 'org-cp-tools/CP-jenkins/describe-topic',
+                            def DescribeTopicsJob =  build job: 'org-cp-tools/CP-jenkins/describe-topic',
                                 parameters: [
                                     string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
                                     string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
@@ -703,6 +703,11 @@ pipeline {
                                 ],
                                 propagate: false,
                                 wait: true
+                            
+                            copyArtifacts projectName: 'org-cp-tools/CP-jenkins/list-topics',
+                                    buildNumber: "${DescribeTopicsJob.number}",
+                                    filter: 'kafka-topics-describe.txt',
+                                    target: '.'
                             break
 
                         case 'DELETE_TOPIC':
