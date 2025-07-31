@@ -150,7 +150,7 @@ properties([
                                     </table>
                                 </div>
                             """
-                        }else if (OPERATION == 'ALTER_CONFIGS') {
+                        } else if (OPERATION == 'ALTER_CONFIGS') {
                            return """
                                <div style="background-color: #e2e3ff; padding: 15px; border-radius: 5px; border-left: 4px solid #6f42c1;">
                                    <h4 style="margin: 0 0 15px 0; color: #4b0082;">🛠️ Alter Configs</h4>
@@ -197,7 +197,7 @@ properties([
                                   <input name='value' type='text' placeholder='e.g., user-events' style="width: 300px;">
                                </div>
                           """
-                      } else if (OPERATION == 'REASSIGN_PARTITIONS') {
+                        } else if (OPERATION == 'REASSIGN_PARTITIONS') {
                           return """
                              <div style="background-color: #fff5e6; padding: 15px; border-radius: 5px; border-left: 4px solid #fd7e14;">
                                  <h4 style="margin: 0 0 10px 0; color: #856404;">🔄 Reassign Partitions</h4>
@@ -219,7 +219,7 @@ properties([
                                     <input name='value' type='text' placeholder='e.g., 100'>
                                </div>
                             """
-                       } else if (OPERATION == 'DUMP_LOG') {
+                        } else if (OPERATION == 'DUMP_LOG') {
                            return """
                                <div style="background-color: #e8f0fe; padding: 15px; border-radius: 5px; border-left: 4px solid #007bff;">
                                    <h4 style="margin: 0 0 10px 0; color: #004085;">📦 Dump Log</h4>
@@ -230,15 +230,88 @@ properties([
                                    <input name='value' type='text' placeholder='e.g., 0'>
                                </div>
                            """
-                       } else {
+                        }                        } else if (OPERATION == 'PRODUCER') {
+                            return """
+                                <div style="background-color: #e9f7ef; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
+                                    <h4 style="margin: 0 0 10px 0; color: #155724;">📝 Producer</h4>
+                                    <p>Send messages to a Kafka topic.</p>
+                                    <label style="font-weight: bold;">Topic Name *</label><br/>
+                                    <input name='value' type='text' placeholder='Enter topic name' style="width: 300px;"><br/>
+                                    <label style="font-weight: bold;">Message *</label><br/>
+                                    <textarea name='value' rows="4" style="width: 300px;" placeholder='Enter message content'></textarea>
+                                </div>
+                            """
+                        } else if (OPERATION == 'CONSUMER') {
+                            return """
+                                <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
+                                    <h4 style="margin: 0 0 10px 0; color: #856404;">📥 Consumer</h4>
+                                    <p>Consume messages from a Kafka topic.</p>
+                                    <label style="font-weight: bold;">Topic Name *</label><br/>
+                                    <input name='value' type='text' placeholder='Enter topic name' style="width: 300px;"><br/>
+                                    <label style="font-weight: bold;">Consumer Group</label><br/>
+                                    <input name='value' type='text' placeholder='Enter consumer group (optional)' style="width: 300px;">
+                                </div>
+                            """
+                        } else if (OPERATION == 'PRODUCER_SCHEMA') {
+                            return """
+                                <div style="background-color: #e8f0fe; padding: 15px; border-radius: 5px; border-left: 4px solid #007bff;">
+                                    <h4 style="margin: 0 0 10px 0; color: #004085;">📝 Producer with Schema</h4>
+                                    <p>Produce messages with schema validation.</p>
+                                    <label style="font-weight: bold;">Topic Name *</label><br/>
+                                    <input name='value' type='text' placeholder='Enter topic name' style="width: 300px;"><br/>
+                                    <label style="font-weight: bold;">Schema ID *</label><br/>
+                                    <input name='value' type='text' placeholder='Enter schema ID' style="width: 300px;"><br/>
+                                    <label style="font-weight: bold;">Message *</label><br/>
+                                    <textarea name='value' rows="4" style="width: 300px;" placeholder='Enter message content'></textarea>
+                                </div>
+                            """
+                        } else if (OPERATION == 'CONSUMER_SCHEMA') {
+                            return """
+                                <div style="background-color: #f0f9ff; padding: 15px; border-radius: 5px; border-left: 4px solid #66b2ff;">
+                                    <h4 style="margin: 0 0 10px 0; color: #004085;">📥 Consumer with Schema</h4>
+                                    <p>Consume messages with schema validation.</p>
+                                    <label style="font-weight: bold;">Topic Name *</label><br/>
+                                    <input name='value' type='text' placeholder='Enter topic name' style="width: 300px;"><br/>
+                                    <label style="font-weight: bold;">Consumer Group</label><br/>
+                                    <input name='value' type='text' placeholder='Enter consumer group (optional)' style="width: 300px;">
+                                </div>
+                            """
+                        } else if (OPERATION == 'REGISTER_SCHEMA') {
+                            return """
+                                <div style="background-color: #e9ecef; padding: 15px; border-radius: 5px; border-left: 4px solid #6c757d;">
+                                    <h4 style="margin: 0 0 10px 0; color: #495057;">📄 Register Schema</h4>
+                                    <p>Register a new schema to the registry.</p>
+                                    <label style="font-weight: bold;">Schema Name *</label><br/>
+                                    <input name='value' type='text' placeholder='Enter schema name' style="width: 300px;"><br/>
+                                    <label style="font-weight: bold;">Schema Definition *</label><br/>
+                                    <textarea name='value' rows="6" style="width: 300px;" placeholder='Enter schema JSON'></textarea>
+                                </div>
+                            """
+                        } else if (OPERATION == 'DELETE_SCHEMA') {
+                            return """
+                                <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
+                                    <h4 style="margin: 0 0 10px 0; color: #721c24;">🗑️ Delete Schema</h4>
+                                    <p>Delete a schema from the registry.</p>
+                                    <label style="font-weight: bold;">Schema Name *</label><br/>
+                                    <input name='value' type='text' placeholder='Enter schema name' style="width: 300px;">
+                                </div>
+                            """
+                        } else if (OPERATION == 'LIST_SCHEMA') {
+                            return """
+                                <div style="background-color: #e2e3ff; padding: 15px; border-radius: 5px; border-left: 4px solid #6f42c1;">
+                                    <h4 style="margin: 0 0 10px 0; color: #4b0082;">📋 List Schemas</h4>
+                                    <p>List all schemas available in the registry.</p>
+                                </div>
+                            """
+                        } else {
                            return """
                               <div style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; border-left: 4px solid #17a2b8;">
                                   <h4 style="margin: 0; color: #0c5460;">Select an Operation</h4>
                                   <p style="margin: 5px 0 0 0; color: #0c5460;">Please choose a topic operation from the dropdown above.</p>
                               </div>
                           """
-                      }
-                      '''
+                       }
+                       '''
                 ]
             ]
         ]
