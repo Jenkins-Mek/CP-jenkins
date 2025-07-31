@@ -607,6 +607,7 @@ pipeline {
         SECURITY_PROTOCOL = 'SASL_PLAINTEXT'
         TOPICS_LIST_FILE = 'kafka-topics-list.txt'
         TOPIC_DESCRIPTION_FILE = 'kafka-topics-describe.txt'
+        SCHEMA_LIST_FILE = 'schema-subjects-list.txt'
         CLIENT_CONFIG_FILE = '/tmp/client.properties'
     }
 
@@ -893,6 +894,7 @@ pipeline {
                 def operationFiles = [
                     'LIST_TOPICS': env.TOPICS_LIST_FILE,
                     'DESCRIBE_TOPIC': env.TOPIC_DESCRIPTION_FILE,
+                    'LIST_SCHEMAs': env.SCHEMA_LIST_FILE,
                 ]
 
                 def currentFile = operationFiles[params.OPERATION]
