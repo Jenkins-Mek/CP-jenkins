@@ -610,7 +610,7 @@ pipeline {
                 script {
                     def option = "${params.TOPIC_OPTIONS}"
                     def values = option.split(',').collect { it.trim() }.findAll { it }
-                    echo " ${value}"
+
                     switch(params.OPERATION) {
                         case 'CREATE_TOPIC':
                             env.TOPIC_NAME = values[0]
@@ -624,7 +624,7 @@ pipeline {
                             echo "Topic: ${env.TOPIC_NAME}"
                             break
                         case 'LIST_TOPICS':
-                            env.INCLUDE_INTERNAL = values.contains('include_internal') ? 'true' : 'false'
+                            env.INCLUDE_INTERNAL = values//.contains('include_internal') ? 'true' : 'false'
                             echo "Listing all topics (Include internal: ${env.INCLUDE_INTERNAL})"
                             break
                     }
