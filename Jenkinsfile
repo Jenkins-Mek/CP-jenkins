@@ -150,15 +150,95 @@ properties([
                                     </table>
                                 </div>
                             """
-                        } else {
-                            return """
-                                <div style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; border-left: 4px solid #17a2b8;">
-                                    <h4 style="margin: 0; color: #0c5460;">Select an Operation</h4>
-                                    <p style="margin: 5px 0 0 0; color: #0c5460;">Please choose a topic operation from the dropdown above.</p>
+                        }else if (OPERATION == 'ALTER_CONFIGS') {
+                           return """
+                               <div style="background-color: #e2e3ff; padding: 15px; border-radius: 5px; border-left: 4px solid #6f42c1;">
+                                   <h4 style="margin: 0 0 15px 0; color: #4b0082;">🛠️ Alter Configs</h4>
+                                   <table style="width: 100%;">
+                                       <tr>
+                                           <td style="padding: 8px; width: 200px;"><label style="font-weight: bold;">Topic Name *</label></td>
+                                           <td style="padding: 8px;"><input name='value' type='text' value='' placeholder='Enter topic name' style="width: 300px;"></td>
+                                       </tr>
+                                       <tr>
+                                           <td style="padding: 8px;"><label style="font-weight: bold;">Config Key *</label></td>
+                                           <td style="padding: 8px;"><input name='value' type='text' value='' placeholder='e.g., retention.ms'></td>
+                                       </tr>
+                                       <tr>
+                                           <td style="padding: 8px;"><label style="font-weight: bold;">Config Value *</label></td>
+                                           <td style="padding: 8px;"><input name='value' type='text' value='' placeholder='e.g., 604800000'></td>
+                                       </tr>
+                                   </table>
+                              </div>
+                           """
+                       } else if (OPERATION == 'DESCRIBE_CONFIGS') {
+                           return """
+                                <div style="background-color: #fefefe; padding: 15px; border-radius: 5px; border-left: 4px solid #6c757d;">
+                                    <h4 style="margin: 0 0 10px 0; color: #343a40;">🔧 Describe Configs</h4>
+                                    <p style="margin-bottom: 10px;">Displays configuration details for a topic.</p>
+                                    <label style="font-weight: bold;">Topic Name *</label>
+                                   <input name='value' type='text' value='' placeholder='Enter topic name' style="width: 300px; display: block; margin-top: 5px;">
                                 </div>
                             """
-                        }
-                        '''
+                        } else if (OPERATION == 'TOPIC_STATS') {
+                           return """
+                               <div style="background-color: #f0f0f0; padding: 15px; border-radius: 5px; border-left: 4px solid #17a2b8;">
+                                   <h4 style="margin: 0; color: #0c5460;">📊 Topic Stats</h4>
+                                   <p style="margin-top: 5px;">Show consumer/producer metrics, message rate, and size.</p>
+                                   <label style="font-weight: bold;">Topic Name *</label><br/>
+                                   <input name='value' type='text' value='' style="width: 300px;">
+                              </div>
+                           """
+                        } else if (OPERATION == 'TOPIC_EXISTS') {
+                           return """
+                                <div style="background-color: #e2f0d9; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
+                                    <h4 style="margin: 0 0 10px 0; color: #155724;">✅ Topic Exists Check</h4>
+                                  <p>Checks if the given topic exists on the cluster.</p>
+                                  <label style="font-weight: bold;">Topic Name *</label><br/>
+                                  <input name='value' type='text' placeholder='e.g., user-events' style="width: 300px;">
+                               </div>
+                          """
+                      } else if (OPERATION == 'REASSIGN_PARTITIONS') {
+                          return """
+                             <div style="background-color: #fff5e6; padding: 15px; border-radius: 5px; border-left: 4px solid #fd7e14;">
+                                 <h4 style="margin: 0 0 10px 0; color: #856404;">🔄 Reassign Partitions</h4>
+                                 <p>This will trigger a reassignment of partitions across brokers.</p>
+                                 <label style="font-weight: bold;">Topic Name *</label><br/>
+                                    <input name='value' type='text' placeholder='e.g., user-events' style="width: 300px;">
+                                </div>
+                           """
+                        } else if (OPERATION == 'PURGE_RECORDS') {
+                           return """
+                                <div style="background-color: #fdecea; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
+                                   <h4 style="margin: 0 0 10px 0; color: #721c24;">🧹 Purge Records</h4>
+                                   <p>Remove all records from the earliest offset up to a specified offset.</p>
+                                    <label style="font-weight: bold;">Topic Name *</label><br/>
+                                   <input name='value' type='text' placeholder='e.g., user-events' style="width: 300px;"><br/>
+                                    <label style="font-weight: bold;">Partition *</label><br/>
+                                   <input name='value' type='text' placeholder='e.g., 0'><br/>
+                                   <label style="font-weight: bold;">Offset *</label><br/>
+                                    <input name='value' type='text' placeholder='e.g., 100'>
+                               </div>
+                            """
+                       } else if (OPERATION == 'DUMP_LOG') {
+                           return """
+                               <div style="background-color: #e8f0fe; padding: 15px; border-radius: 5px; border-left: 4px solid #007bff;">
+                                   <h4 style="margin: 0 0 10px 0; color: #004085;">📦 Dump Log</h4>
+                                   <p>Dumps raw log segments for a given topic/partition for debugging.</p>
+                                   <label style="font-weight: bold;">Topic Name *</label><br/>
+                                   <input name='value' type='text' placeholder='e.g., logs-topic' style="width: 300px;"><br/>
+                                   <label style="font-weight: bold;">Partition *</label><br/>
+                                   <input name='value' type='text' placeholder='e.g., 0'>
+                               </div>
+                           """
+                       } else {
+                           return """
+                              <div style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; border-left: 4px solid #17a2b8;">
+                                  <h4 style="margin: 0; color: #0c5460;">Select an Operation</h4>
+                                  <p style="margin: 5px 0 0 0; color: #0c5460;">Please choose a topic operation from the dropdown above.</p>
+                              </div>
+                          """
+                      }
+                      '''
                 ]
             ]
         ]
