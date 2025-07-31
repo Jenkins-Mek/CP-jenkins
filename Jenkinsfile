@@ -152,7 +152,7 @@ properties([
                                                 <label style="font-weight: bold; color: #856404;">Segment Bytes</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <input name='value' type='text' value='1073741824' placeholder="e.g. 1073741824" style="width: 200px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">
+                                                <input name='value' type='number' value='1073741824' placeholder="e.g. 1073741824" style="width: 200px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">
                                                 <div style="font-size: 12px; color: #856404; margin-top: 3px;">Segment size in bytes (default: 1GB)</div>
                                             </td>
                                         </tr>
@@ -170,7 +170,7 @@ properties([
                                                 <label style="font-weight: bold; color: #856404;">Max Message Bytes</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <input name='value' type='text' value='1000000' placeholder="e.g. 1000000" style="width: 200px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">
+                                                <input name='value' type='number' value='1000000' placeholder="e.g. 1000000" style="width: 200px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">
                                                 <div style="font-size: 12px; color: #856404; margin-top: 3px;">Maximum message size in bytes (default: 1MB)</div>
                                             </td>
                                         </tr>
