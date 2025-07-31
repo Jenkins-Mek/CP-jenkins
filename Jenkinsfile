@@ -624,7 +624,7 @@ pipeline {
                             echo "Topic: ${env.TOPIC_NAME}"
                             break
                         case 'LIST_TOPICS':
-                            env.INCLUDE_INTERNAL = values//.contains('include_internal') ? 'true' : 'false'
+                            env.INCLUDE_INTERNAL = values.contains(true) ? 'true' : 'false'
                             echo "Listing all topics (Include internal: ${env.INCLUDE_INTERNAL})"
                             break
                     }
@@ -661,15 +661,12 @@ pipeline {
                         case 'LIST_TOPICS':
                             echo "==== Calling List Topic job ===="
 
-                            def envParams = "COMPOSE_DIR=${env.COMPOSE_DIR}," +
-                                            "KAFKA_BOOTSTRAP_SERVER=${env.KAFKA_BOOTSTRAP_SERVER}," +
-                                            "INCLUDE_INTERNAL=${env.INCLUDE_INTERNAL}," +
-                                            "SECURITY_PROTOCOL=${env.SECURITY_PROTOCOL}"
-
                             def listTopicsJob = build job: 'org-cp-tools/CP-jenkins/list-topics',
                                 parameters: [
-                                        string(name: 'ParamsAsENV', value: 'true'),
-                                        string(name: 'ENVIRONMENT_PARAMS', value: envParams)
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
+                                    booleanParam(name: 'INCLUDE_INTERNAL', value: "${env.INCLUDE_INTERNAL}"),
+                                    string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
                                 ],
                                 propagate: false,
                                 wait: true
@@ -689,7 +686,7 @@ pipeline {
                                     string(name: 'REPLICATION_FACTOR', value: "${env.REPLICATION_FACTOR}"),
                                     string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
                                     string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
-                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: 'localhost:9092')
+                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}")
                                 ],
                                 propagate: false,
                                 wait: true
