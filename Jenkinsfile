@@ -610,7 +610,7 @@ pipeline {
                 script {
                     def option = "${params.TOPIC_OPTIONS}"
                     def values = option.split(',').collect { it.trim() }.findAll { it }
-
+                    echo " ${value}"
                     switch(params.OPERATION) {
                         case 'CREATE_TOPIC':
                             env.TOPIC_NAME = values[0]
