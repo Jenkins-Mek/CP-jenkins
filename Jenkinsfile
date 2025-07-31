@@ -23,6 +23,7 @@ properties([
                             "CREATE_TOPIC",
                             "DESCRIBE_TOPIC",
                             "ALTER_TOPIC",
+                            "DELETE_TOPIC",
                             "PRODUCER",
                             "CONSUMER",
                             "LIST_SCHEMA",
