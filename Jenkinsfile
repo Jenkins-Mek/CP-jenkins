@@ -21,6 +21,7 @@ properties([
                         return [
                             "LIST_TOPICS:selected",
                             "CREATE_TOPIC",
+                            "DESCRIBE_TOPIC",
                             "ALTER_TOPIC",
                             "PRODUCER",
                             "CONSUMER",
