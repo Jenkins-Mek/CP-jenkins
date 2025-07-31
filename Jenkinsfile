@@ -142,7 +142,7 @@ properties([
                                                 <select name='value' style="width: 200px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">
                                                     <option value='delete' selected>delete</option>
                                                     <option value='compact'>compact</option>
-                                                    <option value='delete,compact'>delete|compact</option>
+                                                    <option value='delete|compact'>delete,compact</option>
                                                 </select>
                                                 <div style="font-size: 12px; color: #856404; margin-top: 3px;">Topic cleanup policy</div>
                                             </td>
