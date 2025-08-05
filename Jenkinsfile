@@ -594,7 +594,7 @@ properties([
                                        </div>
                                    </div>
                                 """
-                            } else if (OPERATION == 'DESCRIBE_SCHEMA') {
+                        } else if (OPERATION == 'DESCRIBE_SCHEMA') {
                             // Load schema subjects from file
                             def subjects = []
                             try {
