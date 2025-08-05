@@ -539,19 +539,19 @@ properties([
                                        .collect { it.trim() }
                                        .findAll { it && !it.startsWith('#') }
                                        .sort()
-                              }
-                          } catch (Exception e) {
+                                }
+                            } catch (Exception e) {
                                subjects = ["ERROR: ${e.message}"]
-                           }
+                            }
 
-                           def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #ff4444; border-radius: 3px; background-color: #fff2f2;">'
-                           subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
-                           subjects.each { subject ->
+                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #ff4444; border-radius: 3px; background-color: #fff2f2;">'
+                            subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
+                            subjects.each { subject ->
                                subjectOptions += "<option value='${subject}'>${subject}</option>"
-                           }
-                           subjectOptions += '</select>'
+                            }
+                            subjectOptions += '</select>'
 
-                           return """
+                            return """
                                <div style="background-color: #ffe6e6; padding: 15px; border-radius: 5px; border-left: 4px solid #ff4444;">
                                    <h4 style="margin: 0 0 15px 0; color: #cc0000;">📋🗑️ Delete Schema</h4>
                                     <div style="background-color: #ffffff; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #ffcccc;">
