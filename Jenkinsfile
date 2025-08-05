@@ -603,7 +603,7 @@ pipeline {
         TOPICS_LIST_FILE = 'kafka-topics-list.txt'
         TOPIC_DESCRIPTION_FILE = 'kafka-topics-describe.txt'
         SCHEMA_LIST_FILE = 'schema-subjects-list.txt'
-        SCHEMA_DESCRIPTION_FILE = 'schema-subjects-list.txt'
+        SCHEMA_DESCRIPTION_FILE = 'schema-subject-description.txt'
         CLIENT_CONFIG_FILE = '/tmp/client.properties'
     }
 
@@ -894,7 +894,7 @@ pipeline {
 
                             copyArtifacts projectName: 'org-cp-tools/CP-jenkins/list-schema',
                                     buildNumber: "${describeSchemasJob.number}",
-                                    filter: 'schema-subjects-list.txt',
+                                    filter: 'schema-subject-description.txt',
                                     target: '.'
                             break
 
