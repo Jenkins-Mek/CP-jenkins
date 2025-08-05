@@ -654,7 +654,7 @@ pipeline {
                             env.SCHEMA_CONTENT = values[4]
                             echo """
                             Register schema ${SCHEMA_FOR} in ${SCHEMA_TYPE} to topic : ${env.TOPIC_NAME}
-                            With content ${SCHEMA_CONTEN}
+                            With content ${SCHEMA_CONTENT}
                             """
                     }
                 }
