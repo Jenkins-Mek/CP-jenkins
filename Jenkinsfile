@@ -13,7 +13,7 @@ pipeline {
     agent any
 
     environment {
-        TOPICS_LIST_FILE = 'kafka-topics-list.txt'
+        TOPICS_LIST_FILE = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
         CLIENT_CONFIG_FILE = '/tmp/client.properties'
     }
 
@@ -144,11 +144,6 @@ def saveTopicsToFile(topics) {
 
     writeFile file: env.TOPICS_LIST_FILE, text: textContent
 
-    sh """
-        sudo mkdir -p /var/lib/jenkins/workspace
-        echo '${textContent}' | sudo tee /var/lib/jenkins/workspace/kafka-topics-list.txt > /dev/null
-        sudo chown jenkins:jenkins /var/lib/jenkins/workspace/kafka-topics-list.txt 2>/dev/null || true
-    """
 }
 
 def cleanupClientConfig() {
