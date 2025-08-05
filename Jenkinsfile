@@ -403,11 +403,23 @@ properties([
                                     <table style="width: 100%; border-collapse: collapse;">
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                <label style="font-weight: bold; color: #4b0082;">Subject Name *</label>
+                                                <label style="font-weight: bold; color: #4b0082;">Topic name *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <input name='value' type='text' value='user-events-value' style="width: 300px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Schema subject name (typically: topic-name-value)</div>
+                                                <input name='value' type='text' value='user-topic' style="width: 300px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Topic name for registered</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #4b0082;">Schema For</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;">
+                                                    <option value='key' >Key</option>
+                                                    <option value='value'selected>Value</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Schema format type</div>
                                             </td>
                                         </tr>
                                         <tr>
@@ -439,11 +451,11 @@ properties([
                                         </tr>
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #4b0082;">Schema File Path *</label>
+                                                <label style="font-weight: bold; color: #4b0082;">Schema Content *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <input name='value' type='text' value='schemas/user-events.avsc' style="width: 300px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Path to schema definition file in repository</div>
+                                                <input name='value' type='text' value='' style="width: 300px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Schema definition</div>
                                             </td>
                                         </tr>
                                     </table>
@@ -630,12 +642,20 @@ pipeline {
                             env.SHOW_VERSIONS = values.contains('true') ? 'true' : 'false'
                             echo "Listing all schemas (Show versions: ${env.SHOW_VERSIONS})"
                             break
-
                         case 'DESCRIBE_SCHEMA':
                             env.SUBJECT_NAME = values[0]
                             env.SHOW_VERSIONS = values[1].contains('true') ? 'true' : 'false'
                             echo "Describe schema ${env.SUBJECT_NAME} (Show versions: ${env.SHOW_VERSIONS})"
                             break
+                        case 'REGISTER_SCHEMA':
+                            env.TOPIC_NAME = values[0]
+                            env.SCHEMA_FOR = values[1]
+                            env.SCHEMA_TYPE = values[2]
+                            env.SCHEMA_CONTENT = values[4]
+                            echo """
+                            Register schema ${SCHEMA_FOR} in ${SCHEMA_TYPE} to topic : ${env.TOPIC_NAME}
+                            With content ${SCHEMA_CONTEN}
+                            """
                     }
                 }
             }
@@ -645,6 +665,11 @@ pipeline {
             steps {
                 script {
                     switch(params.OPERATION) {
+                        case 'REGISTER_SCHEMA':
+                            if (!env.TOPIC_NAME?.trim()) error "Topic name required"
+                            if (!env.TOPIC_NAME.matches('^[a-zA-Z0-9._-]+$')) error "Invalid topic name format"
+                            echo "✅ Validation passed"
+                            break
                         case 'CREATE_TOPIC':
                             if (!env.TOPIC_NAME?.trim()) error "Topic name required"
                             if (!env.TOPIC_NAME.matches('^[a-zA-Z0-9._-]+$')) error "Invalid topic name format"
@@ -820,9 +845,12 @@ pipeline {
                             echo "==== Calling Register Schema job ===="
                             build job: 'org-cp-tools/CP-jenkins/register-schema',
                                 parameters: [
-                                    string(name: 'SUBJECT', value: "${env.SUBJECT}"),
-                                    text(name: 'SCHEMA', value: "${env.SCHEMA}"),
-                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}")
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                    string(name: 'SCHEMA_REGISTRY_URL', value: "${env.SCHEMA_REGISTRY_URL}"),
+                                    string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
+                                    string(name: 'SCHEMA_FOR', value: "${env.SCHEMA_FOR}"),
+                                    string(name: 'SCHEMA_TYPE', value: "${env.SCHEMA_TYPE}"),
+                                    text(name: 'SCHEMA_CONTENT', value: "${env.SCHEMA_CONTENT}"),
                                 ],
                                 propagate: false,
                                 wait: true
