@@ -685,7 +685,7 @@ pipeline {
                             echo "Listing all schemas (Show versions: ${env.SHOW_VERSIONS})"
                             break
                         case 'DELETE_SCHEMA':
-                            env.SUBJECT_NAME = values
+                            env.SUBJECT_NAME = values[0]
                             echo "Delete Subject ${env.SUBJECT_NAME}"
 
                             break
