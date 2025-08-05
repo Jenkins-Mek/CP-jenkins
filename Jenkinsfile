@@ -454,7 +454,7 @@ properties([
                                                 <label style="font-weight: bold; color: #4b0082;">Schema Content *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <input name='value' type='text' value='' style="width: 300px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;">
+                                                <textarea name='value' type='text' value='' style="width: 300px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;"></textarea>
                                                 <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Schema definition</div>
                                             </td>
                                         </tr>
