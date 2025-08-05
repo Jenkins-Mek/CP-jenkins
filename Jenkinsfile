@@ -580,27 +580,36 @@ properties([
                                    </div>
                                 """
                         } else if (OPERATION == 'DESCRIBE_SCHEMA') {
-                            // Load schema subjects from file
-                            def subjects = []
-                            try {
-                                def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
-                                def choicesFile = new File(filePath)
-                                if (choicesFile.exists()) {
-                                   subjects = choicesFile.readLines()
-                                       .collect { it.trim() }
-                                       .findAll { it && !it.startsWith('#') }
-                                       .sort()
+                                // Load schema subjects from file
+                                def subjects = []
+                                try {
+                                    def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
+                                    def choicesFile = new File(filePath)
+                                    if (choicesFile.exists()) {
+                                        choicesFile.readLines()
+                                            .collect { it.trim() }
+                                            .findAll { it && !it.startsWith('#') }
+                                            .each { line ->
+                                                // Parse format: subject-name[version1,version2,...]
+                                                if (line.contains('[') && line.endsWith(']')) {
+                                                    def subjectName = line.substring(0, line.indexOf('['))
+                                                    subjects << subjectName
+                                                } else {
+                                                    subjects << line
+                                                }
+                                            }
+                                        subjects = subjects.sort()
+                                    }
+                                } catch (Exception e) {
+                                   subjects = ["ERROR: ${e.message}"]
                                 }
-                            } catch (Exception e) {
-                               subjects = ["ERROR: ${e.message}"]
-                            }
 
-                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #ff4444; border-radius: 3px; background-color: #fff2f2;">'
-                            subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
-                            subjects.each { subject ->
-                               subjectOptions += "<option value='${subject}'>${subject}</option>"
-                            }
-                            subjectOptions += '</select>'
+                                def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #ff4444; border-radius: 3px; background-color: #fff2f2;">'
+                                subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
+                                subjects.each { subject ->
+                                   subjectOptions += "<option value='${subject}'>${subject}</option>"
+                                }
+                                subjectOptions += '</select>'
 
                             return """
                               <div style="background-color: #f0f8ff; padding: 15px; border-radius: 5px; border-left: 4px solid #4169e1;">
