@@ -541,10 +541,11 @@ properties([
                                         .findAll { it && !it.startsWith('#') }
                                         .each { line ->
                                             // Parse format: subject-name[version1,version2,...]
-                                            def matcher = line =~ ~/^(.+?)\[(.+?)\]$/
-                                            if (matcher.matches()) {
-                                                def subjectName = matcher.group(1)
-                                                def versions = matcher.group(2).split(',').collect { it.trim() }
+                                            if (line.contains('[') && line.endsWith(']')) {
+                                                def bracketIndex = line.indexOf('[')
+                                                def subjectName = line.substring(0, bracketIndex)
+                                                def versionsPart = line.substring(bracketIndex + 1, line.length() - 1)
+                                                def versions = versionsPart.split(',').collect { it.trim() }
                                                 subjects << subjectName
                                                 subjectVersions[subjectName] = versions
                                             } else {
