@@ -51,7 +51,7 @@ pipeline {
                         saveTopicsToFile(topics)
                     } else {
                         echo "⚠️ No topics found"
-                        writeFile file: env.TOPICS_LIST_FILE, text: "# No topics found\n"
+                        writeFile file: env.TOPICS_LIST_PATH, text: "# No topics found\n"
                     }
                 }
             }
@@ -61,7 +61,7 @@ pipeline {
     post {
         success {
             script {
-                archiveArtifacts artifacts: "${env.TOPICS_LIST_PATH}",
+                archiveArtifacts artifacts: "${env.TOPICS_LIST_FILE}",
                                fingerprint: true,
                                allowEmptyArchive: true
                 echo "📦 Topics list archived"
@@ -143,7 +143,7 @@ def saveTopicsToFile(topics) {
         textContent += "${topic}\n"
     }
 
-    writeFile file: env.TOPICS_LIST_FILE, text: textContent
+    writeFile file: env.TOPICS_LIST_PATH, text: textContent
 
 }
 
