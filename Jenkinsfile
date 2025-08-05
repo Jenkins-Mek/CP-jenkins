@@ -510,42 +510,13 @@ properties([
                                         </tr>
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #191970;">Schema Version</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #b6c7ff; border-radius: 3px;">
-                                                    <option value='latest' selected>Latest Version</option>
-                                                    <option value='all'>All Versions</option>
-                                                    <option value='1'>Version 1</option>
-                                                    <option value='2'>Version 2</option>
-                                                    <option value='3'>Version 3</option>
-                                                    <option value='4'>Version 4</option>
-                                                    <option value='5'>Version 5</option>
-                                                </select>
-                                                <div style="font-size: 12px; color: #191970; margin-top: 3px;">Which version to describe</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #191970;">Include Details</label>
                                             </td>
                                             <td style="padding: 8px;">
                                                 <div style="margin-top: 5px;">
                                                     <label style="color: #191970; display: block; margin-bottom: 5px;">
-                                                        <input type="checkbox" name="value" value="show_schema_content" checked style="margin-right: 5px;">
-                                                        Show schema definition/content
-                                                    </label>
-                                                    <label style="color: #191970; display: block; margin-bottom: 5px;">
-                                                        <input type="checkbox" name="value" value="show_compatibility" checked style="margin-right: 5px;">
-                                                        Show compatibility settings
-                                                    </label>
-                                                    <label style="color: #191970; display: block; margin-bottom: 5px;">
-                                                        <input type="checkbox" name="value" value="show_references" style="margin-right: 5px;">
-                                                        Show schema references (if any)
-                                                    </label>
-                                                    <label style="color: #191970; display: block;">
-                                                        <input type="checkbox" name="value" value="show_usage_stats" style="margin-right: 5px;">
-                                                        Show usage statistics
+                                                        <input type="checkbox" name="value" value="show_schema_version" checked style="margin-right: 5px;">
+                                                        Show All version definition/content
                                                     </label>
                                                 </div>
                                             </td>
