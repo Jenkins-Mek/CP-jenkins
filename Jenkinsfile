@@ -102,8 +102,8 @@ pipeline {
         success {
             script {
                 // Archive the appropriate file based on which operation was performed
-                def fileToArchive = params.SUBJECT_NAME?.trim() ?
-                    env.SCHEMA_SUBJECT_DESCRIPTION_FILE :
+                def fileToArchive = params.SUBJECT_NAME?.trim() ? 
+                    env.SCHEMA_SUBJECT_DESCRIPTION_FILE : 
                     env.SCHEMA_SUBJECTS_LIST_FILE
 
                 archiveArtifacts artifacts: "${fileToArchive}", fingerprint: true, allowEmptyArchive: true
@@ -262,10 +262,12 @@ def parseSchemaResponse(jsonLine) {
         formattedLines.add("Version: ${schemaData.version}")
         formattedLines.add("Schema ID: ${schemaData.id}")
 
+        // Detect schema type
         def schemaType = detectSchemaType(schemaData)
         formattedLines.add("Schema Type: ${schemaType}")
         formattedLines.add("")
 
+        // Format based on schema type
         switch (schemaType.toLowerCase()) {
             case 'avro':
                 formattedLines.addAll(formatAvroSchema(schemaData.schema))
@@ -296,10 +298,12 @@ def detectSchemaType(schemaData) {
     try {
         def schema = schemaData.schema
 
+        // Check if it has schemaType field (newer Schema Registry versions)
         if (schemaData.schemaType) {
             return schemaData.schemaType
         }
 
+        // Try to detect by schema content
         if (schema.startsWith('syntax = "proto')) {
             return 'PROTOBUF'
         } else if (schema.contains('"$schema"') && schema.contains('json-schema.org')) {
@@ -320,7 +324,18 @@ def formatAvroSchema(schemaString) {
         def schemaJson = jsonSlurper.parseText(schemaString)
         
         def lines = []
-        lines.add("Avro Schema Details:")
+        lines.add("Avro Schema (Ready to Use):")
+        lines.add("=" * 50)
+        
+        // Pretty print the JSON schema with proper indentation
+        def prettyJson = groovy.json.JsonOutput.prettyPrint(schemaString)
+        lines.add(prettyJson)
+        
+        lines.add("=" * 50)
+        lines.add("")
+        
+        // Add quick summary for reference
+        lines.add("Quick Summary:")
         lines.add("  Type: ${schemaJson.type}")
         
         if (schemaJson.name) {
@@ -331,37 +346,10 @@ def formatAvroSchema(schemaString) {
             lines.add("  Namespace: ${schemaJson.namespace}")
         }
         
-        if (schemaJson.doc) {
-            lines.add("  Documentation: ${schemaJson.doc}")
-        }
-        
-        lines.add("")
-        
         if (schemaJson.fields) {
-            lines.add("Fields:")
-            schemaJson.fields.eachWithIndex { field, index ->
-                def fieldNum = String.format("%2d", index + 1)
-                lines.add("  ${fieldNum}. ${field.name}")
-                lines.add("      Type: ${formatFieldType(field.type)}")
-                
-                if (field.doc) {
-                    lines.add("      Doc: ${field.doc}")
-                }
-                
-                if (field.default != null) {
-                    lines.add("      Default: ${field.default}")
-                }
-                
-                if (field.aliases) {
-                    lines.add("      Aliases: ${field.aliases}")
-                }
-                
-                if (index < schemaJson.fields.size() - 1) {
-                    lines.add("")
-                }
-            }
+            lines.add("  Fields: ${schemaJson.fields.collect { it.name }.join(', ')}")
         } else if (schemaJson.symbols) {
-            lines.add("Enum Values: ${schemaJson.symbols.join(', ')}")
+            lines.add("  Enum Values: ${schemaJson.symbols.join(', ')}")
         }
         
         return lines
@@ -378,7 +366,18 @@ def formatJsonSchema(schemaString) {
         def schemaJson = jsonSlurper.parseText(schemaString)
         
         def lines = []
-        lines.add("JSON Schema Details:")
+        lines.add("JSON Schema (Ready to Use):")
+        lines.add("=" * 50)
+        
+        // Pretty print the JSON schema with proper indentation
+        def prettyJson = groovy.json.JsonOutput.prettyPrint(schemaString)
+        lines.add(prettyJson)
+        
+        lines.add("=" * 50)
+        lines.add("")
+        
+        // Add quick summary for reference
+        lines.add("Quick Summary:")
         
         if (schemaJson.'$schema') {
             lines.add("  Schema Version: ${schemaJson.'$schema'}")
@@ -388,44 +387,17 @@ def formatJsonSchema(schemaString) {
             lines.add("  Title: ${schemaJson.title}")
         }
         
-        if (schemaJson.description) {
-            lines.add("  Description: ${schemaJson.description}")
-        }
-        
         if (schemaJson.type) {
             lines.add("  Type: ${schemaJson.type}")
         }
         
-        lines.add("")
-        
         if (schemaJson.properties) {
-            lines.add("Properties:")
-            schemaJson.properties.eachWithIndex { prop, index ->
-                def propNum = String.format("%2d", index + 1)
-                lines.add("  ${propNum}. ${prop.key}")
-                lines.add("      Type: ${prop.value.type ?: 'Not specified'}")
-                
-                if (prop.value.description) {
-                    lines.add("      Description: ${prop.value.description}")
-                }
-                
-                if (prop.value.format) {
-                    lines.add("      Format: ${prop.value.format}")
-                }
-                
-                if (prop.value.enum) {
-                    lines.add("      Enum: ${prop.value.enum.join(', ')}")
-                }
-                
-                if (index < schemaJson.properties.size() - 1) {
-                    lines.add("")
-                }
-            }
+            def propertyNames = schemaJson.properties.keySet().take(10) // Show first 10 properties
+            lines.add("  Properties: ${propertyNames.join(', ')}${schemaJson.properties.size() > 10 ? '...' : ''}")
         }
         
         if (schemaJson.required) {
-            lines.add("")
-            lines.add("Required Fields: ${schemaJson.required.join(', ')}")
+            lines.add("  Required Fields: ${schemaJson.required.join(', ')}")
         }
         
         return lines
