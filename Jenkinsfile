@@ -13,7 +13,8 @@ pipeline {
     agent any
 
     environment {
-        TOPICS_LIST_FILE = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
+        TOPICS_LIST_PATH = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
+        TOPICS_LIST_FILE = 'kafka-topics-list.txt'
         CLIENT_CONFIG_FILE = '/tmp/client.properties'
     }
 
@@ -60,7 +61,7 @@ pipeline {
     post {
         success {
             script {
-                archiveArtifacts artifacts: "${env.TOPICS_LIST_FILE}",
+                archiveArtifacts artifacts: "${env.TOPICS_LIST_PATH}",
                                fingerprint: true,
                                allowEmptyArchive: true
                 echo "📦 Topics list archived"
