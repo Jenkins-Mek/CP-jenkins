@@ -603,6 +603,7 @@ pipeline {
         TOPICS_LIST_FILE = 'kafka-topics-list.txt'
         TOPIC_DESCRIPTION_FILE = 'kafka-topics-describe.txt'
         SCHEMA_LIST_FILE = 'schema-subjects-list.txt'
+        SCHEMA_DESCRIPTION_FILE = 'schema-subjects-list.txt'
         CLIENT_CONFIG_FILE = '/tmp/client.properties'
     }
 
@@ -657,6 +658,12 @@ pipeline {
                         case 'LIST_SCHEMA':
                             env.SHOW_VERSIONS = values.contains('true') ? 'true' : 'false'
                             echo "Listing all schemas (Show versions: ${env.SHOW_VERSIONS})"
+                            break
+
+                        case 'DESCRIBE_SCHEMA':
+                            env.SUBJECT_NAME = values[0]
+                            env.SHOW_VERSIONS = values[1].contains('true') ? 'true' : 'false'
+                            echo "Describe schema ${env.SUBJECT_NAME} (Show versions: ${env.SHOW_VERSIONS})"
                             break
                     }
                 }
@@ -873,6 +880,24 @@ pipeline {
                                     target: '.'
                             break
 
+                        case 'DESCRIBE_SCHEMA':
+                            echo "==== Calling List Schema job ===="
+                            def describeSchemasJob = build job: 'org-cp-tools/CP-jenkins/list-schema',
+                                parameters: [
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                    string(name: 'SCHEMA_REGISTRY_URL', value: "${env.SCHEMA_REGISTRY_URL}"),
+                                    string(name: 'SUBJECT_NAME', Value:"${env.SUBJECT_NAME}") ,
+                                    booleanParam(name: 'INCLUDE_VERSIONS', value: "${env.SHOW_VERSIONS}")
+                                ],
+                                propagate: false,
+                                wait: true
+
+                            copyArtifacts projectName: 'org-cp-tools/CP-jenkins/list-schema',
+                                    buildNumber: "${describeSchemasJob.number}",
+                                    filter: 'schema-subjects-list.txt',
+                                    target: '.'
+                            break
+
 
                         default:
                             error "❌ Unknown operation: ${params.OPERATION}"
@@ -885,11 +910,12 @@ pipeline {
     post {
         success {
             script {
-                // Map of operations to their corresponding files
+
                 def operationFiles = [
                     'LIST_TOPICS': env.TOPICS_LIST_FILE,
                     'DESCRIBE_TOPIC': env.TOPIC_DESCRIPTION_FILE,
                     'LIST_SCHEMA': env.SCHEMA_LIST_FILE,
+                    'DESCRIBE_SCHEMA': env.SCHEMA_DESCRIPTION_FILE,
                 ]
 
                 def currentFile = operationFiles[params.OPERATION]
