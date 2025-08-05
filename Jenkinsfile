@@ -23,7 +23,7 @@ pipeline {
                     if (!params.SCHEMA_CONTENT?.trim()) {
                         error("SCHEMA_CONTENT is required")
                     }
-                    
+
                     // Generate subject name - use custom if provided, otherwise use standard naming
                     if (params.CUSTOM_SUBJECT_NAME?.trim()) {
                         env.SUBJECT_NAME = params.CUSTOM_SUBJECT_NAME.trim()
@@ -32,7 +32,7 @@ pipeline {
                         env.SUBJECT_NAME = "${params.TOPIC_NAME}-${params.SCHEMA_FOR}"
                         echo "📋 Using standard subject name: ${env.SUBJECT_NAME}"
                     }
-                    
+
                     echo "✅ Input validation passed"
                     echo "📋 Topic: ${params.TOPIC_NAME}"
                     echo "📋 Subject: ${env.SUBJECT_NAME}"
@@ -80,7 +80,7 @@ pipeline {
             steps {
                 script {
                     def escapedSchema = params.SCHEMA_CONTENT.replace('"', '\\"').replace('\n', '\\n').replace('\r', '')
-                    
+
                     def requestBody
                     if (params.SCHEMA_TYPE == 'AVRO') {
                         requestBody = """{"schema": "${escapedSchema}"}"""
@@ -106,7 +106,7 @@ pipeline {
                     def responseBody = lines.size() > 1 ? lines[0..-2].join('\n') : ''
 
                     echo "📤 Registration response: ${responseBody}"
-                    
+
                     if (httpCode.startsWith('2')) {
                         if (env.SCHEMA_EXISTS == 'true') {
                             echo "✅ Schema was already registered - returned existing version (HTTP ${httpCode})"
@@ -141,7 +141,7 @@ pipeline {
                     ).trim()
 
                     echo "🔍 Latest schema version: ${response}"
-                    
+
                     if (response.contains('"subject"') && response.contains('"version"')) {
                         def jsonSlurper = new groovy.json.JsonSlurper()
                         try {
