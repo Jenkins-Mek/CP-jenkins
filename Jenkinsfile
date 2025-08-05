@@ -531,6 +531,7 @@ properties([
                         } else if (OPERATION == 'DELETE_SCHEMA') {
                                 // Load schema subjects from file
                                 def subjects = []
+                                def subjectVersions = [:]
                                 try {
                                     def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
                                     def choicesFile = new File(filePath)
@@ -539,11 +540,15 @@ properties([
                                             .collect { it.trim() }
                                             .findAll { it && !it.startsWith('#') }
                                             .each { line ->
+                                                // Parse format: subject-name[version1,version2,...]
                                                 if (line.contains('[') && line.endsWith(']')) {
                                                     def bracketIndex = line.indexOf('[')
                                                     def subjectName = line.substring(0, bracketIndex)
+                                                    def versionsPart = line.substring(bracketIndex + 1, line.length() - 1)
+                                                    def versions = versionsPart.split(',').collect { it.trim() }
                                                     subjects << subjectName
                                                 } else {
+                                                    // Fallback for lines without version info
                                                     subjects << line
                                                 }
                                             }
