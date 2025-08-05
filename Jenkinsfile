@@ -13,7 +13,8 @@ pipeline {
     agent any
 
     environment {
-        SCHEMA_SUBJECTS_FILE = 'schema-subjects-list.txt'
+        SCHEMA_SUBJECTS_LIST_FILE = 'schema-subjects-list.txt'
+        SCHEMA_SUBJECT_DESCRIPTION_FILE = 'schema-subject-description.txt'
         SCHEMA_REGISTRY_CONFIG_FILE = '/tmp/schema-registry-client.properties'
     }
 
@@ -35,7 +36,7 @@ pipeline {
                     def subjects = listSchemaSubjects()
                     if (!subjects || subjects.isEmpty()) {
                         echo "ℹ️ No schema subjects found in registry."
-                        writeFile file: env.SCHEMA_SUBJECTS_FILE, text: "# No schema subjects found\n# Generated: ${new Date().format('yyyy-MM-dd HH:mm:ss')}\n# Schema Registry: ${params.SCHEMA_REGISTRY_URL}\n\nNo subjects registered in the schema registry."
+                        writeFile file: env.SCHEMA_SUBJECTS_LIST_FILE, text: "# No schema subjects found\n# Generated: ${new Date().format('yyyy-MM-dd HH:mm:ss')}\n# Schema Registry: ${params.SCHEMA_REGISTRY_URL}\n\nNo subjects registered in the schema registry."
                         return
                     }
 
@@ -86,7 +87,7 @@ pipeline {
                     echo "📝 Describing subject: ${inputSubject}"
                     def subjectInfo = describeSchemaSubject(inputSubject)
                     saveSubjectDescriptionToFile(inputSubject, subjectInfo)
-                    echo "✅ Subject description saved to ${env.SCHEMA_SUBJECTS_FILE}"
+                    echo "✅ Subject description saved to ${env.SCHEMA_SUBJECT_DESCRIPTION_FILE}"
                 }
             }
         }
@@ -100,8 +101,13 @@ pipeline {
         }
         success {
             script {
-                archiveArtifacts artifacts: "${env.SCHEMA_SUBJECTS_FILE}", fingerprint: true, allowEmptyArchive: true
-                echo "📦 Artifact '${env.SCHEMA_SUBJECTS_FILE}' archived successfully."
+                // Archive the appropriate file based on which operation was performed
+                def fileToArchive = params.SUBJECT_NAME?.trim() ? 
+                    env.SCHEMA_SUBJECT_DESCRIPTION_FILE : 
+                    env.SCHEMA_SUBJECTS_LIST_FILE
+                
+                archiveArtifacts artifacts: "${fileToArchive}", fingerprint: true, allowEmptyArchive: true
+                echo "📦 Artifact '${fileToArchive}' archived successfully."
             }
         }
     }
@@ -553,7 +559,7 @@ ${subjectInfo}
 
 """
 
-    writeFile file: env.SCHEMA_SUBJECTS_FILE, text: textContent
+    writeFile file: env.SCHEMA_SUBJECT_DESCRIPTION_FILE, text: textContent
 }
 
 def saveSubjectListToFile(subjects, subjectDetails = [:]) {
@@ -584,7 +590,7 @@ def saveSubjectListToFile(subjects, subjectDetails = [:]) {
         textContent += "\nTo get detailed information about a specific subject, re-run with SUBJECT_NAME parameter.\n"
     }
 
-    writeFile file: env.SCHEMA_SUBJECTS_FILE, text: textContent
+    writeFile file: env.SCHEMA_SUBJECTS_LIST_FILE, text: textContent
 }
 
 
