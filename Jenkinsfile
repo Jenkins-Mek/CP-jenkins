@@ -541,7 +541,7 @@ properties([
                                         .findAll { it && !it.startsWith('#') }
                                         .each { line ->
                                             // Parse format: subject-name[version1,version2,...]
-                                            def matcher = line =~ /^(.+?)\[(.+?)\]$/
+                                            def matcher = line =~ ~/^(.+?)\[(.+?)\]$/
                                             if (matcher.matches()) {
                                                 def subjectName = matcher.group(1)
                                                 def versions = matcher.group(2).split(',').collect { it.trim() }
