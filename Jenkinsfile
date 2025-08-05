@@ -663,7 +663,7 @@ properties([
                                 // This should be a separate Active Choice parameter that references SCHEMA_SUBJECT
                                 def selectedSubject = SCHEMA_SUBJECT // This comes from the previous parameter
                                 def availableVersions = []
-                                
+
                                 try {
                                     def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
                                     def choicesFile = new File(filePath)
@@ -685,7 +685,7 @@ properties([
                                 } catch (Exception e) {
                                     availableVersions = ["ERROR: ${e.message}"]
                                 }
-                                
+
                                 if (!selectedSubject || selectedSubject.isEmpty()) {
                                     return """
                                         <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
@@ -694,14 +694,14 @@ properties([
                                         </div>
                                     """
                                 }
-                                
+
                                 def versionOptions = '<select name="value" style="width: 200px; padding: 5px; border: 2px solid #ff4444; border-radius: 3px; background-color: #fff2f2;">'
                                 versionOptions += '<option value="ALL">🗑️ Delete ALL Versions</option>'
                                 availableVersions.each { version ->
                                     versionOptions += "<option value='${version}'>Version ${version}</option>"
                                 }
                                 versionOptions += '</select>'
-                                
+
                                 return """
                                    <div style="background-color: #ffe6e6; padding: 15px; border-radius: 5px; border-left: 4px solid #ff4444;">
                                        <h4 style="margin: 0 0 15px 0; color: #cc0000;">📋🗑️ Delete Schema - Step 2: Select Version</h4>
