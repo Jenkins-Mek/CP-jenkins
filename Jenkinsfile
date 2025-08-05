@@ -322,38 +322,38 @@ def formatAvroSchema(schemaString) {
     try {
         def jsonSlurper = new groovy.json.JsonSlurper()
         def schemaJson = jsonSlurper.parseText(schemaString)
-        
+
         def lines = []
         lines.add("Avro Schema (Ready to Use):")
         lines.add("=" * 50)
-        
+
         // Pretty print the JSON schema with proper indentation
         def prettyJson = groovy.json.JsonOutput.prettyPrint(schemaString)
         lines.add(prettyJson)
-        
+
         lines.add("=" * 50)
         lines.add("")
-        
+
         // Add quick summary for reference
         lines.add("Quick Summary:")
         lines.add("  Type: ${schemaJson.type}")
-        
+
         if (schemaJson.name) {
             lines.add("  Name: ${schemaJson.name}")
         }
-        
+
         if (schemaJson.namespace) {
             lines.add("  Namespace: ${schemaJson.namespace}")
         }
-        
+
         if (schemaJson.fields) {
             lines.add("  Fields: ${schemaJson.fields.collect { it.name }.join(', ')}")
         } else if (schemaJson.symbols) {
             lines.add("  Enum Values: ${schemaJson.symbols.join(', ')}")
         }
-        
+
         return lines
-        
+
     } catch (Exception e) {
         echo "⚠️ Warning: Failed to parse Avro schema - ${e.getMessage()}"
         return formatGenericSchema(schemaString, 'AVRO')
@@ -364,44 +364,44 @@ def formatJsonSchema(schemaString) {
     try {
         def jsonSlurper = new groovy.json.JsonSlurper()
         def schemaJson = jsonSlurper.parseText(schemaString)
-        
+
         def lines = []
         lines.add("JSON Schema (Ready to Use):")
         lines.add("=" * 50)
-        
+
         // Pretty print the JSON schema with proper indentation
         def prettyJson = groovy.json.JsonOutput.prettyPrint(schemaString)
         lines.add(prettyJson)
-        
+
         lines.add("=" * 50)
         lines.add("")
-        
+
         // Add quick summary for reference
         lines.add("Quick Summary:")
-        
+
         if (schemaJson.'$schema') {
             lines.add("  Schema Version: ${schemaJson.'$schema'}")
         }
-        
+
         if (schemaJson.title) {
             lines.add("  Title: ${schemaJson.title}")
         }
-        
+
         if (schemaJson.type) {
             lines.add("  Type: ${schemaJson.type}")
         }
-        
+
         if (schemaJson.properties) {
             def propertyNames = schemaJson.properties.keySet().take(10) // Show first 10 properties
             lines.add("  Properties: ${propertyNames.join(', ')}${schemaJson.properties.size() > 10 ? '...' : ''}")
         }
-        
+
         if (schemaJson.required) {
             lines.add("  Required Fields: ${schemaJson.required.join(', ')}")
         }
-        
+
         return lines
-        
+
     } catch (Exception e) {
         echo "Warning: Failed to parse JSON schema - ${e.getMessage()}"
         return formatGenericSchema(schemaString, 'JSON')
@@ -412,15 +412,15 @@ def formatProtobufSchema(schemaString) {
     def lines = []
     lines.add("Protocol Buffer Schema:")
     lines.add("")
-    
+
     // Split into lines and format
     def schemaLines = schemaString.split('\n')
     def inMessage = false
     def indent = ""
-    
+
     for (line in schemaLines) {
         def trimmedLine = line.trim()
-        
+
         if (trimmedLine.startsWith('syntax')) {
             lines.add("${trimmedLine}")
         } else if (trimmedLine.startsWith('package')) {
@@ -447,7 +447,7 @@ def formatProtobufSchema(schemaString) {
             lines.add(trimmedLine)
         }
     }
-    
+
     return lines
 }
 
@@ -457,7 +457,7 @@ def formatGenericSchema(schemaString, schemaType) {
     lines.add("")
     lines.add("Raw Schema Content:")
     lines.add("┌" + "─" * 78 + "┐")
-    
+
     // Split long lines and add proper formatting
     def schemaLines = schemaString.split('\n')
     for (line in schemaLines) {
