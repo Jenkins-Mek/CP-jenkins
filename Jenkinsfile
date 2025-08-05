@@ -653,7 +653,7 @@ pipeline {
                             env.TOPIC_NAME = values[0]
                             env.SCHEMA_FOR = values[1]
                             env.SCHEMA_TYPE = values[2]
-                            env.SCHEMA_CONTENT = values[4]
+                            env.SCHEMA_CONTENT = values[4].trim().replaceAll(/,\s*$/, '') 
                             echo """
                             Register schema ${SCHEMA_FOR} in ${SCHEMA_TYPE} to topic : ${env.TOPIC_NAME}
                             With content ${SCHEMA_CONTENT}
