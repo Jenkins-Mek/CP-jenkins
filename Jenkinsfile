@@ -555,7 +555,7 @@ def saveSubjectListToFile(subjects, subjectDetails = [:]) {
             }
         }
 
-        textContent += "\n" +"#" "=" * 50 + "\n"
+        textContent += "\n" +"#"+"=" * 50 + "\n"
         textContent += "\n#To get detailed information about a specific subject, re-run with SUBJECT_NAME parameter.\n"
     }
 
