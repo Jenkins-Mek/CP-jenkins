@@ -822,6 +822,15 @@ pipeline {
                                 ],
                                 propagate: true,
                                 wait: true
+                            echo "==== Update topic listed ===="
+                             build job: 'org-cp-tools/CP-jenkins/list-topics',
+                                parameters: [
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
+                                    string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
+                                ],
+                                propagate: false,
+                                wait: true
                             break
                         case 'ALTER_TOPIC':
                             echo "==== Calling Alter Topic job ===="
