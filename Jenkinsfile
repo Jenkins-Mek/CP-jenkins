@@ -216,14 +216,14 @@ properties([
                             } catch (Exception e) {
                                 topics = ["ERROR: ${e.message}"]
                             }
-                            
+
                             def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #ffeaa7; border-radius: 3px;">'
                             topicOptions += '<option value="">-- Select Topic --</option>'
                             topics.each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
-                            
+
                             return """
                                 <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
                                     <h4 style="margin: 0 0 15px 0; color: #856404;">🔍 Describe Topic</h4>
@@ -283,6 +283,28 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'PRODUCER') {
+                            // Load topics from file
+                            def topics = []
+                            try {
+                                def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
+                                def choicesFile = new File(filePath)
+                                if (choicesFile.exists()) {
+                                    topics = choicesFile.readLines()
+                                        .collect { it.trim() }
+                                        .findAll { it && !it.startsWith('#') }
+                                        .sort()
+                                }
+                            } catch (Exception e) {
+                                topics = ["ERROR: ${e.message}"]
+                            }
+
+                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid  #c3e6cb; border-radius: 3px;">'
+                            topicOptions += '<option value="">-- Select Topic --</option>'
+                            topics.each { topic ->
+                                topicOptions += "<option value='${topic}'>${topic}</option>"
+                            }
+                            topicOptions += '</select>'
+
                             return """
                                 <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
                                     <h4 style="margin: 0 0 15px 0; color: #155724;">📤 Kafka Producer</h4>
@@ -304,7 +326,7 @@ properties([
                                                 <label style="font-weight: bold; color: #155724;">Topic Name *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <input name='value' type='text' value='user-events' style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
+                                                ${topicOptions}
                                                 <div style="font-size: 12px; color: #155724; margin-top: 3px;">Topic to send messages to</div>
                                             </td>
                                         </tr>
@@ -385,6 +407,28 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'CONSUMER') {
+                            // Load topics from file
+                            def topics = []
+                            try {
+                                def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
+                                def choicesFile = new File(filePath)
+                                if (choicesFile.exists()) {
+                                    topics = choicesFile.readLines()
+                                        .collect { it.trim() }
+                                        .findAll { it && !it.startsWith('#') }
+                                        .sort()
+                                }
+                            } catch (Exception e) {
+                                topics = ["ERROR: ${e.message}"]
+                            }
+
+                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid  #b3d7ff; border-radius: 3px;">'
+                            topicOptions += '<option value="">-- Select Topic --</option>'
+                            topics.each { topic ->
+                                topicOptions += "<option value='${topic}'>${topic}</option>"
+                            }
+                            topicOptions += '</select>'
+
                             return """
                                 <div style="background-color: #cce5ff; padding: 15px; border-radius: 5px; border-left: 4px solid #007bff;">
                                     <h4 style="margin: 0 0 15px 0; color: #004085;">📥 Kafka Consumer</h4>
@@ -406,7 +450,7 @@ properties([
                                                 <label style="font-weight: bold; color: #004085;">Topic Name *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <input name='value' type='text' value='user-events' style="width: 300px; padding: 5px; border: 1px solid #b3d7ff; border-radius: 3px;">
+                                                ${topicOptions}
                                                 <div style="font-size: 12px; color: #004085; margin-top: 3px;">Topic to consume messages from</div>
                                             </td>
                                         </tr>
