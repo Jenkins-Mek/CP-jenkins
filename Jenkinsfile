@@ -80,7 +80,7 @@ pipeline {
             steps {
                 script {
                     echo "${params.SCHEMA_CONTENT}"
-                    def escapedSchema = params.SCHEMA_CONTENT.replace('"', '\\"').replace('\n', '\\n').replace('\r', '')
+                    def escapedSchema = params.SCHEMA_CONTENT.replaceAll(/(?<!\\)"/, '\\"').replace('\n', '\\n').replace('\r', '')
 
                     def requestBody
                     if (params.SCHEMA_TYPE == 'AVRO') {
