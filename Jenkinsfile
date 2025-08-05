@@ -559,23 +559,12 @@ properties([
                                    subjects = ["ERROR: ${e.message}"]
                                 }
 
-                                def subjectOptions = '<select name="value" id="subjectSelect" style="width: 300px; padding: 5px; border: 2px solid #ff4444; border-radius: 3px; background-color: #fff2f2;" onchange="updateVersions()">'
+                                def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #ff4444; border-radius: 3px; background-color: #fff2f2;">'
                                 subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
                                 subjects.each { subject ->
                                    subjectOptions += "<option value='${subject}'>${subject}</option>"
                                 }
                                 subjectOptions += '</select>'
-
-                                def versionOptions = '<select name="version" id="versionSelect" style="width: 150px; padding: 5px; border: 2px solid #ff4444; border-radius: 3px; background-color: #fff2f2;" disabled>'
-                                versionOptions += '<option value="">-- Select Version --</option>'
-                                versionOptions += '</select>'
-
-                                // Create JavaScript object for subject-version mapping
-                                def jsVersionMap = "{"
-                                subjectVersions.each { subject, versions ->
-                                    jsVersionMap += "'${subject}': [${versions.collect { "'${it}'" }.join(',')}],"
-                                }
-                                jsVersionMap = jsVersionMap.replaceAll(/,$/, "") + "}"
 
                                 return """
                                    <div style="background-color: #ffe6e6; padding: 15px; border-radius: 5px; border-left: 4px solid #ff4444;">
@@ -595,43 +584,19 @@ properties([
                                            </tr>
                                            <tr>
                                                <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                   <label style="font-weight: bold; color: #cc0000;">Version *</label>
+                                                   <label style="font-weight: bold; color: #cc0000;">Available Versions:</label>
                                                </td>
                                                <td style="padding: 8px;">
-                                                   ${versionOptions}
-                                                   <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">⚠️ Select specific version to delete (leave empty to delete all versions)</div>
+                                                   <div style="background-color: #ffffff; padding: 10px; border: 1px solid #ffcccc; border-radius: 3px;">
+                                                       <div style="font-size: 12px; color: #666; margin-bottom: 8px;"><strong>Schema Versions by Subject:</strong></div>
+                                                       ${subjectVersions.collect { subject, versions -> 
+                                                           "<div style='margin-bottom: 5px;'><strong style='color: #cc0000;'>${subject}:</strong> versions ${versions.join(', ')}</div>"
+                                                       }.join('')}
+                                                   </div>
+                                                   <div style="font-size: 12px; color: #cc0000; margin-top: 8px;">⚠️ Note: The deletion will target the selected subject. Specific version handling will be configured in the pipeline logic.</div>
                                                </td>
                                            </tr>
                                        </table>
-
-                                       <script>
-                                           const subjectVersions = ${jsVersionMap};
-
-                                           function updateVersions() {
-                                               const subjectSelect = document.getElementById('subjectSelect');
-                                               const versionSelect = document.getElementById('versionSelect');
-                                               const selectedSubject = subjectSelect.value;
-
-                                               // Clear existing options
-                                               versionSelect.innerHTML = '<option value="">-- Select Version --</option>';
-
-                                               if (selectedSubject && subjectVersions[selectedSubject]) {
-                                                   // Enable version dropdown
-                                                   versionSelect.disabled = false;
-
-                                                   // Add "All Versions" option
-                                                   versionSelect.innerHTML += '<option value="all">🗑️ Delete All Versions</option>';
-
-                                                   // Add individual version options
-                                                   subjectVersions[selectedSubject].forEach(function(version) {
-                                                       versionSelect.innerHTML += '<option value="' + version + '">Version ' + version + '</option>';
-                                                   });
-                                               } else {
-                                                   // Disable version dropdown if no subject selected
-                                                   versionSelect.disabled = true;
-                                               }
-                                           }
-                                       </script>
                                    </div>
                                 """
                         } else if (OPERATION == 'DESCRIBE_SCHEMA') {
