@@ -548,10 +548,10 @@ def saveSubjectListToFile(subjects, subjectDetails = [:]) {
         textContent += "#"+"=" * 50 + "\n\n"
 
         subjects.eachWithIndex { subject, index ->
-            textContent += "${subject}\n"
+            textContent += "${subject}"
 
             if (params.INCLUDE_VERSIONS && subjectDetails.containsKey(subject)) {
-                textContent += "# Versions: ${subjectDetails[subject]}\n"
+                textContent += "${subjectDetails[subject]}\n"
             }
         }
 
