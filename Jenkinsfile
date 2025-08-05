@@ -602,7 +602,7 @@ properties([
                                 } catch (Exception e) {
                                    subjects = ["ERROR: ${e.message}"]
                                 }
-                                def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #413b3bff; border-radius: 3px; background-color: #fff2f2;">'
+                                def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #413b3bff; border-radius: 3px; background-color: #e2edecff;">'
                                 subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
                                 subjects.each { subject ->
                                    subjectOptions += "<option value='${subject}'>${subject}</option>"
