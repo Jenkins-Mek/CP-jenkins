@@ -681,10 +681,12 @@ pipeline {
                             break
                         case 'DESCRIBE_TOPIC':
                         case 'DELETE_TOPIC':
+                        case 'DESCRIBE_SCHEMA':
                             if (!env.TOPIC_NAME?.trim()) error "Topic name required"
                             echo "✅ Validation passed"
                             break
                         case 'LIST_TOPICS':
+                        case 'LIST_SCHEMA':
                             echo "✅ Validation passed"
                             break
                     }
