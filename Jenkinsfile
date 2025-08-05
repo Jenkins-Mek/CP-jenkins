@@ -552,7 +552,7 @@ def saveSubjectListToFile(subjects, subjectDetails = [:]) {
 
             if (params.INCLUDE_VERSIONS && subjectDetails.containsKey(subject)) {
                 textContent += "${subjectDetails[subject]}\n"
-            } else textcontent += "\n"
+            } else textContent += "\n"
         }
 
         textContent += "\n" +"#"+"=" * 50 + "\n"
