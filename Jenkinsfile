@@ -685,6 +685,7 @@ pipeline {
                             echo "Listing all schemas (Show versions: ${env.SHOW_VERSIONS})"
                             break
                         case 'DELETE_SCHEMA':
+                            env.SUBJECT_NAME = values
                         case 'DESCRIBE_SCHEMA':
                             env.SUBJECT_NAME = values[0]
                             env.SHOW_VERSIONS = values[1].contains('true') ? 'true' : 'false'
