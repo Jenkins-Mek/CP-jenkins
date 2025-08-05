@@ -264,9 +264,9 @@ properties([
                             topicOptions += '</select>'
 
                             return """
-                                <div style="background-color: #f3ebecff; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
+                                <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
                                     <h4 style="margin: 0 0 15px 0; color: #721c24;">⚠️ Delete Topic</h4>
-                                    <div style="background-color: #ffffff; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #f3ebecff;">
+                                    <div style="background-color: #ffffff; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #f5c6cb;">
                                         <strong style="color: #721c24;">⚠️ WARNING:</strong> This action will permanently delete the topic and all its data. This cannot be undone!
                                     </div>
                                     <table style="width: 100%;">
@@ -552,8 +552,7 @@ properties([
                                 } catch (Exception e) {
                                    subjects = ["ERROR: ${e.message}"]
                                 }
-
-                                def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #3f3943ff; border-radius: 3px; background-color: #fff2f2;">'
+                                def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #e9dfdfff; border-radius: 3px; background-color: #fff2f2;">'
                                 subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
                                 subjects.each { subject ->
                                    subjectOptions += "<option value='${subject}'>${subject}</option>"
@@ -561,9 +560,9 @@ properties([
                                 subjectOptions += '</select>'
 
                                 return """
-                                   <div style="background-color: #ffe6e6; padding: 15px; border-radius: 5px; border-left: 4px solid #f49d9dff;">
+                                   <div style="background-color: #ffe6e6; padding: 15px; border-radius: 5px; border-left: 4px solid #ff4444;">
                                        <h4 style="margin: 0 0 15px 0; color: #cc0000;">📋🗑️ Delete Schema - Step 1: Select Subject</h4>
-                                        <div style="background-color: #ffffff; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid rgba(255, 224, 224, 1)ff;">
+                                        <div style="background-color: #ffffff; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #ffcccc;">
                                            <strong style="color: #cc0000;">⚠️ WARNING:</strong> Deleting a schema can break existing producers and consumers. Ensure no active applications are using this schema.
                                        </div>
                                        <table style="width: 100%; border-collapse: collapse;">
@@ -573,14 +572,14 @@ properties([
                                                </td>
                                                <td style="padding: 8px;">
                                                    ${subjectOptions}
-                                                  <div style="font-size: 12px; color: #201b1bff; margin-top: 3px;">⚠️ Select the schema subject</div>
+                                                  <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">⚠️ Select the schema subject</div>
                                                </td>
                                            </tr>
                                        </table>
                                    </div>
                                 """
                         } else if (OPERATION == 'DESCRIBE_SCHEMA') {
-                                // Load schema subjects from file
+                                  // Load schema subjects from file
                                 def subjects = []
                                 try {
                                     def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
@@ -603,8 +602,7 @@ properties([
                                 } catch (Exception e) {
                                    subjects = ["ERROR: ${e.message}"]
                                 }
-
-                                def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #1b1313ff; border-radius: 3px; background-color: #f4ecccff;">'
+                                def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #413b3bff; border-radius: 3px; background-color: #fff2f2;">'
                                 subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
                                 subjects.each { subject ->
                                    subjectOptions += "<option value='${subject}'>${subject}</option>"
