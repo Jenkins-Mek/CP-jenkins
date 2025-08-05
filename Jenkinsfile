@@ -531,14 +531,28 @@ properties([
                         } else if (OPERATION == 'DELETE_SCHEMA') {
                             // Load schema subjects from file
                             def subjects = []
+                            def subjectVersions = [:]
                             try {
                                 def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
                                 def choicesFile = new File(filePath)
                                 if (choicesFile.exists()) {
-                                   subjects = choicesFile.readLines()
-                                       .collect { it.trim() }
-                                       .findAll { it && !it.startsWith('#') }
-                                       .sort()
+                                    choicesFile.readLines()
+                                        .collect { it.trim() }
+                                        .findAll { it && !it.startsWith('#') }
+                                        .each { line ->
+                                            // Parse format: subject-name[version1,version2,...]
+                                            def matcher = line =~ /^(.+?)\[(.+?)\]$/
+                                            if (matcher.matches()) {
+                                                def subjectName = matcher.group(1)
+                                                def versions = matcher.group(2).split(',').collect { it.trim() }
+                                                subjects << subjectName
+                                                subjectVersions[subjectName] = versions
+                                            } else {
+                                                // Fallback for lines without version info
+                                                subjects << line
+                                            }
+                                        }
+                                    subjects = subjects.sort()
                                 }
                             } catch (Exception e) {
                                subjects = ["ERROR: ${e.message}"]
@@ -551,23 +565,55 @@ properties([
                             }
                             subjectOptions += '</select>'
 
+                            def versionOptions = '<select name="version" id="versionSelect" style="width: 150px; padding: 5px; border: 2px solid #ff4444; border-radius: 3px; background-color: #fff2f2;" disabled>'
+                            versionOptions += '<option value="">-- Select Version --</option>'
+                            versionOptions += '</select>'
+
                             return """
-                               <div style="background-color: #ffe6e6; padding: 15px; border-radius: 5px; border-left: 4px solid #ff4444;">
-                                   <h4 style="margin: 0 0 15px 0; color: #cc0000;">📋🗑️ Delete Schema</h4>
+                                <div style="background-color: #ffe6e6; padding: 15px; border-radius: 5px; border-left: 4px solid #ff4444;">
+                                    <h4 style="margin: 0 0 15px 0; color: #cc0000;">📋🗑️ Delete Schema</h4>
                                     <div style="background-color: #ffffff; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #ffcccc;">
-                                       <strong style="color: #cc0000;">⚠️ WARNING:</strong> Deleting a schema can break existing producers and consumers. Ensure no active applications are using this schema.
-                                   </div>
-                                   <table style="width: 100%; border-collapse: collapse;">
-                                      <tr>
-                                           <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                               <label style="font-weight: bold; color: #cc0000;">Subject Name *</label>
-                                           </td>
-                                           <td style="padding: 8px;">
-                                               ${subjectOptions}
-                                              <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">⚠️ Carefully select the schema subject you want to delete</div>
-                                           </td>
-                                       </tr>
-                                   </table>
+                                        <strong style="color: #cc0000;">⚠️ WARNING:</strong> Deleting a schema can break existing producers and consumers. Ensure no active applications are using this schema.
+                                    </div>
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: bold; color: #cc0000;">Subject Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                ${subjectOptions}
+                                                <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">⚠️ Carefully select the schema subject you want to delete</div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    <script>
+                                        const subjectVersions = ${jsVersionMap};
+
+                                        function updateVersions() {
+                                            const subjectSelect = document.getElementById('subjectSelect');
+                                            const versionSelect = document.getElementById('versionSelect');
+                                            const selectedSubject = subjectSelect.value;
+
+                                            // Clear existing options
+                                            versionSelect.innerHTML = '<option value="">-- Select Version --</option>';
+
+                                            if (selectedSubject && subjectVersions[selectedSubject]) {
+                                                // Enable version dropdown
+                                                versionSelect.disabled = false;
+
+                                                // Add "All Versions" option
+                                                versionSelect.innerHTML += '<option value="all">🗑️ Delete All Versions</option>';
+
+                                                // Add individual version options
+                                                subjectVersions[selectedSubject].forEach(function(version) {
+                                                    versionSelect.innerHTML += '<option value="' + version + '">Version ' + version + '</option>';
+                                                });
+                                            } else {
+                                                // Disable version dropdown if no subject selected
+                                                versionSelect.disabled = true;
+                                            }
+                                        }
+                                    </script>
                                </div>
                             """
                         } else if (OPERATION == 'DESCRIBE_SCHEMA') {
