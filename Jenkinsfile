@@ -686,6 +686,9 @@ pipeline {
                             break
                         case 'DELETE_SCHEMA':
                             env.SUBJECT_NAME = values
+                            echo "Delete Subject ${env.SUBJECT_NAME}"
+
+                            break
                         case 'DESCRIBE_SCHEMA':
                             env.SUBJECT_NAME = values[0]
                             env.SHOW_VERSIONS = values[1].contains('true') ? 'true' : 'false'
@@ -702,6 +705,7 @@ pipeline {
                             Register schema ${SCHEMA_FOR} in ${SCHEMA_TYPE} to topic : ${env.TOPIC_NAME}
                             With content ${SCHEMA_CONTENT}
                             """
+                            break
                     }
                 }
             }
