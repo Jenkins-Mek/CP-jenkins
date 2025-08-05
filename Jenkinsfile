@@ -648,6 +648,7 @@ pipeline {
                             echo "Describe schema ${env.SUBJECT_NAME} (Show versions: ${env.SHOW_VERSIONS})"
                             break
                         case 'REGISTER_SCHEMA':
+                            echo "${params.TOPIC_OPTIONS}"
                             values = option.split(',', 5).collect { it.trim() }
                             env.TOPIC_NAME = values[0]
                             env.SCHEMA_FOR = values[1]
