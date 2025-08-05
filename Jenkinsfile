@@ -530,11 +530,11 @@ properties([
                             """
                         } else if (OPERATION == 'DELETE_SCHEMA') {
                             // Load schema subjects from file
-                           def subjects = []
-                           try {
-                               def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
-                               def choicesFile = new File(filePath)
-                               if (choicesFile.exists()) {
+                            def subjects = []
+                            try {
+                                def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
+                                def choicesFile = new File(filePath)
+                                if (choicesFile.exists()) {
                                    subjects = choicesFile.readLines()
                                        .collect { it.trim() }
                                        .findAll { it && !it.startsWith('#') }
@@ -577,24 +577,23 @@ properties([
                                 def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
                                 def choicesFile = new File(filePath)
                                 if (choicesFile.exists()) {
-                                    subjects = choicesFile.readLines()
-                                        .collect { it.trim() }
-                                        .findAll { it && !it.startsWith('#') }
+                                   subjects = choicesFile.readLines()
+                                       .collect { it.trim() }
+                                       .findAll { it && !it.startsWith('#') }
                                        .sort()
-                               }
+                                }
                             } catch (Exception e) {
                                subjects = ["ERROR: ${e.message}"]
-                           }
+                            }
 
-                          def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #b6c7ff; border-radius: 3px;">'
-                           subjectOptions += '<option value="">-- Select Schema Subject to Describe --</option>'
-                           subjects.each { subject ->
-                              def selected = subject == 'user-events-value' ? 'selected' : ''
-                                subjectOptions += "<option value='${subject}' ${selected}>${subject}</option>"
-                           }
-                          subjectOptions += '</select>'
+                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #ff4444; border-radius: 3px; background-color: #fff2f2;">'
+                            subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
+                            subjects.each { subject ->
+                               subjectOptions += "<option value='${subject}'>${subject}</option>"
+                            }
+                            subjectOptions += '</select>'
 
-                          return """
+                            return """
                               <div style="background-color: #f0f8ff; padding: 15px; border-radius: 5px; border-left: 4px solid #4169e1;">
                                   <h4 style="margin: 0 0 15px 0; color: #191970;">📋🔍 Describe Schema</h4>
                                   <table style="width: 100%; border-collapse: collapse;">
