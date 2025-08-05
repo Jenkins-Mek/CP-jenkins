@@ -553,7 +553,7 @@ properties([
                                    subjects = ["ERROR: ${e.message}"]
                                 }
 
-                                def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #ff4444; border-radius: 3px; background-color: #fff2f2;">'
+                                def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #3f3943ff; border-radius: 3px; background-color: #fff2f2;">'
                                 subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
                                 subjects.each { subject ->
                                    subjectOptions += "<option value='${subject}'>${subject}</option>"
@@ -604,7 +604,7 @@ properties([
                                    subjects = ["ERROR: ${e.message}"]
                                 }
 
-                                def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #ff4444; border-radius: 3px; background-color: #fff2f2;">'
+                                def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #3f3943ff; border-radius: 3px; background-color: #fff2f2;">'
                                 subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
                                 subjects.each { subject ->
                                    subjectOptions += "<option value='${subject}'>${subject}</option>"
