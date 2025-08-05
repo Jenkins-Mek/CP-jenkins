@@ -305,6 +305,36 @@ properties([
                             }
                             topicOptions += '</select>'
 
+                            // Load schema subjects from file
+                            def subjects = []
+                            try {
+                                def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
+                                def choicesFile = new File(filePath)
+                                if (choicesFile.exists()) {
+                                    choicesFile.readLines()
+                                        .collect { it.trim() }
+                                        .findAll { it && !it.startsWith('#') }
+                                        .each { line ->
+                                            // Parse format: subject-name[version1,version2,...]
+                                            if (line.contains('[') && line.endsWith(']')) {
+                                                def subjectName = line.substring(0, line.indexOf('['))
+                                                subjects << subjectName
+                                            } else {
+                                                subjects << line
+                                            }
+                                        }
+                                    subjects = subjects.sort()
+                                }
+                            } catch (Exception e) {
+                               subjects = ["ERROR: ${e.message}"]
+                            }
+                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">'
+                            subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
+                            subjects.each { subject ->
+                               subjectOptions += "<option value='${subject}'>${subject}</option>"
+                            }
+                            subjectOptions += '</select>'
+
                             return """
                                 <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
                                     <h4 style="margin: 0 0 15px 0; color: #155724;">📤 Kafka Producer</h4>
@@ -344,7 +374,7 @@ properties([
                                                 <label style="font-weight: bold; color: #155724;">Schema Subject *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <input name='value' type='text' value='user-events-value' style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
+                                                ${subjectOptions}
                                                 <div style="font-size: 12px; color: #155724; margin-top: 3px;">Schema registry subject name</div>
                                             </td>
                                         </tr>
@@ -429,6 +459,36 @@ properties([
                             }
                             topicOptions += '</select>'
 
+                            // Load schema subjects from file
+                            def subjects = []
+                            try {
+                                def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
+                                def choicesFile = new File(filePath)
+                                if (choicesFile.exists()) {
+                                    choicesFile.readLines()
+                                        .collect { it.trim() }
+                                        .findAll { it && !it.startsWith('#') }
+                                        .each { line ->
+                                            // Parse format: subject-name[version1,version2,...]
+                                            if (line.contains('[') && line.endsWith(']')) {
+                                                def subjectName = line.substring(0, line.indexOf('['))
+                                                subjects << subjectName
+                                            } else {
+                                                subjects << line
+                                            }
+                                        }
+                                    subjects = subjects.sort()
+                                }
+                            } catch (Exception e) {
+                               subjects = ["ERROR: ${e.message}"]
+                            }
+                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #b3d7ff; border-radius: 3px;">'
+                            subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
+                            subjects.each { subject ->
+                               subjectOptions += "<option value='${subject}'>${subject}</option>"
+                            }
+                            subjectOptions += '</select>'
+
                             return """
                                 <div style="background-color: #cce5ff; padding: 15px; border-radius: 5px; border-left: 4px solid #007bff;">
                                     <h4 style="margin: 0 0 15px 0; color: #004085;">📥 Kafka Consumer</h4>
@@ -468,7 +528,7 @@ properties([
                                                 <label style="font-weight: bold; color: #004085;">Schema Subject</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <input name='value' type='text' value='user-events-value' style="width: 300px; padding: 5px; border: 1px solid #b3d7ff; border-radius: 3px;">
+                                                ${subjectOptions}
                                                 <div style="font-size: 12px; color: #004085; margin-top: 3px;">Schema subject for deserialization</div>
                                             </td>
                                         </tr>
