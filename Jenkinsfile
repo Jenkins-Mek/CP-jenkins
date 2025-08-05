@@ -1,4 +1,3 @@
-
 properties([
     parameters([
         [$class: 'ChoiceParameter',
@@ -115,6 +114,28 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'ALTER_TOPIC') {
+                            // Load topics from file
+                            def topics = []
+                            try {
+                                def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
+                                def choicesFile = new File(filePath)
+                                if (choicesFile.exists()) {
+                                    topics = choicesFile.readLines()
+                                        .collect { it.trim() }
+                                        .findAll { it && !it.startsWith('#') }
+                                        .sort()
+                                }
+                            } catch (Exception e) {
+                                topics = ["ERROR: ${e.message}"]
+                            }
+                            
+                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">'
+                            topicOptions += '<option value="">-- Select Topic --</option>'
+                            topics.each { topic ->
+                                topicOptions += "<option value='${topic}'>${topic}</option>"
+                            }
+                            topicOptions += '</select>'
+                            
                             return """
                                 <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border: 1px solid #ffeeba;">
                                     <h4 style="margin: 0 0 15px 0; color: #856404;">⚙️ Alter Topic Configuration</h4>
@@ -124,33 +145,7 @@ properties([
                                                 <label style="font-weight: bold; color: #856404;">Select Topic *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <script>
-                                                    function loadTopics() {
-                                                        try {
-                                                            var xhr = new XMLHttpRequest();
-                                                            xhr.open('GET', '/job/' + window.location.pathname.split('/')[2] + '/ws/kafka-topics-list.txt', false);
-                                                            xhr.send();
-                                                            if (xhr.status === 200) {
-                                                                var topics = xhr.responseText.split('\\n')
-                                                                    .map(function(line) { return line.trim(); })
-                                                                    .filter(function(line) { return line && !line.startsWith('#'); })
-                                                                    .sort();
-                                                                
-                                                                var select = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">';
-                                                                select += '<option value="">-- Select Topic --</option>';
-                                                                topics.forEach(function(topic) {
-                                                                    select += '<option value="' + topic + '">' + topic + '</option>';
-                                                                });
-                                                                select += '</select>';
-                                                                return select;
-                                                            }
-                                                        } catch (e) {
-                                                            return '<input name="value" type="text" placeholder="Enter topic name" style="width: 300px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">';
-                                                        }
-                                                        return '<input name="value" type="text" placeholder="Enter topic name" style="width: 300px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">';
-                                                    }
-                                                    document.write(loadTopics());
-                                                </script>
+                                                ${topicOptions}
                                                 <div style="font-size: 12px; color: #856404; margin-top: 3px;">Select the topic to modify from the dropdown</div>
                                             </td>
                                         </tr>
@@ -207,6 +202,28 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'DESCRIBE_TOPIC') {
+                            // Load topics from file
+                            def topics = []
+                            try {
+                                def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
+                                def choicesFile = new File(filePath)
+                                if (choicesFile.exists()) {
+                                    topics = choicesFile.readLines()
+                                        .collect { it.trim() }
+                                        .findAll { it && !it.startsWith('#') }
+                                        .sort()
+                                }
+                            } catch (Exception e) {
+                                topics = ["ERROR: ${e.message}"]
+                            }
+                            
+                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #ffeaa7; border-radius: 3px;">'
+                            topicOptions += '<option value="">-- Select Topic --</option>'
+                            topics.each { topic ->
+                                topicOptions += "<option value='${topic}'>${topic}</option>"
+                            }
+                            topicOptions += '</select>'
+                            
                             return """
                                 <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
                                     <h4 style="margin: 0 0 15px 0; color: #856404;">🔍 Describe Topic</h4>
@@ -216,33 +233,7 @@ properties([
                                                 <label style="font-weight: bold; color: #856404;">Select Topic *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <script>
-                                                    function loadTopicsDescribe() {
-                                                        try {
-                                                            var xhr = new XMLHttpRequest();
-                                                            xhr.open('GET', '/job/' + window.location.pathname.split('/')[2] + '/ws/kafka-topics-list.txt', false);
-                                                            xhr.send();
-                                                            if (xhr.status === 200) {
-                                                                var topics = xhr.responseText.split('\\n')
-                                                                    .map(function(line) { return line.trim(); })
-                                                                    .filter(function(line) { return line && !line.startsWith('#'); })
-                                                                    .sort();
-                                                                
-                                                                var select = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #ffeaa7; border-radius: 3px;">';
-                                                                select += '<option value="">-- Select Topic --</option>';
-                                                                topics.forEach(function(topic) {
-                                                                    select += '<option value="' + topic + '">' + topic + '</option>';
-                                                                });
-                                                                select += '</select>';
-                                                                return select;
-                                                            }
-                                                        } catch (e) {
-                                                            return '<input name="value" type="text" placeholder="Enter topic name" style="width: 300px; padding: 5px; border: 1px solid #ffeaa7; border-radius: 3px;">';
-                                                        }
-                                                        return '<input name="value" type="text" placeholder="Enter topic name" style="width: 300px; padding: 5px; border: 1px solid #ffeaa7; border-radius: 3px;">';
-                                                    }
-                                                    document.write(loadTopicsDescribe());
-                                                </script>
+                                                ${topicOptions}
                                                 <div style="font-size: 12px; color: #856404; margin-top: 3px;">Select an existing topic to get its details</div>
                                             </td>
                                         </tr>
@@ -250,6 +241,28 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'DELETE_TOPIC') {
+                            // Load topics from file
+                            def topics = []
+                            try {
+                                def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
+                                def choicesFile = new File(filePath)
+                                if (choicesFile.exists()) {
+                                    topics = choicesFile.readLines()
+                                        .collect { it.trim() }
+                                        .findAll { it && !it.startsWith('#') }
+                                        .sort()
+                                }
+                            } catch (Exception e) {
+                                topics = ["ERROR: ${e.message}"]
+                            }
+                            
+                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #dc3545; border-radius: 3px; background-color: #fff2f2;">'
+                            topicOptions += '<option value="">-- Select Topic to Delete --</option>'
+                            topics.each { topic ->
+                                topicOptions += "<option value='${topic}'>${topic}</option>"
+                            }
+                            topicOptions += '</select>'
+                            
                             return """
                                 <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
                                     <h4 style="margin: 0 0 15px 0; color: #721c24;">⚠️ Delete Topic</h4>
@@ -262,33 +275,7 @@ properties([
                                                 <label style="font-weight: bold; color: #721c24;">Select Topic to Delete *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <script>
-                                                    function loadTopicsDelete() {
-                                                        try {
-                                                            var xhr = new XMLHttpRequest();
-                                                            xhr.open('GET', '/job/' + window.location.pathname.split('/')[2] + '/ws/kafka-topics-list.txt', false);
-                                                            xhr.send();
-                                                            if (xhr.status === 200) {
-                                                                var topics = xhr.responseText.split('\\n')
-                                                                    .map(function(line) { return line.trim(); })
-                                                                    .filter(function(line) { return line && !line.startsWith('#'); })
-                                                                    .sort();
-                                                                
-                                                                var select = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #dc3545; border-radius: 3px; background-color: #fff2f2;">';
-                                                                select += '<option value="">-- Select Topic to Delete --</option>';
-                                                                topics.forEach(function(topic) {
-                                                                    select += '<option value="' + topic + '">' + topic + '</option>';
-                                                                });
-                                                                select += '</select>';
-                                                                return select;
-                                                            }
-                                                        } catch (e) {
-                                                            return '<input name="value" type="text" placeholder="Enter topic name to delete" style="width: 300px; padding: 5px; border: 2px solid #dc3545; border-radius: 3px; background-color: #fff2f2;">';
-                                                        }
-                                                        return '<input name="value" type="text" placeholder="Enter topic name to delete" style="width: 300px; padding: 5px; border: 2px solid #dc3545; border-radius: 3px; background-color: #fff2f2;">';
-                                                    }
-                                                    document.write(loadTopicsDelete());
-                                                </script>
+                                                ${topicOptions}
                                                 <div style="font-size: 12px; color: #721c24; margin-top: 3px;">⚠️ Carefully select the topic you want to permanently delete</div>
                                             </td>
                                         </tr>
