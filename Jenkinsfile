@@ -684,6 +684,7 @@ pipeline {
                             env.SHOW_VERSIONS = values.contains('true') ? 'true' : 'false'
                             echo "Listing all schemas (Show versions: ${env.SHOW_VERSIONS})"
                             break
+                        case 'DELETE_SCHEMA':
                         case 'DESCRIBE_SCHEMA':
                             env.SUBJECT_NAME = values[0]
                             env.SHOW_VERSIONS = values[1].contains('true') ? 'true' : 'false'
@@ -695,7 +696,7 @@ pipeline {
                             env.TOPIC_NAME = values[0]
                             env.SCHEMA_FOR = values[1]
                             env.SCHEMA_TYPE = values[2]
-                            env.SCHEMA_CONTENT = values[4].trim().replaceAll(/,\s*$/, '') 
+                            env.SCHEMA_CONTENT = values[4].trim().replaceAll(/,\s*$/, '')
                             echo """
                             Register schema ${SCHEMA_FOR} in ${SCHEMA_TYPE} to topic : ${env.TOPIC_NAME}
                             With content ${SCHEMA_CONTENT}
@@ -725,6 +726,7 @@ pipeline {
                             echo "✅ Validation passed"
                             break
                         case 'DESCRIBE_SCHEMA':
+                        case 'DELETE_SCHEMA':
                             if (!env.SUBJECT_NAME?.trim()) error "Topic name required"
                             echo "✅ Validation passed"
                             break
