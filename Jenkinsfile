@@ -568,6 +568,28 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'REGISTER_SCHEMA') {
+                            // Load topics from file
+                            def topics = []
+                            try {
+                                def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
+                                def choicesFile = new File(filePath)
+                                if (choicesFile.exists()) {
+                                    topics = choicesFile.readLines()
+                                        .collect { it.trim() }
+                                        .findAll { it && !it.startsWith('#') }
+                                        .sort()
+                                }
+                            } catch (Exception e) {
+                                topics = ["ERROR: ${e.message}"]
+                            }
+
+                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;">'
+                            topicOptions += '<option value="">-- Select Topic --</option>'
+                            topics.each { topic ->
+                                topicOptions += "<option value='${topic}'>${topic}</option>"
+                            }
+                            topicOptions += '</select>'
+
                             return """
                                 <div style="background-color: #f8f0ff; padding: 15px; border-radius: 5px; border-left: 4px solid #8a2be2;">
                                     <h4 style="margin: 0 0 15px 0; color: #4b0082;">📋➕ Register New Schema</h4>
@@ -577,7 +599,7 @@ properties([
                                                 <label style="font-weight: bold; color: #4b0082;">Topic name *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <input name='value' type='text' value='user-topic' style="width: 300px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;">
+                                                ${topicOptions}
                                                 <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Topic name for registered</div>
                                             </td>
                                         </tr>
