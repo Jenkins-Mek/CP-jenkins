@@ -1,3 +1,4 @@
+
 properties([
     parameters([
         [$class: 'ChoiceParameter',
@@ -35,12 +36,56 @@ properties([
                 ]
             ]
         ],
+        [$class: 'ChoiceParameter', 
+            choiceType: 'PT_SINGLE_SELECT', 
+            description: 'Select a Kafka topic from file', 
+            filterLength: 1, 
+            filterable: false, 
+            name: 'KAFKA_TOPIC',
+            script: [
+                $class: 'GroovyScript', 
+                fallbackScript: [
+                    classpath: [], 
+                    sandbox: true, 
+                    script: 
+                        '''return['ERROR: Cannot read file']'''
+                ], 
+                script: [
+                    classpath: [], 
+                    sandbox: false, 
+                    script: 
+                        '''
+                        try {
+                            def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
+                            def choicesFile = new File(filePath)
+                            
+                            if (!choicesFile.exists()) {
+                                return ["ERROR: File not found at ${filePath}"]
+                            }
+                            
+                            def choices = choicesFile.readLines()
+                                .collect { it.trim() }
+                                .findAll { it && !it.startsWith('#') }
+                            
+                            if (choices.isEmpty()) {
+                                return ["ERROR: No topics found in file"]
+                            }
+                            
+                            return choices.sort()
+                            
+                        } catch (Exception e) {
+                            return ["ERROR: ${e.message}"]
+                        }
+                        '''
+                ]
+            ]
+        ],
         [$class: 'DynamicReferenceParameter',
             choiceType: 'ET_FORMATTED_HTML',
             description: 'Topic Configuration Options',
             name: 'TOPIC_OPTIONS',
             omitValueField: false,
-            referencedParameters: 'OPERATION',
+            referencedParameters: 'OPERATION,KAFKA_TOPIC',
             script: [
                 $class: 'GroovyScript',
                 fallbackScript: [
@@ -116,18 +161,12 @@ properties([
                             return """
                                 <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border: 1px solid #ffeeba;">
                                     <h4 style="margin: 0 0 15px 0; color: #856404;">⚙️ Alter Topic Configuration</h4>
+                                    <div style="background-color: #e8f4fd; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #b3d9ff;">
+                                        <strong style="color: #0c5460;">Selected Topic:</strong> <span style="color: #0c5460; font-family: monospace;">${KAFKA_TOPIC ?: 'None selected'}</span>
+                                    </div>
                                     <table style="width: 100%; border-collapse: collapse;">
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                <label style="font-weight: bold; color: #856404;">Topic Name *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <input name='value' type='text' value='user-events' style="width: 300px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #856404; margin-top: 3px;">Enter the name of the topic to modify</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #856404;">Retention Days</label>
                                             </td>
                                             <td style="padding: 8px;">
@@ -182,17 +221,10 @@ properties([
                             return """
                                 <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
                                     <h4 style="margin: 0 0 15px 0; color: #856404;">🔍 Describe Topic</h4>
-                                    <table style="width: 100%;">
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                <label style="font-weight: bold; color: #856404;">Topic Name *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <input name='value' type='text' value='user-events' style="width: 300px; padding: 5px; border: 1px solid #ffeaa7; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #856404; margin-top: 3px;">Enter the name of an existing topic to get its details</div>
-                                            </td>
-                                        </tr>
-                                    </table>
+                                    <div style="background-color: #e8f4fd; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #b3d9ff;">
+                                        <strong style="color: #0c5460;">Selected Topic:</strong> <span style="color: #0c5460; font-family: monospace;">${KAFKA_TOPIC ?: 'None selected'}</span>
+                                    </div>
+                                    <p style="margin: 5px 0 0 0; color: #856404;">This operation will retrieve detailed information about the selected topic including partitions, replication factor, and configuration settings.</p>
                                 </div>
                             """
                         } else if (OPERATION == 'DELETE_TOPIC') {
@@ -202,17 +234,10 @@ properties([
                                     <div style="background-color: #ffffff; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #f5c6cb;">
                                         <strong style="color: #721c24;">⚠️ WARNING:</strong> This action will permanently delete the topic and all its data. This cannot be undone!
                                     </div>
-                                    <table style="width: 100%;">
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                <label style="font-weight: bold; color: #721c24;">Topic Name *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <input name='value' type='text' value='' placeholder='Enter topic name to delete' style="width: 300px; padding: 5px; border: 1px solid #f5c6cb; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #721c24; margin-top: 3px;">You will be asked to confirm the deletion before it proceeds</div>
-                                            </td>
-                                        </tr>
-                                    </table>
+                                    <div style="background-color: #fff2f2; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 2px solid #dc3545;">
+                                        <strong style="color: #721c24;">Topic to Delete:</strong> <span style="color: #721c24; font-family: monospace; font-size: 14px; font-weight: bold;">${KAFKA_TOPIC ?: 'None selected'}</span>
+                                    </div>
+                                    <p style="margin: 5px 0 0 0; color: #721c24;">You will be asked to confirm the deletion before it proceeds. Make sure you have selected the correct topic above.</p>
                                 </div>
                             """
                         } else if (OPERATION == 'PRODUCER') {
