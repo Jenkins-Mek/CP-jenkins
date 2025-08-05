@@ -531,6 +531,7 @@ properties([
                         } else if (OPERATION == 'DELETE_SCHEMA') {
                                 // Load schema subjects from file
                                 def subjects = []
+                                def subjectVersions = [:]
                                 try {
                                     def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
                                     def choicesFile = new File(filePath)
@@ -541,8 +542,15 @@ properties([
                                             .each { line ->
                                                 // Parse format: subject-name[version1,version2,...]
                                                 if (line.contains('[') && line.endsWith(']')) {
-                                                    def subjectName = line.substring(0, line.indexOf('[')
+                                                    def bracketIndex = line.indexOf('[')
+                                                    def subjectName = line.substring(0, bracketIndex)
+                                                    def versionsPart = line.substring(bracketIndex + 1, line.length() - 1)
+                                                    def versions = versionsPart.split(',').collect { it.trim() }
                                                     subjects << subjectName
+                                                    subjectVersions[subjectName] = versions
+                                                } else {
+                                                    // Fallback for lines without version info
+                                                    subjects << line
                                                 }
                                             }
                                         subjects = subjects.sort()
@@ -575,6 +583,15 @@ properties([
                                                </td>
                                            </tr>
                                        </table>
+
+                                       <div style="background-color: #f9f9f9; padding: 10px; border-radius: 3px; margin-top: 15px; border: 1px solid #ddd;">
+                                           <h5 style="margin: 0 0 10px 0; color: #666;">📋 Available Versions Reference:</h5>
+                                           <div style="font-size: 12px; color: #666; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                                               ${subjectVersions.collect { subject, versions -> 
+                                                   "<div><strong>${subject}:</strong> v${versions.join(', v')}</div>"
+                                               }.join('')}
+                                           </div>
+                                       </div>
                                    </div>
                                 """
                             } else if (OPERATION == 'DESCRIBE_SCHEMA') {
@@ -658,7 +675,7 @@ properties([
                                   <p style="margin: 5px 0 0 0; color: #0c5460;">Please choose a topic operation from the dropdown above.</p>
                               </div>
                           """
-                        }
+                       }
                        '''
                 ]
             ]
