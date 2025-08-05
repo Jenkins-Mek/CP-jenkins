@@ -531,7 +531,6 @@ properties([
                         } else if (OPERATION == 'DELETE_SCHEMA') {
                                 // Load schema subjects from file
                                 def subjects = []
-                                def subjectVersions = [:]
                                 try {
                                     def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
                                     def choicesFile = new File(filePath)
@@ -542,13 +541,9 @@ properties([
                                             .each { line ->
                                                 // Parse format: subject-name[version1,version2,...]
                                                 if (line.contains('[') && line.endsWith(']')) {
-                                                    def bracketIndex = line.indexOf('[')
-                                                    def subjectName = line.substring(0, bracketIndex)
-                                                    def versionsPart = line.substring(bracketIndex + 1, line.length() - 1)
-                                                    def versions = versionsPart.split(',').collect { it.trim() }
+                                                    def subjectName = line.substring(0, line.indexOf('['))
                                                     subjects << subjectName
                                                 } else {
-                                                    // Fallback for lines without version info
                                                     subjects << line
                                                 }
                                             }
@@ -575,6 +570,10 @@ properties([
                                           <tr>
                                                <td style="padding: 8px; vertical-align: top; width: 200px;">
                                                    <label style="font-weight: bold; color: #cc0000;">Subject Name *</label>
+                                               </td>
+                                               <td style="padding: 8px;">
+                                                   ${subjectOptions}
+                                                  <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">⚠️ Select the schema subject</div>
                                                </td>
                                            </tr>
                                        </table>
