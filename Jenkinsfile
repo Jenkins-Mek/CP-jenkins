@@ -255,14 +255,14 @@ properties([
                             } catch (Exception e) {
                                 topics = ["ERROR: ${e.message}"]
                             }
-                            
+
                             def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #dc3545; border-radius: 3px; background-color: #fff2f2;">'
                             topicOptions += '<option value="">-- Select Topic to Delete --</option>'
                             topics.each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
-                            
+
                             return """
                                 <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
                                     <h4 style="margin: 0 0 15px 0; color: #721c24;">⚠️ Delete Topic</h4>
@@ -529,51 +529,96 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'DELETE_SCHEMA') {
-                            return """
-                                <div style="background-color: #ffe6e6; padding: 15px; border-radius: 5px; border-left: 4px solid #ff4444;">
-                                    <h4 style="margin: 0 0 15px 0; color: #cc0000;">📋🗑️ Delete Schema</h4>
+                            // Load schema subjects from file
+                           def subjects = []
+                           try {
+                               def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
+                               def choicesFile = new File(filePath)
+                               if (choicesFile.exists()) {
+                                   subjects = choicesFile.readLines()
+                                       .collect { it.trim() }
+                                       .findAll { it && !it.startsWith('#') }
+                                       .sort()
+                              }
+                          } catch (Exception e) {
+                               subjects = ["ERROR: ${e.message}"]
+                           }
+
+                           def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #ff4444; border-radius: 3px; background-color: #fff2f2;">'
+                           subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
+                           subjects.each { subject ->
+                               subjectOptions += "<option value='${subject}'>${subject}</option>"
+                           }
+                           subjectOptions += '</select>'
+
+                           return """
+                               <div style="background-color: #ffe6e6; padding: 15px; border-radius: 5px; border-left: 4px solid #ff4444;">
+                                   <h4 style="margin: 0 0 15px 0; color: #cc0000;">📋🗑️ Delete Schema</h4>
                                     <div style="background-color: #ffffff; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #ffcccc;">
-                                        <strong style="color: #cc0000;">⚠️ WARNING:</strong> Deleting a schema can break existing producers and consumers. Ensure no active applications are using this schema.
-                                    </div>
-                                    <table style="width: 100%; border-collapse: collapse;">
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                <label style="font-weight: bold; color: #cc0000;">Subject Name *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <input name='value' type='text' value='' placeholder='Enter schema subject to delete' style="width: 300px; padding: 5px; border: 1px solid #ffcccc; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">Schema subject name to delete</div>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </div>
+                                       <strong style="color: #cc0000;">⚠️ WARNING:</strong> Deleting a schema can break existing producers and consumers. Ensure no active applications are using this schema.
+                                   </div>
+                                   <table style="width: 100%; border-collapse: collapse;">
+                                      <tr>
+                                           <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                               <label style="font-weight: bold; color: #cc0000;">Subject Name *</label>
+                                           </td>
+                                           <td style="padding: 8px;">
+                                               ${subjectOptions}
+                                              <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">⚠️ Carefully select the schema subject you want to delete</div>
+                                           </td>
+                                       </tr>
+                                   </table>
+                               </div>
                             """
                         } else if (OPERATION == 'DESCRIBE_SCHEMA') {
-                            return """
-                                <div style="background-color: #f0f8ff; padding: 15px; border-radius: 5px; border-left: 4px solid #4169e1;">
-                                    <h4 style="margin: 0 0 15px 0; color: #191970;">📋🔍 Describe Schema</h4>
-                                    <table style="width: 100%; border-collapse: collapse;">
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                <label style="font-weight: bold; color: #191970;">Subject Name *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <input name='value' type='text' value='user-events-value' style="width: 300px; padding: 5px; border: 1px solid #b6c7ff; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #191970; margin-top: 3px;">Schema subject name to describe</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #191970;">Include Details</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <div style="margin-top: 5px;">
-                                                    <label style="color: #191970; display: block; margin-bottom: 5px;">
-                                                        <input type="checkbox" name="value" value="show_schema_version" checked style="margin-right: 5px;">
-                                                        Show All version definition/content
-                                                    </label>
-                                                </div>
-                                            </td>
+                            // Load schema subjects from file
+                            def subjects = []
+                            try {
+                                def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
+                                def choicesFile = new File(filePath)
+                                if (choicesFile.exists()) {
+                                    subjects = choicesFile.readLines()
+                                        .collect { it.trim() }
+                                        .findAll { it && !it.startsWith('#') }
+                                       .sort()
+                               }
+                            } catch (Exception e) {
+                               subjects = ["ERROR: ${e.message}"]
+                           }
+
+                          def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #b6c7ff; border-radius: 3px;">'
+                           subjectOptions += '<option value="">-- Select Schema Subject to Describe --</option>'
+                           subjects.each { subject ->
+                              def selected = subject == 'user-events-value' ? 'selected' : ''
+                                subjectOptions += "<option value='${subject}' ${selected}>${subject}</option>"
+                           }
+                          subjectOptions += '</select>'
+
+                          return """
+                              <div style="background-color: #f0f8ff; padding: 15px; border-radius: 5px; border-left: 4px solid #4169e1;">
+                                  <h4 style="margin: 0 0 15px 0; color: #191970;">📋🔍 Describe Schema</h4>
+                                  <table style="width: 100%; border-collapse: collapse;">
+                                      <tr>
+                                          <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                              <label style="font-weight: bold; color: #191970;">Subject Name *</label>
+                                          </td>
+                                          <td style="padding: 8px;">
+                                               ${subjectOptions}
+                                               <div style="font-size: 12px; color: #191970; margin-top: 3px;">Schema subject name to describe</div>
+                                           </td>
+                                       </tr>
+                                       <tr>
+                                           <td style="padding: 8px; vertical-align: top;">
+                                              <label style="font-weight: bold; color: #191970;">Include Details</label>
+                                           </td>
+                                           <td style="padding: 8px;">
+                                              <div style="margin-top: 5px;">
+                                                   <label style="color: #191970; display: block; margin-bottom: 5px;">
+                                                       <input type="checkbox" name="value" value="show_schema_version" checked style="margin-right: 5px;">
+                                                       Show All version definition/content
+                                                  </label>
+                                              </div>
+                                           </td>
                                         </tr>
                                     </table>
                                 </div>
