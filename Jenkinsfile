@@ -329,7 +329,7 @@ properties([
                                subjects = ["ERROR: ${e.message}"]
                             }
                             def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">'
-                            subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
+                            subjectOptions += '<option value="">-- Select Schema Subject --</option>'
                             subjects.each { subject ->
                                subjectOptions += "<option value='${subject}'>${subject}</option>"
                             }
@@ -483,7 +483,7 @@ properties([
                                subjects = ["ERROR: ${e.message}"]
                             }
                             def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #b3d7ff; border-radius: 3px;">'
-                            subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
+                            subjectOptions += '<option value="">-- Select Schema Subject --</option>'
                             subjects.each { subject ->
                                subjectOptions += "<option value='${subject}'>${subject}</option>"
                             }
@@ -707,7 +707,7 @@ properties([
                                    subjects = ["ERROR: ${e.message}"]
                                 }
                                 def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #413b3bff; border-radius: 3px; background-color: #e2edecff;">'
-                                subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
+                                subjectOptions += '<option value="">-- Select Schema Subject to Describe --</option>'
                                 subjects.each { subject ->
                                    subjectOptions += "<option value='${subject}'>${subject}</option>"
                                 }
