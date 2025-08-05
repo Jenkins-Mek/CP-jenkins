@@ -862,7 +862,7 @@ pipeline {
                                 parameters: [
                                     string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
                                     string(name: 'SCHEMA_REGISTRY_URL', value: "${env.SCHEMA_REGISTRY_URL}"),
-                                    string(name: 'SUBJECT_NAME', Value:"${env.SUBJECT_NAME}") ,
+                                    string(name: 'SUBJECT_NAME', value: "${env.SUBJECT_NAME}") ,
                                     booleanParam(name: 'INCLUDE_VERSIONS', value: "${env.SHOW_VERSIONS}")
                                 ],
                                 propagate: false,
