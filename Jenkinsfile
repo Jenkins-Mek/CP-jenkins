@@ -79,6 +79,7 @@ pipeline {
         stage('Register Schema') {
             steps {
                 script {
+                    echo "${params.SCHEMA_CONTENT}"
                     def escapedSchema = params.SCHEMA_CONTENT.replace('"', '\\"').replace('\n', '\\n').replace('\r', '')
 
                     def requestBody
@@ -87,7 +88,7 @@ pipeline {
                     } else {
                         requestBody = """{"schemaType": "${params.SCHEMA_TYPE}", "schema": "${escapedSchema}"}"""
                     }
-
+                    echo "${escapedSchema}"
                     def response = sh(
                         script: """
                             docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
