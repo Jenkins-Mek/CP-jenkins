@@ -5,7 +5,7 @@ properties([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
         string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://localhost:8081', description: 'Schema Registry URL'),
         string(name: 'SUBJECT_NAME', defaultValue: '', description: 'Enter subject name to describe (or leave empty to list all subjects)'),
-        booleanParam(name: 'INCLUDE_VERSIONS', defaultValue: false, description: 'Include all versions for each subject')
+        booleanParam(name: 'INCLUDE_VERSIONS', defaultValue: true, description: 'Include all versions for each subject')
     ])
 ])
 
