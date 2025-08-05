@@ -568,7 +568,7 @@ properties([
 
                                 return """
                                    <div style="background-color: #ffe6e6; padding: 15px; border-radius: 5px; border-left: 4px solid #ff4444;">
-                                       <h4 style="margin: 0 0 15px 0; color: #cc0000;">📋🗑️ Delete Schema</h4>
+                                       <h4 style="margin: 0 0 15px 0; color: #cc0000;">📋🗑️ Delete Schema - Step 1: Select Subject</h4>
                                         <div style="background-color: #ffffff; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #ffcccc;">
                                            <strong style="color: #cc0000;">⚠️ WARNING:</strong> Deleting a schema can break existing producers and consumers. Ensure no active applications are using this schema.
                                        </div>
@@ -579,27 +579,86 @@ properties([
                                                </td>
                                                <td style="padding: 8px;">
                                                    ${subjectOptions}
-                                                  <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">⚠️ Carefully select the schema subject you want to delete</div>
+                                                  <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">⚠️ Select the schema subject, then choose version in the next parameter</div>
                                                </td>
                                            </tr>
-                                           <tr>
+                                       </table>
+                                       
+                                       <div style="background-color: #f9f9f9; padding: 10px; border-radius: 3px; margin-top: 15px; border: 1px solid #ddd;">
+                                           <h5 style="margin: 0 0 10px 0; color: #666;">📋 Available Versions Reference:</h5>
+                                           <div style="font-size: 12px; color: #666; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                                               ${subjectVersions.collect { subject, versions -> 
+                                                   "<div><strong>${subject}:</strong> v${versions.join(', v')}</div>"
+                                               }.join('')}
+                                           </div>
+                                       </div>
+                                   </div>
+                                """
+                            }
+                            
+                            else if (OPERATION == 'DELETE_SCHEMA_VERSION') {
+                                // This should be a separate Active Choice parameter that references SCHEMA_SUBJECT
+                                def selectedSubject = SCHEMA_SUBJECT // This comes from the previous parameter
+                                def availableVersions = []
+                                
+                                try {
+                                    def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
+                                    def choicesFile = new File(filePath)
+                                    if (choicesFile.exists()) {
+                                        choicesFile.readLines()
+                                            .collect { it.trim() }
+                                            .findAll { it && !it.startsWith('#') }
+                                            .each { line ->
+                                                if (line.contains('[') && line.endsWith(']')) {
+                                                    def bracketIndex = line.indexOf('[')
+                                                    def subjectName = line.substring(0, bracketIndex)
+                                                    if (subjectName == selectedSubject) {
+                                                        def versionsPart = line.substring(bracketIndex + 1, line.length() - 1)
+                                                        availableVersions = versionsPart.split(',').collect { it.trim() }
+                                                    }
+                                                }
+                                            }
+                                    }
+                                } catch (Exception e) {
+                                    availableVersions = ["ERROR: ${e.message}"]
+                                }
+                                
+                                if (!selectedSubject || selectedSubject.isEmpty()) {
+                                    return """
+                                        <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
+                                            <h4 style="margin: 0; color: #856404;">⚠️ Please select a Schema Subject first</h4>
+                                            <p style="margin: 5px 0 0 0; color: #856404;">You must choose a subject in the previous parameter before selecting a version.</p>
+                                        </div>
+                                    """
+                                }
+                                
+                                def versionOptions = '<select name="value" style="width: 200px; padding: 5px; border: 2px solid #ff4444; border-radius: 3px; background-color: #fff2f2;">'
+                                versionOptions += '<option value="ALL">🗑️ Delete ALL Versions</option>'
+                                availableVersions.each { version ->
+                                    versionOptions += "<option value='${version}'>Version ${version}</option>"
+                                }
+                                versionOptions += '</select>'
+                                
+                                return """
+                                   <div style="background-color: #ffe6e6; padding: 15px; border-radius: 5px; border-left: 4px solid #ff4444;">
+                                       <h4 style="margin: 0 0 15px 0; color: #cc0000;">📋🗑️ Delete Schema - Step 2: Select Version</h4>
+                                       <div style="background-color: #e7f3ff; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #b3d9ff;">
+                                           <strong style="color: #0066cc;">Selected Subject:</strong> <span style="color: #cc0000; font-weight: bold;">${selectedSubject}</span>
+                                       </div>
+                                       <table style="width: 100%; border-collapse: collapse;">
+                                          <tr>
                                                <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                   <label style="font-weight: bold; color: #cc0000;">Available Versions:</label>
+                                                   <label style="font-weight: bold; color: #cc0000;">Version to Delete *</label>
                                                </td>
                                                <td style="padding: 8px;">
-                                                   <div style="background-color: #ffffff; padding: 10px; border: 1px solid #ffcccc; border-radius: 3px;">
-                                                       <div style="font-size: 12px; color: #666; margin-bottom: 8px;"><strong>Schema Versions by Subject:</strong></div>
-                                                       ${subjectVersions.collect { subject, versions -> 
-                                                           "<div style='margin-bottom: 5px;'><strong style='color: #cc0000;'>${subject}:</strong> versions ${versions.join(', ')}</div>"
-                                                       }.join('')}
-                                                   </div>
-                                                   <div style="font-size: 12px; color: #cc0000; margin-top: 8px;">⚠️ Note: The deletion will target the selected subject. Specific version handling will be configured in the pipeline logic.</div>
+                                                   ${versionOptions}
+                                                   <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">⚠️ Choose specific version or delete all versions</div>
                                                </td>
                                            </tr>
                                        </table>
                                    </div>
                                 """
-                        } else if (OPERATION == 'DESCRIBE_SCHEMA') {
+                            } else if (OPERATION == 'DESCRIBE_SCHEMA') {
                             // Load schema subjects from file
                             def subjects = []
                             try {
