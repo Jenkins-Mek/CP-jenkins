@@ -544,19 +544,19 @@ def saveSubjectListToFile(subjects, subjectDetails = [:]) {
     if (subjects.isEmpty()) {
         textContent += "No schema subjects found in the registry.\n"
     } else {
-        textContent += "Available Schema Subjects:\n"
-        textContent += "=" * 50 + "\n\n"
+        textContent += "#Available Schema Subjects:\n"
+        textContent += "#"+"=" * 50 + "\n\n"
 
         subjects.eachWithIndex { subject, index ->
-            textContent += "${index + 1}. ${subject}\n"
+            textContent += "${subject}\n"
 
             if (params.INCLUDE_VERSIONS && subjectDetails.containsKey(subject)) {
-                textContent += "   Versions: ${subjectDetails[subject]}\n"
+                textContent += "# Versions: ${subjectDetails[subject]}\n"
             }
         }
 
-        textContent += "\n" + "=" * 50 + "\n"
-        textContent += "\nTo get detailed information about a specific subject, re-run with SUBJECT_NAME parameter.\n"
+        textContent += "\n" +"#" "=" * 50 + "\n"
+        textContent += "\n#To get detailed information about a specific subject, re-run with SUBJECT_NAME parameter.\n"
     }
 
     writeFile file: env.SCHEMA_SUBJECTS_LIST_PATH, text: textContent
