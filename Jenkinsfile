@@ -102,10 +102,10 @@ pipeline {
         success {
             script {
                 // Archive the appropriate file based on which operation was performed
-                def fileToArchive = params.SUBJECT_NAME?.trim() ? 
-                    env.SCHEMA_SUBJECT_DESCRIPTION_FILE : 
+                def fileToArchive = params.SUBJECT_NAME?.trim() ?
+                    env.SCHEMA_SUBJECT_DESCRIPTION_FILE :
                     env.SCHEMA_SUBJECTS_LIST_FILE
-                
+
                 archiveArtifacts artifacts: "${fileToArchive}", fingerprint: true, allowEmptyArchive: true
                 echo "📦 Artifact '${fileToArchive}' archived successfully."
             }
@@ -187,11 +187,11 @@ def describeSchemaSubject(subjectName) {
                     echo
                     echo
                     echo "=== Subject Compatibility ==="
-                    
+
                     # Check subject-level compatibility first
                     SUBJECT_COMPAT=\$(curl -s -w "%{http_code}" ${params.SCHEMA_REGISTRY_URL}/config/${subjectName} 2>/dev/null)
                     HTTP_CODE=\$(echo "\$SUBJECT_COMPAT" | tail -c 4)
-                    
+
                     if [ "\$HTTP_CODE" = "200" ]; then
                         echo "\$SUBJECT_COMPAT" | head -c -4
                     else
@@ -219,21 +219,21 @@ def formatSchemaOutput(rawOutput) {
         def lines = rawOutput.split('\n')
         def formattedLines = []
         def inLatestVersion = false
-        
+
         for (line in lines) {
             if (line.contains('=== Latest Version Info ===')) {
                 formattedLines.add(line)
                 inLatestVersion = true
                 continue
             }
-            
+
             if (line.contains('=== All Versions ===') || line.contains('=== Subject Compatibility ===')) {
                 inLatestVersion = false
                 formattedLines.add('')
                 formattedLines.add(line)
                 continue
             }
-            
+
             // Format the schema JSON in the latest version section
             if (inLatestVersion && line.trim().startsWith('{"subject"')) {
                 def schemaInfo = parseSchemaResponse(line)
@@ -242,9 +242,9 @@ def formatSchemaOutput(rawOutput) {
                 formattedLines.add(line)
             }
         }
-        
+
         return formattedLines.join('\n')
-        
+
     } catch (Exception e) {
         echo "⚠️ Warning: Failed to format schema output, using raw format - ${e.getMessage()}"
         return rawOutput
@@ -256,18 +256,16 @@ def parseSchemaResponse(jsonLine) {
         // Parse the JSON response
         def jsonSlurper = new groovy.json.JsonSlurper()
         def schemaData = jsonSlurper.parseText(jsonLine)
-        
+
         def formattedLines = []
         formattedLines.add("Subject: ${schemaData.subject}")
         formattedLines.add("Version: ${schemaData.version}")
         formattedLines.add("Schema ID: ${schemaData.id}")
-        
-        // Detect schema type
+
         def schemaType = detectSchemaType(schemaData)
         formattedLines.add("Schema Type: ${schemaType}")
         formattedLines.add("")
-        
-        // Format based on schema type
+
         switch (schemaType.toLowerCase()) {
             case 'avro':
                 formattedLines.addAll(formatAvroSchema(schemaData.schema))
@@ -282,12 +280,12 @@ def parseSchemaResponse(jsonLine) {
                 formattedLines.addAll(formatGenericSchema(schemaData.schema, schemaType))
                 break
         }
-        
+
         formattedLines.add("")
         formattedLines.add("=" * 80)
-        
+
         return formattedLines
-        
+
     } catch (Exception e) {
         echo "Warning: Failed to parse schema response, using original format - ${e.getMessage()}"
         return [jsonLine]
@@ -297,13 +295,11 @@ def parseSchemaResponse(jsonLine) {
 def detectSchemaType(schemaData) {
     try {
         def schema = schemaData.schema
-        
-        // Check if it has schemaType field (newer Schema Registry versions)
+
         if (schemaData.schemaType) {
             return schemaData.schemaType
         }
-        
-        // Try to detect by schema content
+
         if (schema.startsWith('syntax = "proto')) {
             return 'PROTOBUF'
         } else if (schema.contains('"$schema"') && schema.contains('json-schema.org')) {
