@@ -545,31 +545,6 @@ properties([
                                                 <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">Schema subject name to delete</div>
                                             </td>
                                         </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #cc0000;">Delete Mode</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #ffcccc; border-radius: 3px;">
-                                                    <option value='soft' selected>Soft Delete (Mark as deleted)</option>
-                                                    <option value='hard'>Hard Delete (Permanent removal)</option>
-                                                </select>
-                                                <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">Soft delete allows recovery, hard delete is permanent</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #cc0000;">Version</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #ffcccc; border-radius: 3px;">
-                                                    <option value='all' selected>All Versions</option>
-                                                    <option value='latest'>Latest Only</option>
-                                                    <option value='specific'>Specific Version</option>
-                                                </select>
-                                                <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">Which versions to delete</div>
-                                            </td>
-                                        </tr>
                                     </table>
                                 </div>
                             """
@@ -929,8 +904,9 @@ pipeline {
                             echo "==== Calling Delete Schema job ===="
                             build job: 'org-cp-tools/CP-jenkins/delete-schema',
                                 parameters: [
-                                    string(name: 'SUBJECT', value: "${env.SUBJECT}"),
-                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}")
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                    string(name: 'SCHEMA_REGISTRY_URL', value: "${env.SCHEMA_REGISTRY_URL}"),
+                                    string(name: 'SUBJECT_NAME', value: "${env.SUBJECT_NAME}"),
                                 ],
                                 propagate: false,
                                 wait: true
@@ -970,7 +946,6 @@ pipeline {
                                     filter: 'schema-subject-description.txt',
                                     target: '.'
                             break
-
 
                         default:
                             error "❌ Unknown operation: ${params.OPERATION}"
