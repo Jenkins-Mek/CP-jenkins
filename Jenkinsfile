@@ -147,36 +147,30 @@ def validateSchemaRegistry() {
 
 def retrieveSchemaInfo() {
     try {
-        // First, let's construct the variables safely
-        def composeDir = params.COMPOSE_DIR
-        def registryUrl = params.SCHEMA_REGISTRY_URL
-        def schemaSubject = env.FINAL_SCHEMA_SUBJECT
-
         def schemaInfo = sh(
             script: """
-                docker compose --project-directory "${composeDir}" -f "${composeDir}/docker-compose.yml" \\
-                exec -T schema-registry bash -c "
-                    echo 'Retrieving schema information for subject: ${schemaSubject}'
-                    RESPONSE=\\$(curl -s '${registryUrl}/subjects/${schemaSubject}/versions/latest')
+                docker compose --project-directory '${params.COMPOSE_DIR}' -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
+                exec -T schema-registry bash -c '
+                    echo "Retrieving schema information for subject: ${env.FINAL_SCHEMA_SUBJECT}"
+                    RESPONSE=\$(curl -s "${params.SCHEMA_REGISTRY_URL}/subjects/${env.FINAL_SCHEMA_SUBJECT}/versions/latest")
 
-                    if echo \\"\\\$RESPONSE\\" | grep -q 'schema'; then
-                        SCHEMA_ID=\\$(echo \\"\\\$RESPONSE\\" | grep -o '\\\"id\\\":[0-9]*' | cut -d: -f2)
-                        SCHEMA_TYPE=\\$(echo \\"\\\$RESPONSE\\" | grep -o '\\\"schemaType\\\":\\\"[^\\\"]*\\\"' | cut -d: -f2 | tr -d '\\\"')
-
-                        # Default to AVRO if no schemaType specified (Avro default)
-                        if [ -z \\\"\\\$SCHEMA_TYPE\\\" ]; then
-                            SCHEMA_TYPE='AVRO'
+                    if echo "\$RESPONSE" | grep -q "schema"; then
+                        SCHEMA_ID=\$(echo "\$RESPONSE" | grep -o \\"id\\":[0-9]* | cut -d: -f2)
+                        SCHEMA_TYPE=\$(echo "\$RESPONSE" | grep -o \\"schemaType\\":\\"[^\\"]*\\" | cut -d: -f2 | tr -d \\"\\")
+                        
+                        if [ -z "\$SCHEMA_TYPE" ]; then
+                            SCHEMA_TYPE="AVRO"
                         fi
 
-                        echo \\\"SCHEMA_ID=\\\$SCHEMA_ID\\\"
-                        echo \\\"SCHEMA_TYPE=\\\$SCHEMA_TYPE\\\"
-                        echo 'Schema found successfully'
+                        echo "SCHEMA_ID=\$SCHEMA_ID"
+                        echo "SCHEMA_TYPE=\$SCHEMA_TYPE"
+                        echo "Schema found successfully"
                     else
-                        echo 'ERROR: Schema not found for subject: ${schemaSubject}'
-                        echo \\\"Response: \\\$RESPONSE\\\"
+                        echo "ERROR: Schema not found for subject: ${env.FINAL_SCHEMA_SUBJECT}"
+                        echo "Response: \$RESPONSE"
                         exit 1
                     fi
-                "
+                '
             """,
             returnStdout: true
         ).trim()
