@@ -497,27 +497,7 @@ properties([
                                             </td>
                                         </tr>
 
-                                        <tr id="schemaRow" style="display: none;">
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Schema Registry URL</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <input name="value" type="text" placeholder="http://schema-registry:8081" style="width: 350px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;">
-                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Schema registry endpoint for deserialization</div>
-                                            </td>
-                                        </tr>
                                     </table>
-                                    <script>
-                                        function toggleSchemaField(format) {
-                                            const schemaRow = document.getElementById('schemaRow');
-                                            const schemaFormats = ['AVRO', 'JSON_SCHEMA', 'PROTOBUF'];
-                                            if (schemaFormats.includes(format)) {
-                                                schemaRow.style.display = 'table-row';
-                                            } else {
-                                                schemaRow.style.display = 'none';
-                                            }
-                                        }
-                                    </script>
                                 </div>
                             """
                         } else if (OPERATION == 'REGISTER_SCHEMA') {
