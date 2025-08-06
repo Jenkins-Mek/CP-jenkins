@@ -327,37 +327,6 @@ properties([
                                                 <div style="font-size: 12px; color: #155724; margin-top: 3px;">Produce with or without schema validation</div>
                                             </td>
                                         </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #155724;">Topic Name *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                ${topicOptions}
-                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Select topic to produce to</div>
-                                            </td>
-                                        </tr>
-                                        <tr id="schemaRow" style="display: none;">
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #155724;">Schema Subject *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                ${subjectOptions}
-                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Schema registry subject</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #155724;">Message Count</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <select name="value" style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
-                                                    <option value="1" selected>1 message</option>
-                                                    <option value="10">10 messages</option>
-                                                    <option value="100">100 messages</option>
-                                                    <option value="1000">1000 messages</option>
-                                                </select>
-                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Number of messages to produce</div>
-                                            </td>
                                         </tr>
                                     </table>
                                 </div>
