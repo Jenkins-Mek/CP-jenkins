@@ -296,8 +296,7 @@ properties([
                                 </div>
                             """
                         }else if (OPERATION == 'PRODUCER') {
-
-                            // Get available topics and schema subjects
+                        
                             def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">'
                             topicOptions += '<option value="">-- Select Topic --</option>'
                             getTopics().each { topic ->
@@ -305,28 +304,28 @@ properties([
                                 topicOptions += "<option value='${topic}' ${selected}>${topic}</option>"
                             }
                             topicOptions += '</select>'
-
+                        
                             def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">'
                             subjectOptions += '<option value="">-- Select Schema Subject --</option>'
                             getSchemaSubjects().each { subject ->
                                 subjectOptions += "<option value='${subject}'>${subject}</option>"
                             }
                             subjectOptions += '</select>'
-
+                        
                             return """
                                 <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
                                     <h4 style="margin: 0 0 15px 0; color: #155724;">📤 Kafka Producer</h4>
                                     <table style="width: 100%;">
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                <label style="font-weight: bold; color: #155724;">Producer Type *</label>
+                                                <label style="font-weight: bold; color: #155724;">Use Schema *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <select name="value" style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" onchange="toggleProducerFields(this.value)">
-                                                    <option value="standard" selected>Standard Producer</option>
-                                                    <option value="schema">Schema-based Producer</option>
+                                                <select name="value" style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" onchange="toggleSchemaField(this.value)">
+                                                    <option value="false" selected>No Schema</option>
+                                                    <option value="true">Use Schema</option>
                                                 </select>
-                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Choose producer type</div>
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Produce with or without schema validation</div>
                                             </td>
                                         </tr>
                                         <tr>
@@ -338,7 +337,7 @@ properties([
                                                 <div style="font-size: 12px; color: #155724; margin-top: 3px;">Select topic to produce to</div>
                                             </td>
                                         </tr>
-                                        <tr class="schema-fields" style="display: none;">
+                                        <tr id="schemaRow" style="display: none;">
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #155724;">Schema Subject *</label>
                                             </td>
@@ -361,26 +360,7 @@ properties([
                                                 <div style="font-size: 12px; color: #155724; margin-top: 3px;">Number of messages to produce</div>
                                             </td>
                                         </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #155724;">Message Key</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <input name="value" type="text" value="" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Optional key for partitioning</div>
-                                            </td>
-                                        </tr>
                                     </table>
-                                    <script>
-                                        function toggleProducerFields(type) {
-                                            var schemaFields = document.querySelectorAll('.schema-fields');
-                                            if (type === 'schema') {
-                                                schemaFields.forEach(field => field.style.display = 'table-row');
-                                            } else {
-                                                schemaFields.forEach(field => field.style.display = 'none');
-                                            }
-                                        }
-                                    </script>
                                 </div>
                             """
                         } else if (OPERATION == 'CONSUMER') {
