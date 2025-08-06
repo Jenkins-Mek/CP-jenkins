@@ -49,15 +49,18 @@ pipeline {
                     echo "DEBUG: After elvis - topicName = '${topicName}'"
                     echo "DEBUG: After elvis - schemaSubject = '${schemaSubject}'"
                     
+                    def finalSchemaSubject = ""
                     if (schemaSubject.toString().trim() != "") {
-                        env.FINAL_SCHEMA_SUBJECT = schemaSubject.toString().trim()
-                        echo "Using provided schema subject: ${env.FINAL_SCHEMA_SUBJECT}"
+                        finalSchemaSubject = schemaSubject.toString().trim()
+                        echo "Using provided schema subject: ${finalSchemaSubject}"
                     } else {
-                        def calculatedSubject = topicName.toString().trim() + "-value"
-                        echo "DEBUG: Calculated subject = '${calculatedSubject}'"
-                        env.FINAL_SCHEMA_SUBJECT = calculatedSubject
-                        echo "Using default schema subject: ${env.FINAL_SCHEMA_SUBJECT}"
+                        finalSchemaSubject = "${topicName}-value"
+                        echo "DEBUG: Calculated subject = '${finalSchemaSubject}'"
+                        echo "Using default schema subject: ${finalSchemaSubject}"
                     }
+                    
+                    // Set environment variable with simple assignment
+                    env.FINAL_SCHEMA_SUBJECT = finalSchemaSubject
 
                     echo "Parameters validated successfully"
                     echo "Topic: ${params.TOPIC_NAME}"
