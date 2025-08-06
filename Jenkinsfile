@@ -56,33 +56,21 @@ properties([
                     sandbox: true,
                     script:
                         '''
-
                         def readHtmlFromFile(String operation) {
                             def htmlFile = new File('/var/lib/jenkins/workspace/html-store.txt')
                             def lines = htmlFile.readLines()
                             def htmlContent = ""
                             def isInSection = false
-                            
-                            println "DEBUG: Looking for operation: '${operation}'"
-                            
                             lines.each { line ->
                                 if (line.trim().startsWith(operation + " =")) {
                                     isInSection = true
-                                    println "DEBUG: Found section start: '${line.trim()}'"
                                 } else if (line.trim().contains(" =") && isInSection) {
                                     isInSection = false
-                                    println "DEBUG: Found section end: '${line.trim()}'"
                                 } else if (isInSection) {
                                     htmlContent += line + "\\n"
-                                    println "DEBUG: Added line: '${line}'"
                                 }
                             }
-                            
-                            def result = htmlContent.trim() ?: " "
-                            println "DEBUG: Final HTML content length: ${result.length()}"
-                            println "DEBUG: Final HTML content: ${result}"
-                            
-                            return result
+                            return htmlContent.trim() ?: " "
                         }
 
 
