@@ -199,12 +199,13 @@ def retrieveSchemaInfo() {
 
 def validateMessageFormat() {
     echo "Validating message data format..."
+    def messageEscaped = params.MESSAGE_DATA.replace("'", "'\"'\"'")
     sh """
         docker compose --project-directory '${params.COMPOSE_DIR}' -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
-        exec -T schema-registry bash -c '
+        exec -T schema-registry bash -c ' 
             echo "Performing basic JSON format validation..."
             if command -v jq >/dev/null 2>&1; then
-                echo '"${params.MESSAGE_DATA}"' | jq . >/dev/null
+                echo '${messageEscaped}' | jq . >/dev/null
                 if [ \$? -eq 0 ]; then
                     echo "Message data appears to be valid JSON format"
                 else
@@ -218,11 +219,11 @@ def validateMessageFormat() {
     """
 }
 
+
 def produceSchemaMessages(topicName, username, password) {
     try {
         def producerCommand = getSchemaProducerCommand(env.SCHEMA_TYPE)
         def saslConfig = "org.apache.kafka.common.security.plain.PlainLoginModule required username=\\\"${username}\\\" password=\\\"${password}\\\";"
-        
         // Generate message data based on count
         def messageCount = params.MESSAGE_COUNT.toInteger()
         def messageData = params.MESSAGE_DATA.trim()
@@ -231,7 +232,6 @@ def produceSchemaMessages(topicName, username, password) {
             messages.add(messageData)
         }
         def messageContent = messages.join('\n')
-        
         def produceOutput = sh(
             script: """
                 docker compose --project-directory '${params.COMPOSE_DIR}' -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
