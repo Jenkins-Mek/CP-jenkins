@@ -422,157 +422,105 @@ properties([
                             topicOptions += '</select>'
 
                             return """
-                                <style>
-                                    .kafka-container {
-                                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                                        border-radius: 15px;
-                                        padding: 25px;
-                                        margin: 15px 0;
-                                        color: white;
-                                        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-                                    }
-                                    .form-section {
-                                        background: rgba(255,255,255,0.95);
-                                        border-radius: 12px;
-                                        padding: 20px;
-                                        margin-top: 15px;
-                                        color: #2d3748;
-                                    }
-                                    .form-group {
-                                        margin-bottom: 20px;
-                                    }
-                                    .form-label {
-                                        display: block;
-                                        font-weight: 600;
-                                        margin-bottom: 8px;
-                                        color: #2d3748;
-                                        font-size: 14px;
-                                    }
-                                    .required::after {
-                                        content: " *";
-                                        color: #e53e3e;
-                                    }
-                                    .form-control {
-                                        width: 100%;
-                                        padding: 12px 16px;
-                                        border: 2px solid #e2e8f0;
-                                        border-radius: 8px;
-                                        font-size: 14px;
-                                        transition: all 0.3s ease;
-                                        background: white;
-                                    }
-                                    .form-control:focus {
-                                        outline: none;
-                                        border-color: #667eea;
-                                        box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
-                                    }
-                                    .help-text {
-                                        font-size: 12px;
-                                        color: #718096;
-                                        margin-top: 5px;
-                                    }
-                                    .form-row {
-                                        display: grid;
-                                        grid-template-columns: 1fr 1fr;
-                                        gap: 15px;
-                                    }
-                                    .schema-section {
-                                        display: none;
-                                        background: rgba(102,126,234,0.05);
-                                        border: 1px solid rgba(102,126,234,0.2);
-                                        border-radius: 8px;
-                                        padding: 15px;
-                                        margin-top: 15px;
-                                    }
-                                    .icon {
-                                        font-size: 24px;
-                                        margin-right: 10px;
-                                    }
-                                    .header {
-                                        display: flex;
-                                        align-items: center;
-                                        margin-bottom: 5px;
-                                    }
-                                </style>
-                        
-                                <div class="kafka-container">
-                                    <div class="header">
-                                        <span class="icon">📥</span>
-                                        <h3 style="margin: 0; font-size: 20px;">Kafka Consumer Configuration</h3>
-                                    </div>
-                                    <div style="font-size: 14px; opacity: 0.9;">Configure your Kafka message consumer</div>
+                                <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #2196f3; margin: 10px 0; box-shadow: 0 4px 12px rgba(33,150,243,0.15);">
+                                    <h4 style="margin: 0 0 18px 0; color: #0d47a1; display: flex; align-items: center; font-size: 18px;">
+                                        <span style="margin-right: 10px; font-size: 24px;">📥</span>
+                                        Kafka Consumer Configuration
+                                    </h4>
                                     
-                                    <div class="form-section">
-                                        <div class="form-group">
-                                            <label class="form-label required">Topic Name</label>
-                                            ${topicOptions}
-                                            <div class="help-text">Select the Kafka topic to consume messages from</div>
-                                        </div>
-                        
-                                        <div class="form-row">
-                                            <div class="form-group">
-                                                <label class="form-label">Consumer Group ID</label>
-                                                <input name="value" type="text" value="default-consumer-group" class="form-control" placeholder="Enter group ID">
-                                                <div class="help-text">Unique identifier for consumer group</div>
-                                            </div>
-                                            
-                                            <div class="form-group">
-                                                <label class="form-label">Max Messages</label>
-                                                <input name="value" type="number" value="10" min="1" max="1000" class="form-control">
-                                                <div class="help-text">Maximum messages to consume</div>
-                                            </div>
-                                        </div>
-                        
-                                        <div class="form-row">
-                                            <div class="form-group">
-                                                <label class="form-label">Offset Reset</label>
-                                                <select name="value" class="form-control">
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 180px;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Topic Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                ${topicOptions}
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Select the Kafka topic to consume from</div>
+                                            </td>
+                                        </tr>
+                                        
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Consumer Group</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name="value" type="text" value="default-consumer-group" style="width: 300px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;">
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Consumer group ID for offset management</div>
+                                            </td>
+                                        </tr>
+                                        
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Offset Reset</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name="value" style="width: 200px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;">
                                                     <option value="latest" selected>Latest</option>
                                                     <option value="earliest">Earliest</option>
                                                 </select>
-                                                <div class="help-text">Starting position for consumption</div>
-                                            </div>
-                                            
-                                            <div class="form-group">
-                                                <label class="form-label">Timeout (seconds)</label>
-                                                <input name="value" type="number" value="30" min="5" max="300" class="form-control">
-                                                <div class="help-text">Consumer timeout duration</div>
-                                            </div>
-                                        </div>
-                        
-                                        <div class="form-group">
-                                            <label class="form-label">Message Format</label>
-                                            <select name="value" class="form-control" onchange="toggleSchemaSection(this.value)">
-                                                <option value="JSON" selected>JSON</option>
-                                                <option value="AVRO">AVRO</option>
-                                                <option value="JSON_SCHEMA">JSON Schema</option>
-                                                <option value="PROTOBUF">Protobuf</option>
-                                            </select>
-                                            <div class="help-text">Format of messages in the topic</div>
-                                        </div>
-                        
-                                        <div id="schemaSection" class="schema-section">
-                                            <div class="form-group">
-                                                <label class="form-label">Schema Registry URL</label>
-                                                <input name="value" type="text" class="form-control" placeholder="http://schema-registry:8081">
-                                                <div class="help-text">URL of your schema registry service</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                        
-                                <script>
-                                    function toggleSchemaSection(format) {
-                                        const schemaSection = document.getElementById('schemaSection');
-                                        const schemaFormats = ['AVRO', 'JSON_SCHEMA', 'PROTOBUF'];
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Starting position for consumption</div>
+                                            </td>
+                                        </tr>
                                         
-                                        if (schemaFormats.includes(format)) {
-                                            schemaSection.style.display = 'block';
-                                        } else {
-                                            schemaSection.style.display = 'none';
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Max Messages</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name="value" type="number" value="10" min="1" max="1000" style="width: 150px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;">
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Maximum number of messages to consume</div>
+                                            </td>
+                                        </tr>
+                                        
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Timeout (seconds)</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name="value" type="number" value="30" min="5" max="300" style="width: 150px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;">
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Consumer timeout duration</div>
+                                            </td>
+                                        </tr>
+                                        
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Message Format</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name="value" style="width: 200px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;" onchange="toggleSchemaField(this.value)">
+                                                    <option value="JSON" selected>JSON</option>
+                                                    <option value="AVRO">AVRO</option>
+                                                    <option value="JSON_SCHEMA">JSON Schema</option>
+                                                    <option value="PROTOBUF">Protobuf</option>
+                                                </select>
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Format of messages in the topic</div>
+                                            </td>
+                                        </tr>
+                                        
+                                        <tr id="schemaRow" style="display: none;">
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Schema Registry URL</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name="value" type="text" placeholder="http://schema-registry:8081" style="width: 350px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;">
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Schema registry endpoint for deserialization</div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    
+                                    <script>
+                                        function toggleSchemaField(format) {
+                                            const schemaRow = document.getElementById('schemaRow');
+                                            const schemaFormats = ['AVRO', 'JSON_SCHEMA', 'PROTOBUF'];
+                                            
+                                            if (schemaFormats.includes(format)) {
+                                                schemaRow.style.display = 'table-row';
+                                            } else {
+                                                schemaRow.style.display = 'none';
+                                            }
                                         }
-                                    }
-                                </script>
+                                    </script>
+                                </div>
                             """
                         } else if (OPERATION == 'REGISTER_SCHEMA') {
 
