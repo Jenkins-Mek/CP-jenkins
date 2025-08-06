@@ -10,7 +10,6 @@ properties([
         string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://schema-registry:8081', description: 'Schema Registry URL'),
         text(name: 'MESSAGE_DATA', defaultValue: '{"message": "Hello World", "timestamp": "2024-01-01T00:00:00Z"}', description: 'Message data (must conform to existing schema)'),
         string(name: 'MESSAGE_COUNT', defaultValue: '1', description: 'Number of messages to produce'),
-        booleanParam(name: 'VALIDATE_MESSAGE_FORMAT', defaultValue: true, description: 'Validate message JSON format before producing')
     ])
 ])
 
@@ -87,10 +86,6 @@ pipeline {
                     echo "Schema Type: ${env.SCHEMA_TYPE}"
                     echo "Message Count: ${params.MESSAGE_COUNT}"
                     echo "Sample Message: ${params.MESSAGE_DATA}"
-
-                    if (params.VALIDATE_MESSAGE_FORMAT) {
-                        validateMessageFormat()
-                    }
                 }
             }
         }
@@ -196,29 +191,6 @@ def retrieveSchemaInfo() {
         error("Failed to retrieve schema information: ${e.getMessage()}")
     }
 }
-
-def validateMessageFormat() {
-    echo "Validating message data format..."
-    def messageEscaped = params.MESSAGE_DATA.replace("'", "'\"'\"'")
-    sh """
-        docker compose --project-directory '${params.COMPOSE_DIR}' -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
-        exec -T schema-registry bash -c ' 
-            echo "Performing basic JSON format validation..."
-            if command -v jq >/dev/null 2>&1; then
-                echo '${messageEscaped}' | jq . >/dev/null
-                if [ \$? -eq 0 ]; then
-                    echo "Message data appears to be valid JSON format"
-                else
-                    echo "Message data is not valid JSON format"
-                    exit 1
-                fi
-            else
-                echo "jq not available - skipping JSON validation"
-            fi
-        '
-    """
-}
-
 
 def produceSchemaMessages(topicName, username, password) {
     try {
