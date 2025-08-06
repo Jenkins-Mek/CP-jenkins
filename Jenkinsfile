@@ -741,6 +741,22 @@ pipeline {
                                   - Max Message Bytes: ${env.MAX_MESSAGE_BYTES}
                             """
                             break
+                        case 'CONSUMER':
+                            env.TOPIC_NAME = values[0]
+                            env.CONSUMER_GROUP_ID = values[1] ?: 'default-consumer-group'
+                            env.OFFSET_RESET = values[2] ?: 'latest'
+                            env.MAX_MESSAGES = values[3] ?: '10'
+                            env.TIMEOUT_SECONDS = values[4] ?: '30'
+                            env.MESSAGE_FORMAT = values[5] ?: 'JSON'
+                            echo """Consumer configuration:
+                                Topic: ${env.TOPIC_NAME}"
+                                Consumer Group: ${env.CONSUMER_GROUP_ID}"
+                                Offset Reset: ${env.OFFSET_RESET}"
+                                Max Messages: ${env.MAX_MESSAGES}"
+                                Timeout: ${env.TIMEOUT_SECONDS} seconds"
+                                Message Format: ${env.MESSAGE_FORMAT}"
+                            """
+                            break
                         case 'LIST_SCHEMA':
                             env.SHOW_VERSIONS = values.contains('true') ? 'true' : 'false'
                             echo "Listing all schemas (Show versions: ${env.SHOW_VERSIONS})"
@@ -786,6 +802,7 @@ pipeline {
                             if (!env.TOPIC_NAME.matches('^[a-zA-Z0-9._-]+$')) error "Invalid topic name format"
                             echo "✅ Validation passed"
                             break
+                        case 'CONSUMER':
                         case 'DESCRIBE_TOPIC':
                         case 'DELETE_TOPIC':
                             if (!env.TOPIC_NAME?.trim()) error "Topic name required"
