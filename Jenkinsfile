@@ -690,6 +690,7 @@ pipeline {
         TOPIC_DESCRIPTION_FILE = 'kafka-topics-describe.txt'
         SCHEMA_LIST_FILE = 'schema-subjects-list.txt'
         SCHEMA_DESCRIPTION_FILE = 'schema-subject-description.txt'
+        CONSUME_MESSAGES_FILE = 'consumed-messages.txt'
         CLIENT_CONFIG_FILE = '/tmp/client.properties'
     }
 
@@ -954,7 +955,7 @@ pipeline {
                         case 'CONSUMER':
                             if ("${env.MESSAGE_FORMAT}" == "JSON" ){
                                 echo "==== Calling Consumer job ===="
-                                build job: 'org-cp-tools/CP-jenkins/consumer',
+                                def ConsumerJob = build job: 'org-cp-tools/CP-jenkins/consumer',
                                     parameters: [
                                         string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
                                         string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
@@ -966,10 +967,14 @@ pipeline {
                                     ],
                                     propagate: false,
                                     wait: true
+                                copyArtifacts projectName: 'org-cp-tools/CP-jenkins/consumer',
+                                    buildNumber: "${ConsumerJob.number}",
+                                    filter: 'consumed-messages.txt',
+                                    target: '.'
                                 break
                             } else {
                                 echo "==== Calling Consumer job ===="
-                                build job: 'org-cp-tools/CP-jenkins/consumer-schema',
+                                def ConsumerScheJob = build job: 'org-cp-tools/CP-jenkins/consumer-schema',
                                     parameters: [
                                         string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
                                         string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
@@ -983,6 +988,10 @@ pipeline {
                                     ],
                                     propagate: false,
                                     wait: true
+                                copyArtifacts projectName: 'org-cp-tools/CP-jenkins/consumer-schema',
+                                    buildNumber: "${ConsumerScheJob.number}",
+                                    filter: 'consumed-messages.txt',
+                                    target: '.'
                                 break
                             }
 
@@ -1079,6 +1088,7 @@ pipeline {
                     'DESCRIBE_TOPIC': env.TOPIC_DESCRIPTION_FILE,
                     'LIST_SCHEMA': env.SCHEMA_LIST_FILE,
                     'DESCRIBE_SCHEMA': env.SCHEMA_DESCRIPTION_FILE,
+                    'CONSUMER': env.CONSUME_MESSAGES_FILE,
                 ]
 
                 def currentFile = operationFiles[params.OPERATION]
