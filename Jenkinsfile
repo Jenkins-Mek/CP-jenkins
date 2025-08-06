@@ -28,15 +28,6 @@ pipeline {
         stage('Validate Input') {
             steps {
                 script {
-                    echo "DEBUG: params.TOPIC_NAME = '${params.TOPIC_NAME}'"
-                    echo "DEBUG: params.SCHEMA_SUBJECT = '${params.SCHEMA_SUBJECT}'"
-                    
-                    // Set schema subject with robust null/empty checking
-                    def schemaSubject = params.SCHEMA_SUBJECT ?: ""
-                    def topicName = params.TOPIC_NAME ?: ""
-
-                    echo "DEBUG: After elvis - topicName = '${topicName}'"
-                    echo "DEBUG: After elvis - schemaSubject = '${schemaSubject}'"
                     if (!params.TOPIC_NAME?.trim()) {
                         error("TOPIC_NAME parameter is required to produce messages.")
                     }
@@ -50,11 +41,21 @@ pipeline {
                         error("MESSAGE_COUNT must be between 1 and 10000")
                     }
 
-                    if (params.SCHEMA_SUBJECT && params.SCHEMA_SUBJECT.trim() != '') {
-                        env.FINAL_SCHEMA_SUBJECT = params.SCHEMA_SUBJECT.trim()
+                    // Set schema subject - use parameter if provided, otherwise default to topic-value
+                    // Set schema subject with robust null/empty checking
+                    def schemaSubject = params.SCHEMA_SUBJECT ?: ""
+                    def topicName = params.TOPIC_NAME ?: ""
+                    
+                    echo "DEBUG: After elvis - topicName = '${topicName}'"
+                    echo "DEBUG: After elvis - schemaSubject = '${schemaSubject}'"
+                    
+                    if (schemaSubject.toString().trim() != "") {
+                        env.FINAL_SCHEMA_SUBJECT = schemaSubject.toString().trim()
                         echo "Using provided schema subject: ${env.FINAL_SCHEMA_SUBJECT}"
                     } else {
-                        env.FINAL_SCHEMA_SUBJECT = "${params.TOPIC_NAME}"+"-value"
+                        def calculatedSubject = topicName.toString().trim() + "-value"
+                        echo "DEBUG: Calculated subject = '${calculatedSubject}'"
+                        env.FINAL_SCHEMA_SUBJECT = calculatedSubject
                         echo "Using default schema subject: ${env.FINAL_SCHEMA_SUBJECT}"
                     }
 
@@ -163,12 +164,12 @@ def retrieveSchemaInfo() {
                     if echo "\$RESPONSE" | grep -q "schema"; then
                         SCHEMA_ID=\$(echo "\$RESPONSE" | grep -o \'"id":[0-9]*\' | cut -d: -f2)
                         SCHEMA_TYPE=\$(echo "\$RESPONSE" | grep -o \'"schemaType":"[^"]*"\' | cut -d: -f2 | tr -d \'"\'')
-
+                        
                         # Default to AVRO if no schemaType specified (Avro default)
                         if [ -z "\$SCHEMA_TYPE" ]; then
                             SCHEMA_TYPE="AVRO"
                         fi
-
+                        
                         echo "SCHEMA_ID=\$SCHEMA_ID"
                         echo "SCHEMA_TYPE=\$SCHEMA_TYPE"
                         echo "Schema found successfully"
