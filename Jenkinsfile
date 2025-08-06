@@ -304,21 +304,21 @@ properties([
                                 topicOptions += "<option value='${topic}' ${selected}>${topic}</option>"
                             }
                             topicOptions += '</select>'
-                        
+
                             def subjectOptions = '<select name="value" style="width: 280px; padding: 8px 12px; border: 2px solid #c3e6cb; border-radius: 6px; font-size: 14px; background: white;">'
                             subjectOptions += '<option value="">-- Select Schema Subject --</option>'
                             getSchemaSubjects().each { subject ->
                                 subjectOptions += "<option value='${subject}'>${subject}</option>"
                             }
                             subjectOptions += '</select>'
-                        
+
                             return """
                                 <div style="background: linear-gradient(135deg, #e8f5e8 0%, #f0f8f0 100%); border: 2px solid #28a745; border-radius: 8px; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                    
+
                                     <div style="color: #155724; margin: 0 0 20px 0; font-size: 18px; font-weight: 600;">
                                         🚀 Kafka Producer Configuration
                                     </div>
-                                    
+
                                     <div id="producer-container">
                                         <table style="width: 100%; border-collapse: collapse;">
                                             <tr>
@@ -333,7 +333,7 @@ properties([
                                                     <div style="font-size: 12px; color: #6c757d; margin-top: 5px; font-style: italic;">Choose how messages will be produced</div>
                                                 </td>
                                             </tr>
-                                            
+
                                             <tr>
                                                 <td style="padding: 10px 15px 10px 0; vertical-align: top; width: 180px; font-weight: 600; color: #155724; font-size: 14px;">
                                                     Topic Name <span style="color: #dc3545;">*</span>
@@ -343,7 +343,7 @@ properties([
                                                     <div style="font-size: 12px; color: #6c757d; margin-top: 5px; font-style: italic;">Kafka topic to send messages to</div>
                                                 </td>
                                             </tr>
-                                            
+
                                             <tr id="schemaSubjectRow" style="display: none;">
                                                 <td style="padding: 10px 15px 10px 0; vertical-align: top; width: 180px; font-weight: 600; color: #155724; font-size: 14px;">
                                                     Schema Subject <span style="color: #dc3545;">*</span>
@@ -353,7 +353,7 @@ properties([
                                                     <div style="font-size: 12px; color: #6c757d; margin-top: 5px; font-style: italic;">Schema Registry subject for message validation</div>
                                                 </td>
                                             </tr>
-                                            
+
                                             <tr>
                                                 <td style="padding: 10px 15px 10px 0; vertical-align: top; width: 180px; font-weight: 600; color: #155724; font-size: 14px;">
                                                     Message Count
@@ -369,28 +369,8 @@ properties([
                                                     <div style="font-size: 12px; color: #6c757d; margin-top: 5px; font-style: italic;">Number of test messages to produce</div>
                                                 </td>
                                             </tr>
-                                            
-                                            <tr>
-                                                <td style="padding: 10px 15px 10px 0; vertical-align: top; width: 180px; font-weight: 600; color: #155724; font-size: 14px;">
-                                                    Message Key
-                                                </td>
-                                                <td style="padding: 10px; vertical-align: top;">
-                                                    <input name="value" type="text" placeholder="user_123" value="" style="width: 280px; padding: 8px 12px; border: 2px solid #c3e6cb; border-radius: 6px; font-size: 14px; background: white;">
-                                                    <div style="font-size: 12px; color: #6c757d; margin-top: 5px; font-style: italic;">Optional key for message partitioning</div>
-                                                </td>
-                                            </tr>
                                         </table>
                                     </div>
-                                    <script>
-                                        function toggleProducerType(type) {
-                                            const schemaRow = document.getElementById('schemaSubjectRow');
-                                            if (type === 'schema') {
-                                                schemaRow.style.display = 'table-row';
-                                            } else {
-                                                schemaRow.style.display = 'none';
-                                            }
-                                        }
-                                    </script>
                                 </div>
                             """
                         } else if (OPERATION == 'CONSUMER') {
