@@ -355,11 +355,20 @@ properties([
                                             <td style="padding: 8px;">
                                                 <select name="value" style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
                                                     <option value="1" selected>1 message</option>
+                                                    <option value="5">5 messages</option>
                                                     <option value="10">10 messages</option>
-                                                    <option value="100">100 messages</option>
-                                                    <option value="1000">1000 messages</option>
+                                                    <option value="50">50 messages</option>
                                                 </select>
                                                 <div style="font-size: 12px; color: #155724; margin-top: 3px;">Number of messages to produce</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #455724;">Messages to produce *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <textarea name='value' type='text' value='' style="width: 300px; height: 400px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;"></textarea>
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Message</div>
                                             </td>
                                         </tr>
                                     </table>
@@ -709,6 +718,22 @@ pipeline {
                                 Max Messages: ${env.MAX_MESSAGES}"
                                 Timeout: ${env.TIMEOUT_SECONDS} seconds"
                                 Message Format: ${env.MESSAGE_FORMAT}"
+                            """
+                            break
+                        case 'PRODUCER':
+                            values = option.split(',', 5).collect { it.trim() }
+                            env.PRODUCER_TYPE = values[0] ?: 'standard'
+                            env.TOPIC_NAME = values[1]
+                            env.SCHEMA_SUBJECT = values[2] ?: ''
+                            env.MESSAGE_COUNT = values[3] ?: '1'
+                            env.MESSAGE_DATA = values[4] ?: ''
+
+                            echo """Producer configuration:
+                                Producer Type: ${env.PRODUCER_TYPE}
+                                Topic: ${env.TOPIC_NAME}
+                                Schema Subject: ${env.SCHEMA_SUBJECT}
+                                Message Count: ${env.MESSAGE_COUNT}
+                                Message DATA: ${env.MESSAGE_DATA}
                             """
                             break
                         case 'LIST_SCHEMA':
