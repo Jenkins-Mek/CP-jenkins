@@ -61,17 +61,15 @@ properties([
                             def lines = htmlFile.readLines()
                             def htmlContent = ""
                             def isInSection = false
-
                             lines.each { line ->
                                 if (line.trim().startsWith(operation + " =")) {
                                     isInSection = true
-                                } else if (line.trim().matches(/^\w+\s*=.*/) && isInSection) {
+                                } else if (line.trim().contains(" =") && isInSection) {
                                     isInSection = false
                                 } else if (isInSection) {
                                     htmlContent += line + "\\n"
                                 }
                             }
-
                             return htmlContent.trim() ?: " "
                         }
 
