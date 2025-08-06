@@ -55,12 +55,12 @@ pipeline {
                         echo "Using provided schema subject: ${finalSchemaSubject}"
                     } else {
                         finalSchemaSubject = "${topicName}-value"
-                        echo "DEBUG: Calculated subject = '${finalSchemaSubject}'"
+                        echo "DEBUG: Calculated subject = ${finalSchemaSubject}"
                         echo "Using default schema subject: ${finalSchemaSubject}"
                     }
                     
                     // Set environment variable with simple assignment
-                    env.FINAL_SCHEMA_SUBJECT = finalSchemaSubject
+                    env.FINAL_SCHEMA_SUBJECT = '${finalSchemaSubject}'
 
                     echo "Parameters validated successfully"
                     echo "Topic: ${params.TOPIC_NAME}"
