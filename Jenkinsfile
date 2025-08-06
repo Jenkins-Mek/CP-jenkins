@@ -57,48 +57,22 @@ properties([
                     script:
                         '''
                         def readHtmlFromFile(String operation) {
+                            def htmlFile = new File('/var/lib/jenkins/workspace/html-store.txt')
+                            def lines = htmlFile.readLines()
                             def htmlContent = ""
-                            try {
-                                def htmlFilePath = '/var/lib/jenkins/workspace/html-store.txt'
-                                def htmlFile = new File(htmlFilePath)
-                                if (htmlFile.exists()) {
-                                    def lines = htmlFile.readLines()
-                                    def isInSection = false
-                                    def currentSection = ""
-                                    lines.each { line ->
-                                        line = line.trim()
+                            def isInSection = false
 
-                                        if (line.startsWith(operation + " =")) {
-                                            isInSection = true
-                                            currentSection = operation
-                                            return // Skip the declaration line
-                                        }
-
-                                        else if (line.contains(" =") && isInSection) {
-                                            isInSection = false
-                                            return
-                                        }
-
-                                        else if (isInSection) {
-                                            htmlContent += line + "\\n"
-                                        }
-                                    }
-
-                                    // Clean up the HTML content
-                                    htmlContent = htmlContent.trim()
-                                    if (htmlContent.isEmpty()) {
-                                        // Fallback HTML if section not found
-                                        htmlContent = getDefaultHtml(operation)
-                                    }
-                                } else {
-                                    // Fallback if file doesn't exist
-                                    htmlContent = getDefaultHtml(operation)
+                            lines.each { line ->
+                                if (line.trim().startsWith(operation + " =")) {
+                                    isInSection = true
+                                } else if (line.trim().matches(/^\w+\s*=.*/) && isInSection) {
+                                    isInSection = false
+                                } else if (isInSection) {
+                                    htmlContent += line + "\\n"
                                 }
-                            } catch (Exception e) {
-                                htmlContent = "<div style='color: red;'>ERROR reading HTML file: ${e.message}</div>"
                             }
 
-                            return htmlContent
+                            return htmlContent.trim() ?: " "
                         }
 
 
@@ -1213,3 +1187,61 @@ pipeline {
     }
 }
 
+
+/*
+                                    return """
+                                        <div style="background-color: #e8f5e8; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
+                                            <h4 style="margin: 0; color: #155724;">📋 List All Topics</h4>
+                                            <p style="margin: 5px 0 0 0; color: #155724;">This operation will list all available Kafka topics with detailed information including count, names, partitions, and replication factors.</p>
+                                            <div style="margin-top: 10px;">
+                                                <label style="font-weight: bold; color: #155724;">
+                                                    <input type="checkbox" name="value" value="include_internal" style="margin-right: 5px;">
+                                                    Include internal topics (starting with _)
+                                                </label>
+                                            </div>
+                                        </div>
+                                    """
+                                    return """
+                                        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
+                                            <h4 style="margin: 0 0 15px 0; color: #495057;">🚀 Create New Topic</h4>
+                                            <table style="width: 100%; border-collapse: collapse;">
+                                                <tr>
+                                                    <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                        <label style="font-weight: bold; color: #495057;">Topic Name *</label>
+                                                    </td>
+                                                    <td style="padding: 8px;">
+                                                        <input name='value' type='text' value='user-events' style="width: 300px; padding: 5px; border: 1px solid #ced4da; border-radius: 3px;">
+                                                        <div style="font-size: 12px; color: #6c757d; margin-top: 3px;">Use alphanumeric characters, dots, underscores, and hyphens</div>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding: 8px; vertical-align: top;">
+                                                        <label style="font-weight: bold; color: #495057;">Partitions *</label>
+                                                    </td>
+                                                    <td style="padding: 8px;">
+                                                        <select name='value' style="width: 200px; padding: 5px; border: 1px solid #ced4da; border-radius: 3px;">
+                                                            <option value='1' selected>1 (Development)</option>
+                                                            <option value='3'>3 (Small workload)</option>
+                                                            <option value='6'>6 (Medium workload)</option>
+                                                            <option value='12'>12 (High workload)</option>
+                                                            <option value='24'>24 (Very high workload)</option>
+                                                        </select>
+                                                        <div style="font-size: 12px; color: #6c757d; margin-top: 3px;">More partitions = better parallelism but more overhead</div>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding: 8px; vertical-align: top;">
+                                                        <label style="font-weight: bold; color: #495057;">Replication Factor *</label>
+                                                    </td>
+                                                    <td style="padding: 8px;">
+                                                        <select name='value' style="width: 200px; padding: 5px; border: 1px solid #ced4da; border-radius: 3px;">
+                                                            <option value='1' selected>1 (Development - No redundancy)</option>
+                                                            <option value='2'>2 (Staging - Basic redundancy)</option>
+                                                            <option value='3'>3 (Production - High availability)</option>
+                                                        </select>
+                                                        <div style="font-size: 12px; color: #6c757d; margin-top: 3px;">Production should use 3 for fault tolerance</div>
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </div>
+*/
