@@ -297,14 +297,14 @@ properties([
                             """
                         }else if (OPERATION == 'PRODUCER') {
 
-                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #c3e6cb; border-radius: 3px; background-color: #fff2f2;">'
+                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #c3e6cb; border-radius: 3px; background-color: #d4edda;">'
                             topicOptions += '<option value="">-- Select Topic to Delete --</option>'
                             getTopics().each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
 
-                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px; background-color: #fff2f2;">'
+                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px; background-color: #d4edda">'
                             subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
                             getSchemaSubjects().each { subject ->
                                subjectOptions += "<option value='${subject}'>${subject}</option>"
@@ -367,7 +367,7 @@ properties([
                                                 <label style="font-weight: bold; color: #455724;">Messages to produce *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <textarea name='value' type='text' value='' style="width: 300px; height: 400px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;"></textarea>
+                                                <textarea name='value' type='text' value='' style="width: 350px; height: 100px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;"></textarea>
                                                 <div style="font-size: 12px; color: #155724; margin-top: 3px;">Message</div>
                                             </td>
                                         </tr>
