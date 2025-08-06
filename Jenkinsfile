@@ -73,7 +73,8 @@ properties([
                             return htmlContent.trim() ?: " "
                         }
 
-                        def topics = []
+                        def getTopics() {
+                            def topics = []
                             try {
                                 def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
                                 def choicesFile = new File(filePath)
@@ -82,11 +83,14 @@ properties([
                                         .collect { it.trim() }
                                         .findAll { it && !it.startsWith('#') }
                                         .sort()
+                                } else {
+                                    topics = ["ERROR: File not found: ${filePath}"]
                                 }
                             } catch (Exception e) {
                                 topics = ["ERROR: ${e.message}"]
+                            }
+                            return topics
                         }
-
 
                         // Main logic
                         if (OPERATION == 'LIST_TOPICS'){
@@ -264,24 +268,10 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'DELETE_TOPIC') {
-                            // Load topics from file
-                            def topics = []
-                            try {
-                                def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
-                                def choicesFile = new File(filePath)
-                                if (choicesFile.exists()) {
-                                    topics = choicesFile.readLines()
-                                        .collect { it.trim() }
-                                        .findAll { it && !it.startsWith('#') }
-                                        .sort()
-                                }
-                            } catch (Exception e) {
-                                topics = ["ERROR: ${e.message}"]
-                            }
 
                             def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #dc3545; border-radius: 3px; background-color: #fff2f2;">'
                             topicOptions += '<option value="">-- Select Topic to Delete --</option>'
-                            topics.each { topic ->
+                            getTopics().each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
@@ -594,7 +584,7 @@ properties([
 
                             def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;">'
                             topicOptions += '<option value="">-- Select Topic --</option>'
-                            topics.each { topic ->
+                            getTopics().each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
