@@ -427,7 +427,7 @@ properties([
                                         <span style="margin-right: 10px; font-size: 24px;">📥</span>
                                         Kafka Consumer Configuration
                                     </h4>
-                                    
+
                                     <table style="width: 100%; border-collapse: collapse;">
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top; width: 180px;">
@@ -438,7 +438,7 @@ properties([
                                                 <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Select the Kafka topic to consume from</div>
                                             </td>
                                         </tr>
-                                        
+
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Consumer Group</label>
@@ -448,7 +448,7 @@ properties([
                                                 <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Consumer group ID for offset management</div>
                                             </td>
                                         </tr>
-                                        
+
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Offset Reset</label>
@@ -461,7 +461,7 @@ properties([
                                                 <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Starting position for consumption</div>
                                             </td>
                                         </tr>
-                                        
+
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Max Messages</label>
@@ -471,7 +471,7 @@ properties([
                                                 <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Maximum number of messages to consume</div>
                                             </td>
                                         </tr>
-                                        
+
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Timeout (seconds)</label>
@@ -481,7 +481,7 @@ properties([
                                                 <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Consumer timeout duration</div>
                                             </td>
                                         </tr>
-                                        
+
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Message Format</label>
@@ -496,7 +496,7 @@ properties([
                                                 <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Format of messages in the topic</div>
                                             </td>
                                         </tr>
-                                        
+
                                         <tr id="schemaRow" style="display: none;">
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Schema Registry URL</label>
@@ -507,12 +507,10 @@ properties([
                                             </td>
                                         </tr>
                                     </table>
-                                    
                                     <script>
                                         function toggleSchemaField(format) {
                                             const schemaRow = document.getElementById('schemaRow');
                                             const schemaFormats = ['AVRO', 'JSON_SCHEMA', 'PROTOBUF'];
-                                            
                                             if (schemaFormats.includes(format)) {
                                                 schemaRow.style.display = 'table-row';
                                             } else {
