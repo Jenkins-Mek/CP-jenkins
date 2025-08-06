@@ -297,25 +297,26 @@ properties([
                             """
                         }else if (OPERATION == 'PRODUCER') {
 
-                            // Get available topics and schema subjects
-                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">'
-                            topicOptions += '<option value="">-- Select Topic --</option>'
+                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #dc3545; border-radius: 3px; background-color: #fff2f2;">'
+                            topicOptions += '<option value="">-- Select Topic to Delete --</option>'
                             getTopics().each { topic ->
-                                def selected = (topic == env.TOPIC_NAME) ? 'selected' : ''
-                                topicOptions += "<option value='${topic}' ${selected}>${topic}</option>"
+                                topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
 
-                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">'
-                            subjectOptions += '<option value="">-- Select Schema Subject --</option>'
+                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #e9dfdfff; border-radius: 3px; background-color: #fff2f2;">'
+                            subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
                             getSchemaSubjects().each { subject ->
-                                subjectOptions += "<option value='${subject}'>${subject}</option>"
+                               subjectOptions += "<option value='${subject}'>${subject}</option>"
                             }
                             subjectOptions += '</select>'
 
                             return """
-                                <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
-                                    <h4 style="margin: 0 0 15px 0; color: #155724;">📤 Kafka Producer</h4>
+                                <div style="background: linear-gradient(135deg, #d4edda 0%, #bbdefb 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #28a745; margin: 10px 0; box-shadow: 0 4px 12px rgba(33,150,243,0.15);">
+                                    <h4 style="margin: 0 0 18px 0; color: #155724; display: flex; align-items: center; font-size: 18px;">
+                                        <span style="margin-right: 10px; font-size: 24px;">📤</span>
+                                        Kafka Producer
+                                    </h4>
                                     <table style="width: 100%;">
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top; width: 200px;">
