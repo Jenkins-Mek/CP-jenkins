@@ -55,58 +55,20 @@ properties([
                     sandbox: true,
                     script:
                         '''
-                        // Function to read HTML content from file
-                        def readHtmlFromFile(String operation) {
-                            def htmlContent = ""
-                            try {
-                                def htmlFilePath = '/var/lib/jenkins/workspace/html-store.txt'
-                                def htmlFile = new File(htmlFilePath)
-
-                                if (htmlFile.exists()) {
-                                    def lines = htmlFile.readLines()
-                                    def isInSection = false
-                                    def currentSection = ""
-
-                                    lines.each { line ->
-                                        line = line.trim()
-
-                                        // Check if this line starts a new section
-                                        if (line.startsWith(operation + " =")) {
-                                            isInSection = true
-                                            currentSection = operation
-                                            return // Skip the declaration line
-                                        }
-                                        // Check if we've hit a new section
-                                        else if (line.contains(" =") && isInSection) {
-                                            isInSection = false
-                                            return
-                                        }
-                                        // Collect lines for current section
-                                        else if (isInSection) {
-                                            htmlContent += line + "\\n"
-                                        }
-                                    }
-
-                                    // Clean up the HTML content
-                                    htmlContent = htmlContent.trim()
-                                    if (htmlContent.isEmpty()) {
-                                        // Fallback HTML if section not found
-                                        htmlContent = getDefaultHtml(operation)
-                                    }
-                                } else {
-                                    // Fallback if file doesn't exist
-                                    htmlContent = getDefaultHtml(operation)
-                                }
-                            } catch (Exception e) {
-                                htmlContent = "<div style='color: red;'>ERROR reading HTML file: ${e.message}</div>"
-                            }
-
-                            return htmlContent
-                        }
-                        // Main logic
                         if (OPERATION == 'LIST_TOPICS'){
-                            return readHtmlFromFile('LIST_TOPICS')
-                        }else if (OPERATION == 'CREATE_TOPIC') {
+                            return """
+                                <div style="background-color: #e8f5e8; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
+                                    <h4 style="margin: 0; color: #155724;">📋 List All Topics</h4>
+                                    <p style="margin: 5px 0 0 0; color: #155724;">This operation will list all available Kafka topics with detailed information including count, names, partitions, and replication factors.</p>
+                                    <div style="margin-top: 10px;">
+                                        <label style="font-weight: bold; color: #155724;">
+                                            <input type="checkbox" name="value" value="include_internal" style="margin-right: 5px;">
+                                            Include internal topics (starting with _)
+                                        </label>
+                                    </div>
+                                </div>
+                            """
+                        } else if (OPERATION == 'CREATE_TOPIC') {
                             return """
                                 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
                                     <h4 style="margin: 0 0 15px 0; color: #495057;">🚀 Create New Topic</h4>
@@ -1090,7 +1052,7 @@ pipeline {
                                 parameters: [
                                     string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
                                     string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
-                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
+                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}")
                                     string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
                                 ],
                                 propagate: false,
