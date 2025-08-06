@@ -19,9 +19,6 @@ pipeline {
 
     environment {
         PRODUCER_OUTPUT_FILE = 'schema-producer-results.txt'
-        SCHEMA_ID = ''
-        SCHEMA_TYPE = ''
-        FINAL_SCHEMA_SUBJECT = ''
     }
 
     stages {
