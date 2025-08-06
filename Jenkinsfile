@@ -67,7 +67,7 @@ properties([
                                 } else if (line.trim().contains(" =") && isInSection) {
                                     isInSection = false
                                 } else if (isInSection) {
-                                    htmlContent += line + "\\n"
+                                    htmlContent += line + "\n" 
                                 }
                             }
                             return htmlContent.trim() ?: " "
