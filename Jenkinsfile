@@ -444,7 +444,7 @@ properties([
                                                 <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Consumer Group</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <input name="value" type="text" value="default-consumer-group" style="width: 300px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;">
+                                                <input name="value" type="text" placeholder="Enter consumer group ID (optional)" style="width: 300px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;">
                                                 <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Consumer group ID for offset management</div>
                                             </td>
                                         </tr>
@@ -574,7 +574,7 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'DELETE_SCHEMA') {
- 
+
                                 def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #e9dfdfff; border-radius: 3px; background-color: #fff2f2;">'
                                 subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
                                 getSchemaSubjects().each { subject ->
@@ -743,7 +743,7 @@ pipeline {
                             break
                         case 'CONSUMER':
                             env.TOPIC_NAME = values[0]
-                            env.CONSUMER_GROUP_ID = values[1] ?: 'default-consumer-group'
+                            env.CONSUMER_GROUP_ID = values[1] ?: ''
                             env.OFFSET_RESET = values[2] ?: 'latest'
                             env.MAX_MESSAGES = values[3] ?: '10'
                             env.TIMEOUT_SECONDS = values[4] ?: '30'
@@ -967,8 +967,7 @@ pipeline {
                                     propagate: false,
                                     wait: true
                                 break
-                            }
-                            else {
+                            } else {
                                 echo "==== Calling Consumer job ===="
                                 build job: 'org-cp-tools/CP-jenkins/consumer-schema',
                                     parameters: [
