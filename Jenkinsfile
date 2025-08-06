@@ -282,6 +282,7 @@ properties([
                                     </table>
                                 </div>
                             """
+
                         } else if (OPERATION == 'PRODUCER') {
                             // Load topics from file
                             def topics = []
@@ -298,14 +299,14 @@ properties([
                                 topics = ["ERROR: ${e.message}"]
                             }
 
-                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid  #c3e6cb; border-radius: 3px;">'
+                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" id="topicSelect">'
                             topicOptions += '<option value="">-- Select Topic --</option>'
                             topics.each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
 
-                            // Load schema subjects from file
+                            // Load schema subjects from file (for schema-based producer)
                             def subjects = []
                             try {
                                 def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
@@ -326,49 +327,161 @@ properties([
                                     subjects = subjects.sort()
                                 }
                             } catch (Exception e) {
-                               subjects = ["ERROR: ${e.message}"]
+                                subjects = ["ERROR: ${e.message}"]
                             }
-                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">'
+
+                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" id="schemaSubjectSelect">'
                             subjectOptions += '<option value="">-- Select Schema Subject --</option>'
                             subjects.each { subject ->
-                               subjectOptions += "<option value='${subject}'>${subject}</option>"
+                                subjectOptions += "<option value='${subject}'>${subject}</option>"
                             }
                             subjectOptions += '</select>'
 
                             return """
                                 <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
-                                    <h4 style="margin: 0 0 15px 0; color: #155724;">📤 Kafka Producer</h4>
+                                    <h4 style="margin: 0 0 15px 0; color: #155724;">📤 Kafka Producer Configuration</h4>
                                     <table style="width: 100%; border-collapse: collapse;">
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top; width: 200px;">
                                                 <label style="font-weight: bold; color: #155724;">Producer Type *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" onchange="toggleProducerFields(this.value)">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" 
+                                                        onchange="toggleProducerFields(this.value)" id="producerTypeSelect">
                                                     <option value='standard' selected>Standard Producer</option>
                                                     <option value='schema'>Schema-based Producer</option>
                                                 </select>
                                                 <div style="font-size: 12px; color: #155724; margin-top: 3px;">Choose producer type</div>
                                             </td>
                                         </tr>
+
+                                        <!-- Standard Producer Fields -->
+                                        <tr class="standard-fields">
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Docker Compose Directory</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='/confluent/cp-mysetup/cp-all-in-one' 
+                                                       style="width: 400px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" id="composeDir">
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Docker Compose directory path</div>
+                                            </td>
+                                        </tr>
+
+                                        <tr class="standard-fields">
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Kafka Bootstrap Server</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='localhost:9092' 
+                                                       style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" id="bootstrapServer">
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Kafka bootstrap server address</div>
+                                            </td>
+                                        </tr>
+
+                                        <tr class="standard-fields">
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Security Protocol</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" id="securityProtocol">
+                                                    <option value='SASL_PLAINTEXT' selected>SASL_PLAINTEXT</option>
+                                                    <option value='SASL_SSL'>SASL_SSL</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Kafka security protocol</div>
+                                            </td>
+                                        </tr>
+
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #155724;">Topic Name *</label>
                                             </td>
                                             <td style="padding: 8px;">
                                                 ${topicOptions}
-                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Topic to send messages to</div>
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Kafka topic to produce messages to</div>
                                             </td>
                                         </tr>
+
+                                        <tr class="standard-fields">
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Message Format</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" id="messageFormat">
+                                                    <option value='STRING'>STRING</option>
+                                                    <option value='JSON' selected>JSON</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Message format for serialization</div>
+                                            </td>
+                                        </tr>
+
+                                        <tr class="standard-fields">
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Message Data *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <textarea name='value' style="width: 400px; height: 80px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" 
+                                                          placeholder='{"message": "Hello World from Kafka Producer!", "user": "test_user"}' id="messageData">Hello World from Kafka Producer!</textarea>
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Message data to produce</div>
+                                            </td>
+                                        </tr>
+
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Message Count</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" id="messageCount">
+                                                    <option value='1' selected>1 message</option>
+                                                    <option value='10'>10 messages</option>
+                                                    <option value='100'>100 messages</option>
+                                                    <option value='1000'>1000 messages</option>
+                                                    <option value='5000'>5000 messages</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Number of messages to produce</div>
+                                            </td>
+                                        </tr>
+
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #155724;">Message Key</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <input name='value' type='text' value='user_123' style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Optional key for message partitioning</div>
+                                                <input name='value' type='text' value='' placeholder='user_123' 
+                                                       style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" id="messageKey">
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Optional message key (leave empty for null key)</div>
                                             </td>
                                         </tr>
+
+                                        <tr class="standard-fields">
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Input Options</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <label style="margin-right: 20px;">
+                                                    <input type='checkbox' name='value' value='true' id="useFileInput"> Use File Input
+                                                </label>
+                                                <label style="margin-right: 20px;">
+                                                    <input type='checkbox' name='value' value='true' checked id="addTimestamp"> Add Timestamp
+                                                </label>
+                                                <label>
+                                                    <input type='checkbox' name='value' value='false' id="addMessageIndex"> Add Message Index
+                                                </label>
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Message enhancement options</div>
+                                            </td>
+                                        </tr>
+
+                                        <tr class="standard-fields" id="fileInputRow" style="display: none;">
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Input File Path</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name='value' type='text' value='/tmp/input-messages.txt' 
+                                                       style="width: 400px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" id="inputFilePath">
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Path to input file (only used when Use File Input is checked)</div>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Schema-based Producer Fields (kept for future schema module) -->
                                         <tr class="schema-fields" style="display: none;">
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #155724;">Schema Subject *</label>
@@ -378,53 +491,39 @@ properties([
                                                 <div style="font-size: 12px; color: #155724; margin-top: 3px;">Schema registry subject name</div>
                                             </td>
                                         </tr>
+
                                         <tr class="schema-fields" style="display: none;">
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #155724;">Schema Version</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
+                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" id="schemaVersion">
                                                     <option value='latest' selected>Latest</option>
                                                     <option value='1'>Version 1</option>
                                                     <option value='2'>Version 2</option>
                                                     <option value='3'>Version 3</option>
+                                                    <option value='4'>Version 4</option>
+                                                    <option value='5'>Version 5</option>
                                                 </select>
                                                 <div style="font-size: 12px; color: #155724; margin-top: 3px;">Schema version to use for serialization</div>
                                             </td>
                                         </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #155724;">Message Count</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
-                                                    <option value='1' selected>1 message</option>
-                                                    <option value='10'>10 messages</option>
-                                                    <option value='100'>100 messages</option>
-                                                    <option value='1000'>1000 messages</option>
-                                                </select>
-                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Number of test messages to produce</div>
-                                            </td>
-                                        </tr>
-                                        <tr class="standard-fields">
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #155724;">Message Format</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
-                                                    <option value='json' selected>JSON</option>
-                                                    <option value='avro'>Avro</option>
-                                                    <option value='string'>Plain Text</option>
-                                                    <option value='binary'>Binary</option>
-                                                </select>
-                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Format of the message payload</div>
+
+                                        <tr class="schema-fields" style="display: none;">
+                                            <td colspan="2" style="padding: 15px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 3px;">
+                                                <div style="color: #856404; font-weight: bold;">ℹ️ Schema-based Producer</div>
+                                                <div style="color: #856404; font-size: 12px; margin-top: 5px;">
+                                                    This feature uses a separate schema-based producer module with Avro serialization and Schema Registry integration.
+                                                </div>
                                             </td>
                                         </tr>
                                     </table>
+
                                     <script>
                                         function toggleProducerFields(type) {
                                             var schemaFields = document.querySelectorAll('.schema-fields');
                                             var standardFields = document.querySelectorAll('.standard-fields');
+
                                             if (type === 'schema') {
                                                 schemaFields.forEach(field => field.style.display = 'table-row');
                                                 standardFields.forEach(field => field.style.display = 'none');
@@ -433,6 +532,42 @@ properties([
                                                 standardFields.forEach(field => field.style.display = 'table-row');
                                             }
                                         }
+
+                                        // Handle file input checkbox toggle
+                                        document.addEventListener('DOMContentLoaded', function() {
+                                            var useFileInputCheckbox = document.getElementById('useFileInput');
+                                            var fileInputRow = document.getElementById('fileInputRow');
+
+                                            if (useFileInputCheckbox) {
+                                                useFileInputCheckbox.addEventListener('change', function() {
+                                                    if (this.checked) {
+                                                        fileInputRow.style.display = 'table-row';
+                                                    } else {
+                                                        fileInputRow.style.display = 'none';
+                                                    }
+                                                });
+                                            }
+
+                                            // Update message data placeholder based on format
+                                            var messageFormatSelect = document.getElementById('messageFormat');
+                                            var messageDataTextarea = document.getElementById('messageData');
+
+                                            if (messageFormatSelect && messageDataTextarea) {
+                                                messageFormatSelect.addEventListener('change', function() {
+                                                    if (this.value === 'JSON') {
+                                                        messageDataTextarea.placeholder = '{"message": "Hello World from Kafka Producer!", "user": "test_user"}';
+                                                        if (messageDataTextarea.value === 'Hello World from Kafka Producer!') {
+                                                            messageDataTextarea.value = '{"message": "Hello World from Kafka Producer!", "user": "test_user"}';
+                                                        }
+                                                    } else {
+                                                        messageDataTextarea.placeholder = 'Hello World from Kafka Producer!';
+                                                        if (messageDataTextarea.value.startsWith('{')) {
+                                                            messageDataTextarea.value = 'Hello World from Kafka Producer!';
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        });
                                     </script>
                                 </div>
                             """
@@ -1053,6 +1188,13 @@ pipeline {
                                     string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
                                     string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
                                     string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}")
+                                    string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
+                                    choice(name: 'MESSAGE_FORMAT', value: "${env.SECURITY_PROTOCOL}"),
+                                    text(name: 'MESSAGE_DATA', value: "${env.SECURITY_PROTOCOL}"),
+                                    string(name: 'MESSAGE_COUNT', value: "${env.SECURITY_PROTOCOL}"),
+                                    booleanParam(name: 'ADD_TIMESTAMP', value: "${env.SECURITY_PROTOCOL}"),
+                                    booleanParam(name: 'ADD_MESSAGE_INDEX', value: "${env.SECURITY_PROTOCOL}"),
+                                    string(name: 'MESSAGE_KEY', value: "${env.SECURITY_PROTOCOL}")
                                 ],
                                 propagate: false,
                                 wait: true
