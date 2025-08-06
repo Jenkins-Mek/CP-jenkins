@@ -945,49 +945,47 @@ pipeline {
                                     string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
                                     string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
                                     string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
-                                    string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
+                                    string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}")
                                 ],
                                 propagate: false,
                                 wait: true
                             break
 
                         case 'CONSUMER':
-                            echo "==== Calling Consumer job ===="
-                            build job: 'org-cp-tools/CP-jenkins/consumer',
-                                parameters: [
-                                    string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
-                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
-                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}")
-                                ],
-                                propagate: false,
-                                wait: true
-                            break
-
-                        case 'PRODUCER_SCHEMA':
-                            echo "==== Calling Producer Schema job ===="
-                            build job: 'org-cp-tools/CP-jenkins/producer-schema',
-                                parameters: [
-                                    string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
-                                    string(name: 'SCHEMA_ID', value: "${env.SCHEMA_ID}"),
-                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
-                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}")
-                                ],
-                                propagate: false,
-                                wait: true
-                            break
-
-                        case 'CONSUMER_SCHEMA':
-                            echo "==== Calling Consumer Schema job ===="
-                            build job: 'org-cp-tools/CP-jenkins/consumer-schema',
-                                parameters: [
-                                    string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
-                                    string(name: 'SCHEMA_ID', value: "${env.SCHEMA_ID}"),
-                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
-                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}")
-                                ],
-                                propagate: false,
-                                wait: true
-                            break
+                            if ("${env.MESSAGE_FORMAT}" == "JSON" ){
+                                echo "==== Calling Consumer job ===="
+                                build job: 'org-cp-tools/CP-jenkins/consumer',
+                                    parameters: [
+                                        string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
+                                        string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                        string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
+                                        string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
+                                        string(name: 'OFFSET_RESET', value: "${env.OFFSET_RESET}"),
+                                        string(name: 'CONSUMER_GROUP_ID', value: "${env.CONSUMER_GROUP_ID}"),
+                                        string(name: 'MAX_MESSAGES', value: "${env.MAX_MESSAGES}")
+                                    ],
+                                    propagate: false,
+                                    wait: true
+                                break
+                            }
+                            else {
+                                echo "==== Calling Consumer job ===="
+                                build job: 'org-cp-tools/CP-jenkins/consumer-schema',
+                                    parameters: [
+                                        string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
+                                        string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                        string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
+                                        string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
+                                        string(name: 'OFFSET_RESET', value: "${env.OFFSET_RESET}"),
+                                        string(name: 'CONSUMER_GROUP_ID', value: "${env.CONSUMER_GROUP_ID}"),
+                                        string(name: 'MAX_MESSAGES', value: "${env.MAX_MESSAGES}"),
+                                        string(name: 'MESSAGE_FORMAT', value: "${env.MESSAGE_FORMAT}"),
+                                        string(name: 'SCHEMA_REGISTRY_URL', value: "${env.SCHEMA_REGISTRY_URL}")
+                                    ],
+                                    propagate: false,
+                                    wait: true
+                                break
+                            }
 
                         case 'REGISTER_SCHEMA':
                             echo "==== Calling Register Schema job ===="
