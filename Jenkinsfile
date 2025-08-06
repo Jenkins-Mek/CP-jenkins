@@ -5,7 +5,8 @@ properties([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'broker:29093', description: 'Kafka bootstrap server'),
         choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], description: 'Kafka security protocol'),
-        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name (schema subject will be auto-derived as topic-value)'),
+        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name'),
+        string(name: 'SCHEMA_SUBJECT', defaultValue: '', description: 'Schema subject name (defaults to TOPIC_NAME-value if empty)'),
         string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://schema-registry:8081', description: 'Schema Registry URL'),
         text(name: 'MESSAGE_DATA', defaultValue: '{"message": "Hello World", "timestamp": "2024-01-01T00:00:00Z"}', description: 'Message data (must conform to existing schema)'),
         string(name: 'MESSAGE_COUNT', defaultValue: '1', description: 'Number of messages to produce'),
@@ -20,7 +21,7 @@ pipeline {
         PRODUCER_OUTPUT_FILE = 'schema-producer-results.txt'
         SCHEMA_ID = ''
         SCHEMA_TYPE = ''
-        SCHEMA_SUBJECT = ''
+        FINAL_SCHEMA_SUBJECT = ''
     }
 
     stages {
@@ -40,12 +41,18 @@ pipeline {
                         error("MESSAGE_COUNT must be between 1 and 10000")
                     }
 
-                    // Auto-derive schema subject from topic name
-                    env.SCHEMA_SUBJECT = "${params.TOPIC_NAME}-value"
+                    // Set schema subject - use parameter if provided, otherwise default to topic-value
+                    if (params.SCHEMA_SUBJECT?.trim()) {
+                        env.FINAL_SCHEMA_SUBJECT = params.SCHEMA_SUBJECT.trim()
+                        echo "Using provided schema subject: ${env.FINAL_SCHEMA_SUBJECT}"
+                    } else {
+                        env.FINAL_SCHEMA_SUBJECT = "${params.TOPIC_NAME}-value"
+                        echo "Using default schema subject: ${env.FINAL_SCHEMA_SUBJECT}"
+                    }
 
                     echo "Parameters validated successfully"
                     echo "Topic: ${params.TOPIC_NAME}"
-                    echo "Auto-derived Schema Subject: ${env.SCHEMA_SUBJECT}"
+                    echo "Schema Subject: ${env.FINAL_SCHEMA_SUBJECT}"
                     echo "Schema Registry: ${params.SCHEMA_REGISTRY_URL}"
                     echo "Message Count: ${messageCount}"
                 }
@@ -64,7 +71,7 @@ pipeline {
         stage('Retrieve Schema Information') {
             steps {
                 script {
-                    echo "Retrieving schema information for subject: ${env.SCHEMA_SUBJECT}"
+                    echo "Retrieving schema information for subject: ${env.FINAL_SCHEMA_SUBJECT}"
                     retrieveSchemaInfo()
                 }
             }
@@ -142,8 +149,8 @@ def retrieveSchemaInfo() {
             script: """
                 docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
                 exec -T schema-registry bash -c '
-                    echo "Retrieving schema information for subject: ${env.SCHEMA_SUBJECT}"
-                    RESPONSE=\$(curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${env.SCHEMA_SUBJECT}/versions/latest)
+                    echo "Retrieving schema information for subject: ${env.FINAL_SCHEMA_SUBJECT}"
+                    RESPONSE=\$(curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${env.FINAL_SCHEMA_SUBJECT}/versions/latest)
 
                     if echo "\$RESPONSE" | grep -q "schema"; then
                         SCHEMA_ID=\$(echo "\$RESPONSE" | grep -o \'"id":[0-9]*\' | cut -d: -f2)
@@ -158,7 +165,7 @@ def retrieveSchemaInfo() {
                         echo "SCHEMA_TYPE=\$SCHEMA_TYPE"
                         echo "Schema found successfully"
                     else
-                        echo "ERROR: Schema not found for subject: ${env.SCHEMA_SUBJECT}"
+                        echo "ERROR: Schema not found for subject: ${env.FINAL_SCHEMA_SUBJECT}"
                         echo "Response: \$RESPONSE"
                         exit 1
                     fi
@@ -178,7 +185,7 @@ def retrieveSchemaInfo() {
         }
 
         if (!env.SCHEMA_ID) {
-            error("Failed to retrieve schema ID for subject: ${env.SCHEMA_SUBJECT}")
+            error("Failed to retrieve schema ID for subject: ${env.FINAL_SCHEMA_SUBJECT}")
         }
 
         echo "Retrieved Schema ID: ${env.SCHEMA_ID}"
@@ -244,7 +251,7 @@ EOF
         return """Schema-based message production completed.
 Topic: ${topicName}
 Schema Type: ${env.SCHEMA_TYPE}
-Schema Subject: ${env.SCHEMA_SUBJECT}
+Schema Subject: ${env.FINAL_SCHEMA_SUBJECT}
 Schema ID: ${env.SCHEMA_ID}
 Message Count: ${messageCount}
 Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
@@ -280,7 +287,7 @@ def saveProducerResults(result) {
 # Generated: ${timestamp}
 # Topic: ${params.TOPIC_NAME}
 # Schema Type: ${env.SCHEMA_TYPE}
-# Schema Subject: ${env.SCHEMA_SUBJECT}
+# Schema Subject: ${env.FINAL_SCHEMA_SUBJECT}
 # Schema ID: ${env.SCHEMA_ID}
 # Message Count: ${params.MESSAGE_COUNT}
 # Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
@@ -298,7 +305,7 @@ SCHEMA INFORMATION
 ================================================================================
 
 Schema Type: ${env.SCHEMA_TYPE}
-Schema Subject: ${env.SCHEMA_SUBJECT}
+Schema Subject: ${env.FINAL_SCHEMA_SUBJECT}
 Schema ID: ${env.SCHEMA_ID}
 Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
 
@@ -307,6 +314,7 @@ CONFIGURATION SUMMARY
 ================================================================================
 
 Topic Name: ${params.TOPIC_NAME}
+Schema Subject: ${env.FINAL_SCHEMA_SUBJECT}
 Message Count: ${params.MESSAGE_COUNT}
 Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
 Security Protocol: ${params.SECURITY_PROTOCOL}
