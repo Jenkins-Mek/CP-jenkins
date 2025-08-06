@@ -295,9 +295,10 @@ properties([
                                     </table>
                                 </div>
                             """
-                        } else if (OPERATION == 'PRODUCER') {
+                        }else if (OPERATION == 'PRODUCER') {
+
                             // Get available topics and schema subjects
-                            def topicOptions = '<select name="value" style="width: 280px; padding: 8px 12px; border: 2px solid #c3e6cb; border-radius: 6px; font-size: 14px; background: white;">'
+                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">'
                             topicOptions += '<option value="">-- Select Topic --</option>'
                             getTopics().each { topic ->
                                 def selected = (topic == env.TOPIC_NAME) ? 'selected' : ''
@@ -305,7 +306,7 @@ properties([
                             }
                             topicOptions += '</select>'
 
-                            def subjectOptions = '<select name="value" style="width: 280px; padding: 8px 12px; border: 2px solid #c3e6cb; border-radius: 6px; font-size: 14px; background: white;">'
+                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">'
                             subjectOptions += '<option value="">-- Select Schema Subject --</option>'
                             getSchemaSubjects().each { subject ->
                                 subjectOptions += "<option value='${subject}'>${subject}</option>"
@@ -313,64 +314,73 @@ properties([
                             subjectOptions += '</select>'
 
                             return """
-                                <div style="background: linear-gradient(135deg, #e8f5e8 0%, #f0f8f0 100%); border: 2px solid #28a745; border-radius: 8px; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-
-                                    <div style="color: #155724; margin: 0 0 20px 0; font-size: 18px; font-weight: 600;">
-                                        🚀 Kafka Producer Configuration
-                                    </div>
-
-                                    <div id="producer-container">
-                                        <table style="width: 100%; border-collapse: collapse;">
-                                            <tr>
-                                                <td style="padding: 10px 15px 10px 0; vertical-align: top; width: 180px; font-weight: 600; color: #155724; font-size: 14px;">
-                                                    Producer Type <span style="color: #dc3545;">*</span>
-                                                </td>
-                                                <td style="padding: 10px; vertical-align: top;">
-                                                    <select name="value" id="producerType" onchange="toggleProducerType(this.value)" style="width: 280px; padding: 8px 12px; border: 2px solid #c3e6cb; border-radius: 6px; font-size: 14px; background: white;">
-                                                        <option value="standard">📝 Standard Producer</option>
-                                                        <option value="schema">📋 Schema-based Producer</option>
-                                                    </select>
-                                                    <div style="font-size: 12px; color: #6c757d; margin-top: 5px; font-style: italic;">Choose how messages will be produced</div>
-                                                </td>
-                                            </tr>
-
-                                            <tr>
-                                                <td style="padding: 10px 15px 10px 0; vertical-align: top; width: 180px; font-weight: 600; color: #155724; font-size: 14px;">
-                                                    Topic Name <span style="color: #dc3545;">*</span>
-                                                </td>
-                                                <td style="padding: 10px; vertical-align: top;">
-                                                    ${topicOptions}
-                                                    <div style="font-size: 12px; color: #6c757d; margin-top: 5px; font-style: italic;">Kafka topic to send messages to</div>
-                                                </td>
-                                            </tr>
-
-                                            <tr id="schemaSubjectRow" style="display: none;">
-                                                <td style="padding: 10px 15px 10px 0; vertical-align: top; width: 180px; font-weight: 600; color: #155724; font-size: 14px;">
-                                                    Schema Subject <span style="color: #dc3545;">*</span>
-                                                </td>
-                                                <td style="padding: 10px; vertical-align: top;">
-                                                    ${subjectOptions}
-                                                    <div style="font-size: 12px; color: #6c757d; margin-top: 5px; font-style: italic;">Schema Registry subject for message validation</div>
-                                                </td>
-                                            </tr>
-
-                                            <tr>
-                                                <td style="padding: 10px 15px 10px 0; vertical-align: top; width: 180px; font-weight: 600; color: #155724; font-size: 14px;">
-                                                    Message Count
-                                                </td>
-                                                <td style="padding: 10px; vertical-align: top;">
-                                                    <select name="value" style="width: 280px; padding: 8px 12px; border: 2px solid #c3e6cb; border-radius: 6px; font-size: 14px; background: white;">
-                                                        <option value="1" ${env.MESSAGE_COUNT == '1' ? 'selected' : ''}>1 message</option>
-                                                        <option value="10" ${env.MESSAGE_COUNT == '10' ? 'selected' : ''}>10 messages</option>
-                                                        <option value="100" ${env.MESSAGE_COUNT == '100' ? 'selected' : ''}>100 messages</option>
-                                                        <option value="1000" ${env.MESSAGE_COUNT == '1000' ? 'selected' : ''}>1000 messages</option>
-                                                        <option value="custom">Custom amount</option>
-                                                    </select>
-                                                    <div style="font-size: 12px; color: #6c757d; margin-top: 5px; font-style: italic;">Number of test messages to produce</div>
-                                                </td>
-                                            </tr>
-                                        </table>
-                                    </div>
+                                <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
+                                    <h4 style="margin: 0 0 15px 0; color: #155724;">📤 Kafka Producer</h4>
+                                    <table style="width: 100%;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: bold; color: #155724;">Producer Type *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name="value" style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" onchange="toggleProducerFields(this.value)">
+                                                    <option value="standard" selected>Standard Producer</option>
+                                                    <option value="schema">Schema-based Producer</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Choose producer type</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Topic Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                ${topicOptions}
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Select topic to produce to</div>
+                                            </td>
+                                        </tr>
+                                        <tr class="schema-fields" style="display: none;">
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Schema Subject *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                ${subjectOptions}
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Schema registry subject</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Message Count</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name="value" style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
+                                                    <option value="1" selected>1 message</option>
+                                                    <option value="10">10 messages</option>
+                                                    <option value="100">100 messages</option>
+                                                    <option value="1000">1000 messages</option>
+                                                </select>
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Number of messages to produce</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: bold; color: #155724;">Message Key</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name="value" type="text" value="" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
+                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Optional key for partitioning</div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    <script>
+                                        function toggleProducerFields(type) {
+                                            var schemaFields = document.querySelectorAll('.schema-fields');
+                                            if (type === 'schema') {
+                                                schemaFields.forEach(field => field.style.display = 'table-row');
+                                            } else {
+                                                schemaFields.forEach(field => field.style.display = 'none');
+                                            }
+                                        }
+                                    </script>
                                 </div>
                             """
                         } else if (OPERATION == 'CONSUMER') {
