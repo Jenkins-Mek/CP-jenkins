@@ -317,52 +317,6 @@ properties([
                                         <span style="margin-right: 10px; font-size: 24px;">📤</span>
                                         Kafka Producer Configuration
                                     </h4>
-                                    <table style="width: 100%; border-collapse: collapse;">
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top; width: 180px;">
-                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Use Schema *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <select name="value" style="width: 300px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;" onchange="toggleSchemaField(this.value)">
-                                                    <option value="false" selected>No Schema</option>
-                                                    <option value="true">Use Schema</option>
-                                                </select>
-                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Produce with or without schema validation</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Topic Name *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                ${topicOptions}
-                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Select topic to produce to</div>
-                                            </td>
-                                        </tr>
-                                        <tr id="schemaRow" style="display: none;">
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Schema Subject *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                ${subjectOptions}
-                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Schema registry subject</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Message Count</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <select name="value" style="width: 300px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;">
-                                                    <option value="1" selected>1 message</option>
-                                                    <option value="10">10 messages</option>
-                                                    <option value="100">100 messages</option>
-                                                    <option value="1000">1000 messages</option>
-                                                </select>
-                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Number of messages to produce</div>
-                                            </td>
-                                        </tr>
-                                    </table>
                                 </div>
                             """
                         } else if (OPERATION == 'CONSUMER') {
