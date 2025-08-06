@@ -92,6 +92,34 @@ properties([
                             return topics
                         }
 
+                        def getSchemaSubjects() {
+                            def subjects = []
+                                try {
+                                    def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
+                                    def choicesFile = new File(filePath)
+                                    if (choicesFile.exists()) {
+                                        choicesFile.readLines()
+                                            .collect { it.trim() }
+                                            .findAll { it && !it.startsWith('#') }
+                                            .each { line ->
+                                                // Parse format: subject-name[version1,version2,...]
+                                                if (line.contains('[') && line.endsWith(']')) {
+                                                    def subjectName = line.substring(0, line.indexOf('['))
+                                                    subjects << subjectName
+                                                } else {
+                                                    subjects << line
+                                                }
+                                            }
+                                        subjects = subjects.sort()
+                                    } else {
+                                        subjects = ["ERROR: File not found: ${filePath}"]
+                                    }
+                                } catch (Exception e) {
+                                    subjects = ["ERROR: ${e.message}"]
+                                }
+                                return subjects
+                        }
+
                         // Main logic
                         if (OPERATION == 'LIST_TOPICS'){
                             return readHtmlFromFile('LIST_TOPICS')
@@ -141,24 +169,10 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'ALTER_TOPIC') {
-                            // Load topics from file
-                            def topics = []
-                            try {
-                                def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
-                                def choicesFile = new File(filePath)
-                                if (choicesFile.exists()) {
-                                    topics = choicesFile.readLines()
-                                        .collect { it.trim() }
-                                        .findAll { it && !it.startsWith('#') }
-                                        .sort()
-                                }
-                            } catch (Exception e) {
-                                topics = ["ERROR: ${e.message}"]
-                            }
 
                             def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">'
                             topicOptions += '<option value="">-- Select Topic --</option>'
-                            topics.each { topic ->
+                            getTopics().each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
@@ -229,24 +243,10 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'DESCRIBE_TOPIC') {
-                            // Load topics from file
-                            def topics = []
-                            try {
-                                def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
-                                def choicesFile = new File(filePath)
-                                if (choicesFile.exists()) {
-                                    topics = choicesFile.readLines()
-                                        .collect { it.trim() }
-                                        .findAll { it && !it.startsWith('#') }
-                                        .sort()
-                                }
-                            } catch (Exception e) {
-                                topics = ["ERROR: ${e.message}"]
-                            }
 
                             def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #ffeaa7; border-radius: 3px;">'
                             topicOptions += '<option value="">-- Select Topic --</option>'
-                            topics.each { topic ->
+                            getTopics().each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
@@ -296,54 +296,17 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'PRODUCER') {
-                            // Load topics from file
-                            def topics = []
-                            try {
-                                def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
-                                def choicesFile = new File(filePath)
-                                if (choicesFile.exists()) {
-                                    topics = choicesFile.readLines()
-                                        .collect { it.trim() }
-                                        .findAll { it && !it.startsWith('#') }
-                                        .sort()
-                                }
-                            } catch (Exception e) {
-                                topics = ["ERROR: ${e.message}"]
-                            }
 
                             def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid  #c3e6cb; border-radius: 3px;">'
                             topicOptions += '<option value="">-- Select Topic --</option>'
-                            topics.each { topic ->
+                            getTopics().each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
 
-                            // Load schema subjects from file
-                            def subjects = []
-                            try {
-                                def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
-                                def choicesFile = new File(filePath)
-                                if (choicesFile.exists()) {
-                                    choicesFile.readLines()
-                                        .collect { it.trim() }
-                                        .findAll { it && !it.startsWith('#') }
-                                        .each { line ->
-                                            // Parse format: subject-name[version1,version2,...]
-                                            if (line.contains('[') && line.endsWith(']')) {
-                                                def subjectName = line.substring(0, line.indexOf('['))
-                                                subjects << subjectName
-                                            } else {
-                                                subjects << line
-                                            }
-                                        }
-                                    subjects = subjects.sort()
-                                }
-                            } catch (Exception e) {
-                               subjects = ["ERROR: ${e.message}"]
-                            }
                             def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">'
                             subjectOptions += '<option value="">-- Select Schema Subject --</option>'
-                            subjects.each { subject ->
+                            getSchemaSubjects().each { subject ->
                                subjectOptions += "<option value='${subject}'>${subject}</option>"
                             }
                             subjectOptions += '</select>'
@@ -450,54 +413,17 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'CONSUMER') {
-                            // Load topics from file
-                            def topics = []
-                            try {
-                                def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
-                                def choicesFile = new File(filePath)
-                                if (choicesFile.exists()) {
-                                    topics = choicesFile.readLines()
-                                        .collect { it.trim() }
-                                        .findAll { it && !it.startsWith('#') }
-                                        .sort()
-                                }
-                            } catch (Exception e) {
-                                topics = ["ERROR: ${e.message}"]
-                            }
 
                             def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid  #b3d7ff; border-radius: 3px;">'
                             topicOptions += '<option value="">-- Select Topic --</option>'
-                            topics.each { topic ->
+                            getTopics().each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
 
-                            // Load schema subjects from file
-                            def subjects = []
-                            try {
-                                def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
-                                def choicesFile = new File(filePath)
-                                if (choicesFile.exists()) {
-                                    choicesFile.readLines()
-                                        .collect { it.trim() }
-                                        .findAll { it && !it.startsWith('#') }
-                                        .each { line ->
-                                            // Parse format: subject-name[version1,version2,...]
-                                            if (line.contains('[') && line.endsWith(']')) {
-                                                def subjectName = line.substring(0, line.indexOf('['))
-                                                subjects << subjectName
-                                            } else {
-                                                subjects << line
-                                            }
-                                        }
-                                    subjects = subjects.sort()
-                                }
-                            } catch (Exception e) {
-                               subjects = ["ERROR: ${e.message}"]
-                            }
                             def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #b3d7ff; border-radius: 3px;">'
                             subjectOptions += '<option value="">-- Select Schema Subject --</option>'
-                            subjects.each { subject ->
+                            getSchemaSubjects().each { subject ->
                                subjectOptions += "<option value='${subject}'>${subject}</option>"
                             }
                             subjectOptions += '</select>'
@@ -654,32 +580,10 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'DELETE_SCHEMA') {
-                                // Load schema subjects from file
-                                def subjects = []
-                                try {
-                                    def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
-                                    def choicesFile = new File(filePath)
-                                    if (choicesFile.exists()) {
-                                        choicesFile.readLines()
-                                            .collect { it.trim() }
-                                            .findAll { it && !it.startsWith('#') }
-                                            .each { line ->
-                                                // Parse format: subject-name[version1,version2,...]
-                                                if (line.contains('[') && line.endsWith(']')) {
-                                                    def subjectName = line.substring(0, line.indexOf('['))
-                                                    subjects << subjectName
-                                                } else {
-                                                    subjects << line
-                                                }
-                                            }
-                                        subjects = subjects.sort()
-                                    }
-                                } catch (Exception e) {
-                                   subjects = ["ERROR: ${e.message}"]
-                                }
+ 
                                 def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #e9dfdfff; border-radius: 3px; background-color: #fff2f2;">'
                                 subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
-                                subjects.each { subject ->
+                                getSchemaSubjects().each { subject ->
                                    subjectOptions += "<option value='${subject}'>${subject}</option>"
                                 }
                                 subjectOptions += '</select>'
@@ -704,32 +608,10 @@ properties([
                                    </div>
                                 """
                         } else if (OPERATION == 'DESCRIBE_SCHEMA') {
-                                  // Load schema subjects from file
-                                def subjects = []
-                                try {
-                                    def filePath = '/var/lib/jenkins/workspace/schema-subjects-list.txt'
-                                    def choicesFile = new File(filePath)
-                                    if (choicesFile.exists()) {
-                                        choicesFile.readLines()
-                                            .collect { it.trim() }
-                                            .findAll { it && !it.startsWith('#') }
-                                            .each { line ->
-                                                // Parse format: subject-name[version1,version2,...]
-                                                if (line.contains('[') && line.endsWith(']')) {
-                                                    def subjectName = line.substring(0, line.indexOf('['))
-                                                    subjects << subjectName
-                                                } else {
-                                                    subjects << line
-                                                }
-                                            }
-                                        subjects = subjects.sort()
-                                    }
-                                } catch (Exception e) {
-                                   subjects = ["ERROR: ${e.message}"]
-                                }
+
                                 def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #413b3bff; border-radius: 3px; background-color: #e2edecff;">'
                                 subjectOptions += '<option value="">-- Select Schema Subject to Describe --</option>'
-                                subjects.each { subject ->
+                                getSchemaSubjects().each { subject ->
                                    subjectOptions += "<option value='${subject}'>${subject}</option>"
                                 }
                                 subjectOptions += '</select>'
