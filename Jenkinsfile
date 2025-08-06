@@ -312,21 +312,55 @@ properties([
                             subjectOptions += '</select>'
 
                             return """
-                                <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
-                                    <h4 style="margin: 0 0 15px 0; color: #155724;">📤 Kafka Producer</h4>
-                                    <table style="width: 100%;">
+                                <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #2196f3; margin: 10px 0; box-shadow: 0 4px 12px rgba(33,150,243,0.15);">
+                                    <h4 style="margin: 0 0 18px 0; color: #0d47a1; display: flex; align-items: center; font-size: 18px;">
+                                        <span style="margin-right: 10px; font-size: 24px;">📤</span>
+                                        Kafka Producer Configuration
+                                    </h4>
+                                    <table style="width: 100%; border-collapse: collapse;">
                                         <tr>
-                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                <label style="font-weight: bold; color: #155724;">Use Schema *</label>
+                                            <td style="padding: 8px; vertical-align: top; width: 180px;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Use Schema *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <select name="value" style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" onchange="toggleSchemaField(this.value)">
+                                                <select name="value" style="width: 300px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;" onchange="toggleSchemaField(this.value)">
                                                     <option value="false" selected>No Schema</option>
                                                     <option value="true">Use Schema</option>
                                                 </select>
-                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Produce with or without schema validation</div>
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Produce with or without schema validation</div>
                                             </td>
                                         </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Topic Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                ${topicOptions}
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Select topic to produce to</div>
+                                            </td>
+                                        </tr>
+                                        <tr id="schemaRow" style="display: none;">
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Schema Subject *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                ${subjectOptions}
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Schema registry subject</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Message Count</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name="value" style="width: 300px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;">
+                                                    <option value="1" selected>1 message</option>
+                                                    <option value="10">10 messages</option>
+                                                    <option value="100">100 messages</option>
+                                                    <option value="1000">1000 messages</option>
+                                                </select>
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Number of messages to produce</div>
+                                            </td>
                                         </tr>
                                     </table>
                                 </div>
