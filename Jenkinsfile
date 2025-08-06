@@ -73,6 +73,20 @@ properties([
                             return htmlContent.trim() ?: " "
                         }
 
+                        def topics = []
+                            try {
+                                def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
+                                def choicesFile = new File(filePath)
+                                if (choicesFile.exists()) {
+                                    topics = choicesFile.readLines()
+                                        .collect { it.trim() }
+                                        .findAll { it && !it.startsWith('#') }
+                                        .sort()
+                                }
+                            } catch (Exception e) {
+                                topics = ["ERROR: ${e.message}"]
+                        }
+
 
                         // Main logic
                         if (OPERATION == 'LIST_TOPICS'){
@@ -577,20 +591,6 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'REGISTER_SCHEMA') {
-                            // Load topics from file
-                            def topics = []
-                            try {
-                                def filePath = '/var/lib/jenkins/workspace/kafka-topics-list.txt'
-                                def choicesFile = new File(filePath)
-                                if (choicesFile.exists()) {
-                                    topics = choicesFile.readLines()
-                                        .collect { it.trim() }
-                                        .findAll { it && !it.startsWith('#') }
-                                        .sort()
-                                }
-                            } catch (Exception e) {
-                                topics = ["ERROR: ${e.message}"]
-                            }
 
                             def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #dda0dd; border-radius: 3px;">'
                             topicOptions += '<option value="">-- Select Topic --</option>'
