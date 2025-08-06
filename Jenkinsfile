@@ -41,7 +41,7 @@ pipeline {
                         error("MESSAGE_COUNT must be between 1 and 10000")
                     }
 
-                    if (params.SCHEMA_SUBJECT?.trim()) {
+                    if (params.SCHEMA_SUBJECT && params.SCHEMA_SUBJECT.trim() != '') {
                         env.FINAL_SCHEMA_SUBJECT = params.SCHEMA_SUBJECT.trim()
                         echo "Using provided schema subject: ${env.FINAL_SCHEMA_SUBJECT}"
                     } else {
