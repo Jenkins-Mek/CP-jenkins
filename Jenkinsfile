@@ -963,7 +963,8 @@ pipeline {
                                         string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
                                         string(name: 'OFFSET_RESET', value: "${env.OFFSET_RESET}"),
                                         string(name: 'CONSUMER_GROUP_ID', value: "${env.CONSUMER_GROUP_ID}"),
-                                        string(name: 'MAX_MESSAGES', value: "${env.MAX_MESSAGES}")
+                                        string(name: 'MAX_MESSAGES', value: "${env.MAX_MESSAGES}"),
+                                        string(name: 'TIMEOUT_SECONDS', value: "${env.TIMEOUT_SECONDS}")
                                     ],
                                     propagate: false,
                                     wait: true
@@ -984,6 +985,7 @@ pipeline {
                                         string(name: 'CONSUMER_GROUP_ID', value: "${env.CONSUMER_GROUP_ID}"),
                                         string(name: 'MAX_MESSAGES', value: "${env.MAX_MESSAGES}"),
                                         string(name: 'MESSAGE_FORMAT', value: "${env.MESSAGE_FORMAT}"),
+                                        string(name: 'TIMEOUT_SECONDS', value: "${env.TIMEOUT_SECONDS}"),
                                         string(name: 'SCHEMA_REGISTRY_URL', value: "${env.SCHEMA_REGISTRY_URL}")
                                     ],
                                     propagate: false,
