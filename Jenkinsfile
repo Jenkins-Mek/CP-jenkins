@@ -128,14 +128,14 @@ properties([
                             } catch (Exception e) {
                                 topics = ["ERROR: ${e.message}"]
                             }
-                            
+
                             def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">'
                             topicOptions += '<option value="">-- Select Topic --</option>'
                             topics.each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
-                            
+
                             return """
                                 <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border: 1px solid #ffeeba;">
                                     <h4 style="margin: 0 0 15px 0; color: #856404;">⚙️ Alter Topic Configuration</h4>
@@ -966,6 +966,15 @@ pipeline {
                                 ],
                                 propagate: false,
                                 wait: true
+                            echo "==== Update topic listed ===="
+                             build job: 'org-cp-tools/CP-jenkins/list-topics',
+                                parameters: [
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
+                                    string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
+                                ],
+                                propagate: false,
+                                wait: true
                             break
 
                         case 'DESCRIBE_TOPIC':
@@ -1100,6 +1109,13 @@ pipeline {
                                 ],
                                 propagate: false,
                                 wait: true
+                            build job: 'org-cp-tools/CP-jenkins/list-schema',
+                                parameters: [
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                    string(name: 'SCHEMA_REGISTRY_URL', value: "${env.SCHEMA_REGISTRY_URL}"),
+                                ],
+                                propagate: false,
+                                wait: true
                             break
 
                         case 'DELETE_SCHEMA':
@@ -1109,6 +1125,13 @@ pipeline {
                                     string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
                                     string(name: 'SCHEMA_REGISTRY_URL', value: "${env.SCHEMA_REGISTRY_URL}"),
                                     string(name: 'SUBJECT_NAME', value: "${env.SUBJECT_NAME}"),
+                                ],
+                                propagate: false,
+                                wait: true
+                            build job: 'org-cp-tools/CP-jenkins/list-schema',
+                                parameters: [
+                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                    string(name: 'SCHEMA_REGISTRY_URL', value: "${env.SCHEMA_REGISTRY_URL}"),
                                 ],
                                 propagate: false,
                                 wait: true
