@@ -5,17 +5,11 @@ properties([
         string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
         string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'broker:29093', description: 'Kafka bootstrap server'),
         choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], description: 'Kafka security protocol'),
-        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name to produce messages to'),
-        choice(name: 'SCHEMA_TYPE', choices: ['JSON_SCHEMA', 'AVRO_SCHEMA', 'PROTOBUF_SCHEMA'], description: 'Schema type for message serialization'),
+        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name (schema subject will be auto-derived as topic-value)'),
         string(name: 'SCHEMA_REGISTRY_URL', defaultValue: 'http://schema-registry:8081', description: 'Schema Registry URL'),
-        string(name: 'SCHEMA_SUBJECT', defaultValue: '', description: 'Schema subject name (optional - defaults to topic-value)'),
-        text(name: 'SCHEMA_DEFINITION', defaultValue: '', description: 'Schema definition (JSON Schema/Avro/Protobuf format)'),
-        booleanParam(name: 'AUTO_REGISTER_SCHEMA', defaultValue: true, description: 'Automatically register schema if not exists'),
-        text(name: 'MESSAGE_DATA', defaultValue: '{"message": "Hello World", "timestamp": "2024-01-01T00:00:00Z"}', description: 'Message data (must conform to schema)'),
+        text(name: 'MESSAGE_DATA', defaultValue: '{"message": "Hello World", "timestamp": "2024-01-01T00:00:00Z"}', description: 'Message data (must conform to existing schema)'),
         string(name: 'MESSAGE_COUNT', defaultValue: '1', description: 'Number of messages to produce'),
-        booleanParam(name: 'USE_FILE_INPUT', defaultValue: false, description: 'Use file input instead of parameter data'),
-        string(name: 'INPUT_FILE_PATH', defaultValue: '/tmp/input-messages.json', description: 'Path to input file (only used when USE_FILE_INPUT is true)'),
-        booleanParam(name: 'VALIDATE_SCHEMA_COMPATIBILITY', defaultValue: true, description: 'Validate schema compatibility before producing')
+        booleanParam(name: 'VALIDATE_MESSAGE_FORMAT', defaultValue: true, description: 'Validate message JSON format before producing')
     ])
 ])
 
@@ -24,6 +18,9 @@ pipeline {
 
     environment {
         PRODUCER_OUTPUT_FILE = 'schema-producer-results.txt'
+        SCHEMA_ID = ''
+        SCHEMA_TYPE = ''
+        SCHEMA_SUBJECT = ''
     }
 
     stages {
@@ -33,26 +30,24 @@ pipeline {
                     if (!params.TOPIC_NAME?.trim()) {
                         error("TOPIC_NAME parameter is required to produce messages.")
                     }
-                    
-                    if (!params.SCHEMA_DEFINITION?.trim()) {
-                        error("SCHEMA_DEFINITION parameter is required for schema-based production.")
-                    }
-                    
+
                     if (params.MESSAGE_COUNT && !params.MESSAGE_COUNT.isNumber()) {
                         error("MESSAGE_COUNT must be a valid number")
                     }
-                    
+
                     def messageCount = params.MESSAGE_COUNT.toInteger()
                     if (messageCount <= 0 || messageCount > 10000) {
                         error("MESSAGE_COUNT must be between 1 and 10000")
                     }
-                    
+
+                    // Auto-derive schema subject from topic name
+                    env.SCHEMA_SUBJECT = "${params.TOPIC_NAME}-value"
+
                     echo "Parameters validated successfully"
                     echo "Topic: ${params.TOPIC_NAME}"
-                    echo "Schema Type: ${params.SCHEMA_TYPE}"
+                    echo "Auto-derived Schema Subject: ${env.SCHEMA_SUBJECT}"
                     echo "Schema Registry: ${params.SCHEMA_REGISTRY_URL}"
                     echo "Message Count: ${messageCount}"
-                    echo "Auto Register Schema: ${params.AUTO_REGISTER_SCHEMA}"
                 }
             }
         }
@@ -66,26 +61,11 @@ pipeline {
             }
         }
 
-        stage('Prepare Schema') {
+        stage('Retrieve Schema Information') {
             steps {
                 script {
-                    echo "Preparing schema definition..."
-                    prepareSchemaDefinition()
-                }
-            }
-        }
-
-        stage('Register/Validate Schema') {
-            steps {
-                script {
-                    def schemaSubject = getSchemaSubject()
-                    echo "Processing schema for subject: ${schemaSubject}"
-                    
-                    if (params.AUTO_REGISTER_SCHEMA) {
-                        registerSchema(schemaSubject)
-                    } else {
-                        validateExistingSchema(schemaSubject)
-                    }
+                    echo "Retrieving schema information for subject: ${env.SCHEMA_SUBJECT}"
+                    retrieveSchemaInfo()
                 }
             }
         }
@@ -93,12 +73,14 @@ pipeline {
         stage('Prepare Message Data') {
             steps {
                 script {
-                    echo "Message data will be provided via heredoc"
+                    echo "Preparing message data..."
+                    echo "Schema ID: ${env.SCHEMA_ID}"
+                    echo "Schema Type: ${env.SCHEMA_TYPE}"
                     echo "Message Count: ${params.MESSAGE_COUNT}"
                     echo "Sample Message: ${params.MESSAGE_DATA}"
                     
-                    if (params.VALIDATE_SCHEMA_COMPATIBILITY) {
-                        validateMessageAgainstSchema()
+                    if (params.VALIDATE_MESSAGE_FORMAT) {
+                        validateMessageFormat()
                     }
                 }
             }
@@ -120,11 +102,6 @@ pipeline {
     }
 
     post {
-        always {
-            script {
-                cleanupFiles()
-            }
-        }
         success {
             script {
                 archiveArtifacts artifacts: "${env.PRODUCER_OUTPUT_FILE}", fingerprint: true, allowEmptyArchive: true
@@ -137,77 +114,6 @@ pipeline {
                 echo "Schema-based message production failed. Check the logs above for details."
             }
         }
-    }
-}
-
-def produceSchemaMessages(topicName, username, password) {
-    try {
-        def producerCommand = getSchemaProducerCommand(params.SCHEMA_TYPE)
-        def saslConfig = "org.apache.kafka.common.security.plain.PlainLoginModule required username=\\\"${username}\\\" password=\\\"${password}\\\";"
-        
-        // Generate message data based on count
-        def messageCount = params.MESSAGE_COUNT.toInteger()
-        def messageData = params.MESSAGE_DATA.trim()
-        def messages = []
-        for (int i = 0; i < messageCount; i++) {
-            messages.add(messageData)
-        }
-        def messageContent = messages.join('\n')
-        
-        // Escape the schema definition for shell
-        def escapedSchema = params.SCHEMA_DEFINITION.replaceAll('"', '\\\\"')
-        
-        def produceOutput = sh(
-            script: """
-                docker compose --project-directory '${params.COMPOSE_DIR}' -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
-                exec -T schema-registry ${producerCommand} \\
-                --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
-                --topic "${topicName}" \\
-                --property schema.registry.url=${params.SCHEMA_REGISTRY_URL} \\
-                --producer-property security.protocol=${params.SECURITY_PROTOCOL} \\
-                --producer-property sasl.mechanism=PLAIN \\
-                --producer-property "sasl.jaas.config=${saslConfig}" \\
-                --property "value.schema=${escapedSchema}" <<'EOF'
-${messageContent}
-EOF
-            """,
-            returnStdout: true
-        ).trim()
-
-        return """Schema-based message production completed.
-Topic: ${topicName}
-Schema Type: ${params.SCHEMA_TYPE}
-Schema Subject: ${getSchemaSubject()}
-Message Count: ${messageCount}
-Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
-Security Protocol: ${params.SECURITY_PROTOCOL}
-
-Producer Output:
-${produceOutput}"""
-
-    } catch (Exception e) {
-        return "ERROR: Failed to produce schema-based messages to topic '${topicName}' - ${e.getMessage()}"
-    }
-}
-
-def getSchemaProducerCommand(schemaType) {
-    switch (schemaType.toLowerCase()) {
-        case 'json_schema':
-            return 'kafka-json-schema-console-producer'
-        case 'avro_schema':
-            return 'kafka-avro-console-producer'
-        case 'protobuf_schema':
-            return 'kafka-protobuf-console-producer'
-        default:
-            error("Unsupported schema type: ${schemaType}")
-    }
-}
-
-def getSchemaSubject() {
-    if (params.SCHEMA_SUBJECT?.trim()) {
-        return params.SCHEMA_SUBJECT.trim()
-    } else {
-        return "${params.TOPIC_NAME}-value"
     }
 }
 
@@ -230,137 +136,67 @@ def validateSchemaRegistry() {
     }
 }
 
-def prepareSchemaDefinition() {
-    sh """
-        docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-        exec -T schema-registry bash -c '
-            cat > ${env.SCHEMA_FILE} << "SCHEMA_EOF"
-${params.SCHEMA_DEFINITION}
-SCHEMA_EOF
-            echo "Schema definition prepared"
-            echo "Schema content preview:"
-            head -10 ${env.SCHEMA_FILE}
-        '
-    """
-}
-
-def registerSchema(schemaSubject) {
+def retrieveSchemaInfo() {
     try {
-        def schemaType = params.SCHEMA_TYPE.replace('_SCHEMA', '').toUpperCase()
-        def rawSchema = params.SCHEMA_DEFINITION.trim()
-        def requestBodyMap = [:]
-        requestBodyMap.schema = rawSchema
-
-        if (schemaType != 'AVRO') {
-            requestBodyMap.schemaType = schemaType
-        }
-
-        def requestBody = JsonOutput.toJson(requestBodyMap)
-
-        echo "Registering schema for subject: ${schemaSubject}"
-        echo "Schema type: ${schemaType}"
-
-        def response = sh(
+        def schemaInfo = sh(
             script: """
                 docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
                 exec -T schema-registry bash -c '
-                    curl -s -w "\\n%{http_code}" -X POST \\
-                    -H "Content-Type: application/vnd.schemaregistry.v1+json" \\
-                    --data '${requestBody}' \\
-                    ${params.SCHEMA_REGISTRY_URL}/subjects/${schemaSubject}/versions
+                    echo "Retrieving schema information for subject: ${env.SCHEMA_SUBJECT}"
+                    RESPONSE=\$(curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${env.SCHEMA_SUBJECT}/versions/latest)
+
+                    if echo "\$RESPONSE" | grep -q "schema"; then
+                        SCHEMA_ID=\$(echo "\$RESPONSE" | grep -o \'"id":[0-9]*\' | cut -d: -f2)
+                        SCHEMA_TYPE=\$(echo "\$RESPONSE" | grep -o \'"schemaType":"[^"]*"\' | cut -d: -f2 | tr -d \'"\'')
+                        
+                        # Default to AVRO if no schemaType specified (Avro default)
+                        if [ -z "\$SCHEMA_TYPE" ]; then
+                            SCHEMA_TYPE="AVRO"
+                        fi
+                        
+                        echo "SCHEMA_ID=\$SCHEMA_ID"
+                        echo "SCHEMA_TYPE=\$SCHEMA_TYPE"
+                        echo "Schema found successfully"
+                    else
+                        echo "ERROR: Schema not found for subject: ${env.SCHEMA_SUBJECT}"
+                        echo "Response: \$RESPONSE"
+                        exit 1
+                    fi
                 '
             """,
             returnStdout: true
         ).trim()
 
-        def lines = response.split('\n')
-        def httpCode = lines[-1]
-        def responseBody = lines.size() > 1 ? lines[0..-2].join('\n') : ''
-
-        echo "Registration response: ${responseBody}"
-
-        if (httpCode.startsWith('2')) {
-            echo "Schema registered successfully (HTTP ${httpCode})"
-            if (responseBody.contains('"id"')) {
-                def schemaId = responseBody.replaceAll('.*"id":(\\d+).*', '$1')
-                echo "Schema ID: ${schemaId}"
+        // Parse the output to extract schema ID and type
+        def lines = schemaInfo.split('\n')
+        lines.each { line ->
+            if (line.startsWith('SCHEMA_ID=')) {
+                env.SCHEMA_ID = line.split('=')[1]
+            } else if (line.startsWith('SCHEMA_TYPE=')) {
+                env.SCHEMA_TYPE = line.split('=')[1]
             }
-        } else {
-            error("Schema registration failed (HTTP ${httpCode}): ${responseBody}")
         }
-        
+
+        if (!env.SCHEMA_ID) {
+            error("Failed to retrieve schema ID for subject: ${env.SCHEMA_SUBJECT}")
+        }
+
+        echo "Retrieved Schema ID: ${env.SCHEMA_ID}"
+        echo "Retrieved Schema Type: ${env.SCHEMA_TYPE}"
+
     } catch (Exception e) {
-        error("Schema registration failed: ${e.getMessage()}")
+        error("Failed to retrieve schema information: ${e.getMessage()}")
     }
 }
 
-def validateExistingSchema(schemaSubject) {
-    try {
-        sh """
-            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T schema-registry bash -c '
-                echo "Validating existing schema for subject: ${schemaSubject}"
-                RESPONSE=\$(curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${schemaSubject}/versions/latest)
-                
-                if echo "\$RESPONSE" | grep -q "schema"; then
-                    SCHEMA_ID=\$(echo "\$RESPONSE" | grep -o \'"id":[0-9]*\' | cut -d: -f2)
-                    echo "Schema found with ID: \$SCHEMA_ID"
-                else
-                    echo "Schema not found for subject: ${schemaSubject}"
-                    echo "Response: \$RESPONSE"
-                    exit 1
-                fi
-            '
-        """
-    } catch (Exception e) {
-        error("Schema validation failed: ${e.getMessage()}")
-    }
-}
-
-def prepareMessageDataFromFile() {
-    sh """
-        docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-        exec -T schema-registry bash -c '
-            if [ -f "${params.INPUT_FILE_PATH}" ]; then
-                cp "${params.INPUT_FILE_PATH}" "${env.MESSAGE_DATA_FILE}"
-                echo "Message data copied from ${params.INPUT_FILE_PATH}"
-            else
-                echo "Input file ${params.INPUT_FILE_PATH} not found"
-                exit 1
-            fi
-        '
-    """
-}
-
-def prepareMessageDataFromParameter() {
-    def messageCount = params.MESSAGE_COUNT.toInteger()
-    def messageData = params.MESSAGE_DATA.trim()
-
-    sh """
-        docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-        exec -T schema-registry bash -c '
-            echo "Preparing ${messageCount} schema-based messages..."
-            rm -f "${env.MESSAGE_DATA_FILE}"
-            for i in \$(seq 1 ${messageCount}); do
-                echo "'"${messageData}"'" >> "${env.MESSAGE_DATA_FILE}"
-            done
-            echo "Message data file prepared with ${messageCount} messages"
-            echo "File exists check:"
-            ls -la "${env.MESSAGE_DATA_FILE}"
-            echo "Sample content:"
-            head -3 "${env.MESSAGE_DATA_FILE}"
-        '
-    """
-}
-
-def validateMessageAgainstSchema() {
-    echo "Validating message data against schema..."
+def validateMessageFormat() {
+    echo "Validating message data format..."
     sh """
         docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
         exec -T schema-registry bash -c '
             echo "Performing basic JSON format validation..."
             if command -v jq >/dev/null 2>&1; then
-                echo "'"${params.MESSAGE_DATA}"'" | jq . >/dev/null
+                echo '"${params.MESSAGE_DATA}"' | jq . >/dev/null
                 if [ \$? -eq 0 ]; then
                     echo "Message data appears to be valid JSON format"
                 else
@@ -374,13 +210,78 @@ def validateMessageAgainstSchema() {
     """
 }
 
+def produceSchemaMessages(topicName, username, password) {
+    try {
+        def producerCommand = getSchemaProducerCommand(env.SCHEMA_TYPE)
+        def saslConfig = "org.apache.kafka.common.security.plain.PlainLoginModule required username=\\\"${username}\\\" password=\\\"${password}\\\";"
+        
+        // Generate message data based on count
+        def messageCount = params.MESSAGE_COUNT.toInteger()
+        def messageData = params.MESSAGE_DATA.trim()
+        def messages = []
+        for (int i = 0; i < messageCount; i++) {
+            messages.add(messageData)
+        }
+        def messageContent = messages.join('\n')
+        
+        def produceOutput = sh(
+            script: """
+                docker compose --project-directory '${params.COMPOSE_DIR}' -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
+                exec -T schema-registry ${producerCommand} \\
+                --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                --topic "${topicName}" \\
+                --property schema.registry.url=${params.SCHEMA_REGISTRY_URL} \\
+                --producer-property security.protocol=${params.SECURITY_PROTOCOL} \\
+                --producer-property sasl.mechanism=PLAIN \\
+                --producer-property "sasl.jaas.config=${saslConfig}" \\
+                --property "value.schema.id=${env.SCHEMA_ID}" <<'EOF'
+${messageContent}
+EOF
+            """,
+            returnStdout: true
+        ).trim()
+
+        return """Schema-based message production completed.
+Topic: ${topicName}
+Schema Type: ${env.SCHEMA_TYPE}
+Schema Subject: ${env.SCHEMA_SUBJECT}
+Schema ID: ${env.SCHEMA_ID}
+Message Count: ${messageCount}
+Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
+Security Protocol: ${params.SECURITY_PROTOCOL}
+
+Producer Output:
+${produceOutput}"""
+
+    } catch (Exception e) {
+        return "ERROR: Failed to produce schema-based messages to topic '${topicName}' - ${e.getMessage()}"
+    }
+}
+
+def getSchemaProducerCommand(schemaType) {
+    switch (schemaType.toUpperCase()) {
+        case 'JSON':
+        case 'JSON_SCHEMA':
+            return 'kafka-json-schema-console-producer'
+        case 'AVRO':
+        case 'AVRO_SCHEMA':
+            return 'kafka-avro-console-producer'
+        case 'PROTOBUF':
+        case 'PROTOBUF_SCHEMA':
+            return 'kafka-protobuf-console-producer'
+        default:
+            return 'kafka-avro-console-producer' // Default to Avro if unknown
+    }
+}
+
 def saveProducerResults(result) {
     def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
     def content = """# Kafka Schema-Based Producer Results
 # Generated: ${timestamp}
 # Topic: ${params.TOPIC_NAME}
-# Schema Type: ${params.SCHEMA_TYPE}
-# Schema Subject: ${getSchemaSubject()}
+# Schema Type: ${env.SCHEMA_TYPE}
+# Schema Subject: ${env.SCHEMA_SUBJECT}
+# Schema ID: ${env.SCHEMA_ID}
 # Message Count: ${params.MESSAGE_COUNT}
 # Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
 # Security Protocol: ${params.SECURITY_PROTOCOL}
@@ -393,17 +294,13 @@ PRODUCER EXECUTION RESULTS
 ${result}
 
 ================================================================================
-SCHEMA CONFIGURATION
+SCHEMA INFORMATION
 ================================================================================
 
-Schema Type: ${params.SCHEMA_TYPE}
-Schema Subject: ${getSchemaSubject()}
+Schema Type: ${env.SCHEMA_TYPE}
+Schema Subject: ${env.SCHEMA_SUBJECT}
+Schema ID: ${env.SCHEMA_ID}
 Schema Registry URL: ${params.SCHEMA_REGISTRY_URL}
-Auto Register Schema: ${params.AUTO_REGISTER_SCHEMA}
-Validate Schema Compatibility: ${params.VALIDATE_SCHEMA_COMPATIBILITY}
-
-Schema Definition:
-${params.SCHEMA_DEFINITION}
 
 ================================================================================
 CONFIGURATION SUMMARY
@@ -413,16 +310,12 @@ Topic Name: ${params.TOPIC_NAME}
 Message Count: ${params.MESSAGE_COUNT}
 Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
 Security Protocol: ${params.SECURITY_PROTOCOL}
-Use File Input: ${params.USE_FILE_INPUT}
-Input File Path: ${params.INPUT_FILE_PATH}
+
+Sample Message Data:
+${params.MESSAGE_DATA}
 
 ================================================================================
 """
 
     writeFile file: env.PRODUCER_OUTPUT_FILE, text: content
-}
-
-def cleanupFiles() {
-    // No temporary files to clean up when using heredoc
-    echo "No cleanup needed - using heredoc approach"
 }
