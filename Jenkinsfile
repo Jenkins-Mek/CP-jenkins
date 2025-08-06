@@ -149,10 +149,10 @@ def retrieveSchemaInfo() {
     try {
         def schemaInfo = sh(
             script: """
-                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+                docker compose --project-directory '${params.COMPOSE_DIR}' -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
                 exec -T schema-registry bash -c '
                     echo "Retrieving schema information for subject: ${env.FINAL_SCHEMA_SUBJECT}"
-                    RESPONSE=\$(curl -s ${params.SCHEMA_REGISTRY_URL}/subjects/${env.FINAL_SCHEMA_SUBJECT}/versions/latest)
+                    RESPONSE=\$(curl -s "${params.SCHEMA_REGISTRY_URL}/subjects/${env.FINAL_SCHEMA_SUBJECT}/versions/latest")
 
                     if echo "\$RESPONSE" | grep -q "schema"; then
                         SCHEMA_ID=\$(echo "\$RESPONSE" | grep -o \'"id":[0-9]*\' | cut -d: -f2)
@@ -201,7 +201,7 @@ def retrieveSchemaInfo() {
 def validateMessageFormat() {
     echo "Validating message data format..."
     sh """
-        docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+        docker compose --project-directory '${params.COMPOSE_DIR}' -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
         exec -T schema-registry bash -c '
             echo "Performing basic JSON format validation..."
             if command -v jq >/dev/null 2>&1; then
