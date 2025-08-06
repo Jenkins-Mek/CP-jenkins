@@ -297,26 +297,90 @@ properties([
                             """
                         }else if (OPERATION == 'PRODUCER') {
 
-                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">'
+                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid  #b3d7ff; border-radius: 3px;">'
                             topicOptions += '<option value="">-- Select Topic --</option>'
                             getTopics().each { topic ->
-                                topicOptions += "<option value='${topic}' ${selected}>${topic}</option>"
+                                topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
-
-                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">'
-                            subjectOptions += '<option value="">-- Select Schema Subject --</option>'
-                            getSchemaSubjects().each { subject ->
-                                subjectOptions += "<option value='${subject}'>${subject}</option>"
-                            }
-                            subjectOptions += '</select>'
 
                             return """
                                 <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #2196f3; margin: 10px 0; box-shadow: 0 4px 12px rgba(33,150,243,0.15);">
                                     <h4 style="margin: 0 0 18px 0; color: #0d47a1; display: flex; align-items: center; font-size: 18px;">
-                                        <span style="margin-right: 10px; font-size: 24px;">📤</span>
-                                        Kafka Producer Configuration
+                                        <span style="margin-right: 10px; font-size: 24px;">📥</span>
+                                        Kafka Consumer Configuration
                                     </h4>
+
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 180px;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Topic Name *</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                ${topicOptions}
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Select the Kafka topic to consume from</div>
+                                            </td>
+                                        </tr>
+
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Consumer Group</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name="value" type="text" placeholder="Enter consumer group ID (optional)" style="width: 300px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;">
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Consumer group ID for offset management</div>
+                                            </td>
+                                        </tr>
+
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Offset Reset</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name="value" style="width: 200px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;">
+                                                    <option value="latest" selected>Latest</option>
+                                                    <option value="earliest">Earliest</option>
+                                                </select>
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Starting position for consumption</div>
+                                            </td>
+                                        </tr>
+
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Max Messages</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name="value" type="number" value="10" min="1" max="1000" style="width: 150px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;">
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Maximum number of messages to consume</div>
+                                            </td>
+                                        </tr>
+
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Timeout (seconds)</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <input name="value" type="number" value="30" min="5" max="300" style="width: 150px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;">
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Consumer timeout duration</div>
+                                            </td>
+                                        </tr>
+
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top;">
+                                                <label style="font-weight: 600; color: #1565c0; font-size: 14px;">Message Format</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <select name="value" style="width: 200px; padding: 8px; border: 1px solid #b3d7ff; border-radius: 5px; background: white;" onchange="toggleSchemaField(this.value)">
+                                                    <option value="JSON" selected>JSON</option>
+                                                    <option value="AVRO">AVRO</option>
+                                                    <option value="JSON_SCHEMA">JSON Schema</option>
+                                                    <option value="PROTOBUF">Protobuf</option>
+                                                </select>
+                                                <div style="font-size: 11px; color: #1976d2; margin-top: 3px;">Format of messages in the topic</div>
+                                            </td>
+                                        </tr>
+
+                                    </table>
                                 </div>
                             """
                         } else if (OPERATION == 'CONSUMER') {
