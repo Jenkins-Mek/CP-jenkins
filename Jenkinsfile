@@ -979,7 +979,6 @@ pipeline {
                                     parameters: [
                                         string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
                                         string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
-                                        string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
                                         string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
                                         string(name: 'OFFSET_RESET', value: "${env.OFFSET_RESET}"),
                                         string(name: 'CONSUMER_GROUP_ID', value: "${env.CONSUMER_GROUP_ID}"),
