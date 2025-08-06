@@ -28,6 +28,15 @@ pipeline {
         stage('Validate Input') {
             steps {
                 script {
+                    echo "DEBUG: params.TOPIC_NAME = '${params.TOPIC_NAME}'"
+                    echo "DEBUG: params.SCHEMA_SUBJECT = '${params.SCHEMA_SUBJECT}'"
+                    
+                    // Set schema subject with robust null/empty checking
+                    def schemaSubject = params.SCHEMA_SUBJECT ?: ""
+                    def topicName = params.TOPIC_NAME ?: ""
+
+                    echo "DEBUG: After elvis - topicName = '${topicName}'"
+                    echo "DEBUG: After elvis - schemaSubject = '${schemaSubject}'"
                     if (!params.TOPIC_NAME?.trim()) {
                         error("TOPIC_NAME parameter is required to produce messages.")
                     }
