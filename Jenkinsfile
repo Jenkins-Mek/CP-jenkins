@@ -297,14 +297,14 @@ properties([
                             """
                         }else if (OPERATION == 'PRODUCER') {
 
-                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #dc3545; border-radius: 3px; background-color: #fff2f2;">'
+                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #c3e6cb; border-radius: 3px; background-color: #fff2f2;">'
                             topicOptions += '<option value="">-- Select Topic to Delete --</option>'
                             getTopics().each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
 
-                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #e9dfdfff; border-radius: 3px; background-color: #fff2f2;">'
+                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px; background-color: #fff2f2;">'
                             subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
                             getSchemaSubjects().each { subject ->
                                subjectOptions += "<option value='${subject}'>${subject}</option>"
@@ -362,26 +362,7 @@ properties([
                                                 <div style="font-size: 12px; color: #155724; margin-top: 3px;">Number of messages to produce</div>
                                             </td>
                                         </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #155724;">Message Key</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <input name="value" type="text" value="" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Optional key for partitioning</div>
-                                            </td>
-                                        </tr>
                                     </table>
-                                    <script>
-                                        function toggleProducerFields(type) {
-                                            var schemaFields = document.querySelectorAll('.schema-fields');
-                                            if (type === 'schema') {
-                                                schemaFields.forEach(field => field.style.display = 'table-row');
-                                            } else {
-                                                schemaFields.forEach(field => field.style.display = 'none');
-                                            }
-                                        }
-                                    </script>
                                 </div>
                             """
                         } else if (OPERATION == 'CONSUMER') {
