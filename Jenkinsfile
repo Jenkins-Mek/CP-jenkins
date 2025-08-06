@@ -41,12 +41,11 @@ pipeline {
                         error("MESSAGE_COUNT must be between 1 and 10000")
                     }
 
-                    // Set schema subject - use parameter if provided, otherwise default to topic-value
                     if (params.SCHEMA_SUBJECT?.trim()) {
                         env.FINAL_SCHEMA_SUBJECT = params.SCHEMA_SUBJECT.trim()
                         echo "Using provided schema subject: ${env.FINAL_SCHEMA_SUBJECT}"
                     } else {
-                        env.FINAL_SCHEMA_SUBJECT = "${params.TOPIC_NAME}-value"
+                        env.FINAL_SCHEMA_SUBJECT = "${params.TOPIC_NAME}"+"-value"
                         echo "Using default schema subject: ${env.FINAL_SCHEMA_SUBJECT}"
                     }
 
@@ -155,12 +154,12 @@ def retrieveSchemaInfo() {
                     if echo "\$RESPONSE" | grep -q "schema"; then
                         SCHEMA_ID=\$(echo "\$RESPONSE" | grep -o \'"id":[0-9]*\' | cut -d: -f2)
                         SCHEMA_TYPE=\$(echo "\$RESPONSE" | grep -o \'"schemaType":"[^"]*"\' | cut -d: -f2 | tr -d \'"\'')
-                        
+
                         # Default to AVRO if no schemaType specified (Avro default)
                         if [ -z "\$SCHEMA_TYPE" ]; then
                             SCHEMA_TYPE="AVRO"
                         fi
-                        
+
                         echo "SCHEMA_ID=\$SCHEMA_ID"
                         echo "SCHEMA_TYPE=\$SCHEMA_TYPE"
                         echo "Schema found successfully"
