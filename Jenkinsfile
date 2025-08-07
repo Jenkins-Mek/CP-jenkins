@@ -539,32 +539,31 @@ properties([
                             """
                         } else if (OPERATION == 'DELETE_SCHEMA') {
 
-                                def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #e9dfdfff; border-radius: 3px; background-color: #fff2f2;">'
-                                subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
-                                getSchemaSubjects().each { subject ->
-                                   subjectOptions += "<option value='${subject}'>${subject}</option>"
-                                }
-                                subjectOptions += '</select>'
-
-                                return """
-                                   <div style="background-color: #ffe6e6; padding: 15px; border-radius: 5px; border-left: 4px solid #ff4444;">
-                                       <h4 style="margin: 0 0 15px 0; color: #cc0000;">📋🗑️ Delete Schema - Step 1: Select Subject</h4>
-                                        <div style="background-color: #ffffff; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #ffcccc;">
-                                           <strong style="color: #cc0000;">⚠️ WARNING:</strong> Deleting a schema can break existing producers and consumers. Ensure no active applications are using this schema.
-                                       </div>
-                                       <table style="width: 100%; border-collapse: collapse;">
-                                          <tr>
-                                               <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                   <label style="font-weight: bold; color: #cc0000;">Subject Name *</label>
-                                               </td>
-                                               <td style="padding: 8px;">
-                                                   ${subjectOptions}
-                                                  <div style="font-size: 12px; color: #cc0000; margin-top: 3px;">⚠️ Select the schema subject</div>
-                                               </td>
-                                           </tr>
-                                       </table>
+                            def subjectOptions = '<select name="value" style="width: 300px; padding: 8px; border: 1px solid #d1e7ff; border-radius: 5px; background-color: #f8fbff; font-size: 14px;">'
+                            subjectOptions += '<option value="">-- Choose a schema subject --</option>'
+                            getSchemaSubjects().each { subject ->
+                               subjectOptions += "<option value='${subject}'>${subject}</option>"
+                            }
+                            subjectOptions += '</select>'
+                            return """
+                               <div style="background-color: #f0f7ff; padding: 20px; border-radius: 8px; border-left: 4px solid #4a90e2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                   <h4 style="margin: 0 0 18px 0; color: #2c5aa0; font-size: 18px;">📋 Schema Management - Remove Schema</h4>
+                                    <div style="background-color: #fff3cd; padding: 12px; border-radius: 5px; margin-bottom: 18px; border: 1px solid #ffeaa7; border-left: 3px solid #fdcb6e;">
+                                       <strong style="color: #856404;">💡 Important Note:</strong> Please ensure that no active applications are currently using this schema before proceeding with removal.
                                    </div>
-                                """
+                                   <table style="width: 100%; border-collapse: collapse;">
+                                      <tr>
+                                           <td style="padding: 10px; vertical-align: top; width: 200px;">
+                                               <label style="font-weight: 600; color: #2c5aa0; font-size: 14px;">Schema Subject</label>
+                                           </td>
+                                           <td style="padding: 10px;">
+                                               ${subjectOptions}
+                                              <div style="font-size: 13px; color: #6c757d; margin-top: 5px;">Select the schema subject you'd like to remove</div>
+                                           </td>
+                                       </tr>
+                                   </table>
+                               </div>
+                            """
                         } else if (OPERATION == 'DESCRIBE_SCHEMA') {
 
                                 def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #413b3bff; border-radius: 3px; background-color: #e2edecff;">'
