@@ -932,7 +932,6 @@ pipeline {
                                     parameters: [
                                         string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
                                         string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
-                                        string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
                                         string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
                                         string(name: 'MESSAGE_COUNT', value: "${env.MESSAGE_COUNT}"),
                                         text(name: 'MESSAGE_DATA', value: "${env.MESSAGE_DATA}"),
