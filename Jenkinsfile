@@ -495,41 +495,40 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'E2E_TEST') {
+                            def topicOptions = '<select name="existing_topic" id="existing_topic_select" style="width: 300px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;" disabled>'
+                            topicOptions += '<option value="">-- Select Existing Topic --</option>'
+                            getTopics().each { topic ->
+                                topicOptions += "<option value='${topic}'>${topic}</option>"
+                            }
+                            topicOptions += '</select>'
+
                             return """
-                                def topicOptions = '<select name="existing_topic" style="width: 300px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;" disabled>'
-                                topicOptions += '<option value="">-- Select Existing Topic --</option>'
-                                getTopics().each { topic ->
-                                    topicOptions += "<option value='${topic}'>${topic}</option>"
-                                }
-                                topicOptions += '</select>'
+                                <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #ffc107; margin: 10px 0; box-shadow: 0 4px 12px rgba(255,193,7,0.15);">
+                                    <h4 style="margin: 0 0 18px 0; color: #856404; display: flex; align-items: center; font-size: 18px;">
+                                        <span style="margin-right: 10px; font-size: 24px;">🔄🧪</span>
+                                        End-to-End Test
+                                    </h4>
+                                    <p style="margin: 5px 0 15px 0; color: #856404;">This operation will perform a comprehensive end-to-end test including topic creation, message production, and consumption with configurable parameters.</p>
 
-                                return """
-                                    <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #ffc107; margin: 10px 0; box-shadow: 0 4px 12px rgba(255,193,7,0.15);">
-                                        <h4 style="margin: 0 0 18px 0; color: #856404; display: flex; align-items: center; font-size: 18px;">
-                                            <span style="margin-right: 10px; font-size: 24px;">🔄🧪</span>
-                                            End-to-End Test
-                                        </h4>
-                                        <p style="margin: 5px 0 15px 0; color: #856404;">This operation will perform a comprehensive end-to-end test including topic creation, message production, and consumption with configurable parameters.</p>
-
-                                        <table style="width: 100%; border-collapse: collapse;">
-                                            <tr>
-                                                <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                    <label style="font-weight: bold; color: #856404;">Topic Selection</label>
-                                                </td>
-                                                <td style="padding: 8px;">
-                                                    <div style="margin-bottom: 10px;">
-                                                        <label style="color: #856404; display: block; margin-bottom: 5px;">
-                                                            <input type="radio" name="topic_mode" value="existing" style="margin-right: 5px;">
-                                                            Use Existing Topic
-                                                        </label>
-                                                        ${topicOptions}
-                                                    </div>
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: bold; color: #856404;">Topic Selection</label>
+                                            </td>
+                                            <td style="padding: 8px;">
+                                                <div style="margin-bottom: 10px;">
+                                                    <label style="color: #856404; display: block; margin-bottom: 5px;">
+                                                        <input type="radio" name="topic_mode" value="existing" style="margin-right: 5px;" onchange="toggleTopicInputs()">
+                                                        Use Existing Topic
+                                                    </label>
+                                                    ${topicOptions}
+                                                </div>
                                                 <div>
                                                     <label style="color: #856404; display: block; margin-bottom: 5px;">
-                                                        <input type="radio" name="topic_mode" value="create_new" checked style="margin-right: 5px;">
+                                                        <input type="radio" name="topic_mode" value="create_new" checked style="margin-right: 5px;" onchange="toggleTopicInputs()">
                                                         Create New Topic
                                                     </label>
-                                                    <input type="text" name="new_topic_name" placeholder="Enter topic name..." style="width: 300px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
+                                                    <input type="text" name="new_topic_name" id="new_topic_input" placeholder="Enter topic name..." style="width: 300px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                 </div>
                                             </td>
                                         </tr>
@@ -601,18 +600,6 @@ properties([
                                             </td>
                                         </tr>
                                     </table>
-
-                                    <div style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 3px;">
-                                        <h5 style="margin: 0 0 8px 0; color: #495057;">📊 Test Flow</h5>
-                                        <ol style="margin: 0; color: #495057; font-size: 14px;">
-                                            <li>Create or validate topic with specified configuration</li>
-                                            <li>Start producer threads to send messages</li>
-                                            <li>Start consumer to receive and validate messages</li>
-                                            <li>Measure performance metrics (throughput, latency)</li>
-                                            <li>Verify message integrity and ordering</li>
-                                            <li>Generate comprehensive test report</li>
-                                        </ol>
-                                    </div>
                                 </div>
                             """
                         } else {
