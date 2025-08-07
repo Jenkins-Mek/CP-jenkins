@@ -732,7 +732,8 @@ pipeline {
 Producer Type: ${env.PRODUCER_TYPE}
 Topic: ${env.TOPIC_NAME}
 Message Count: ${env.MESSAGE_COUNT}
-Message Data: ${env.MESSAGE_DATA}
+Message Data:
+${env.MESSAGE_DATA}
                                 """
                             } else {
                                 echo """Producer configuration:
@@ -740,7 +741,8 @@ Producer Type: ${env.PRODUCER_TYPE}
 Topic: ${env.TOPIC_NAME}
 Schema Subject: ${env.SCHEMA_SUBJECT}
 Message Count: ${env.MESSAGE_COUNT}
-Message Data: ${env.MESSAGE_DATA}
+Message Data:
+${env.MESSAGE_DATA}
                                 """
                             }
                             break
