@@ -508,31 +508,33 @@ properties([
                                         <span style="margin-right: 10px; font-size: 24px;">🔄🧪</span>
                                         End-to-End Test
                                     </h4>
-                                    <p style="margin: 5px 0 15px 0; color: #856404;">This operation will perform a comprehensive end-to-end test including topic creation, message production, and consumption with configurable parameters.</p>
+                                    <p style="margin: 5px 0 15px 0; color: #856404;">
+                                        This operation will perform a comprehensive end-to-end test including topic creation, message production, and consumption with configurable parameters.
+                                    </p>
 
                                     <table style="width: 100%; border-collapse: collapse;">
+                                        <!-- Topic Selection -->
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top; width: 200px;">
                                                 <label style="font-weight: bold; color: #856404;">Topic Selection</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <div style="margin-bottom: 10px;">
-                                                    <label style="color: #856404; display: block; margin-bottom: 5px;">
-                                                        <input type="radio" name="topic_mode" value="existing" style="margin-right: 5px;" onchange="toggleTopicInputs()">
-                                                        Use Existing Topic
-                                                    </label>
-                                                    ${topicOptions}
-                                                </div>
-                                                <div>
-                                                    <label style="color: #856404; display: block; margin-bottom: 5px;">
-                                                        <input type="radio" name="topic_mode" value="create_new" checked style="margin-right: 5px;" onchange="toggleTopicInputs()">
-                                                        Create New Topic
-                                                    </label>
-                                                    <input type="text" name="new_topic_name" id="new_topic_input" placeholder="Enter topic name..." style="width: 300px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
-                                                </div>
+                                                <label style="color: #856404; display: block; margin-bottom: 5px;">
+                                                    <input type="radio" name="topic_mode" value="existing" style="margin-right: 5px;" onchange="toggleTopicInputs()">
+                                                    Use Existing Topic
+                                                </label>
+                                                ${topicOptions}
+                                                <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Topic name for registered</div>
+
+                                                <label style="color: #856404; display: block; margin: 15px 0 5px 0;">
+                                                    <input type="radio" name="topic_mode" value="create_new" checked style="margin-right: 5px;" onchange="toggleTopicInputs()">
+                                                    Create New Topic
+                                                </label>
+                                                <input type="text" name="new_topic_name" id="new_topic_input" placeholder="Enter topic name..." style="width: 300px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                             </td>
                                         </tr>
 
+                                        <!-- Topic Configuration -->
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #856404;">Topic Configuration</label>
@@ -553,6 +555,7 @@ properties([
                                             </td>
                                         </tr>
 
+                                        <!-- Test Parameters -->
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #856404;">Test Parameters</label>
@@ -578,25 +581,24 @@ properties([
                                             </td>
                                         </tr>
 
+                                        <!-- Test Options -->
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #856404;">Test Options</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <div style="margin-top: 5px;">
-                                                    <label style="color: #856404; display: block; margin-bottom: 5px;">
-                                                        <input type="checkbox" name="cleanup_after_test" value="true" style="margin-right: 5px;">
-                                                        Clean up topic after test completion
-                                                    </label>
-                                                    <label style="color: #856404; display: block; margin-bottom: 5px;">
-                                                        <input type="checkbox" name="verify_message_order" value="true" checked style="margin-right: 5px;">
-                                                        Verify message ordering within partitions
-                                                    </label>
-                                                    <label style="color: #856404; display: block; margin-bottom: 5px;">
-                                                        <input type="checkbox" name="measure_throughput" value="true" checked style="margin-right: 5px;">
-                                                        Measure throughput and latency metrics
-                                                    </label>
-                                                </div>
+                                                <label style="color: #856404; display: block; margin-bottom: 5px;">
+                                                    <input type="checkbox" name="cleanup_after_test" value="true" style="margin-right: 5px;">
+                                                    Clean up topic after test completion
+                                                </label>
+                                                <label style="color: #856404; display: block; margin-bottom: 5px;">
+                                                    <input type="checkbox" name="verify_message_order" value="true" checked style="margin-right: 5px;">
+                                                    Verify message ordering within partitions
+                                                </label>
+                                                <label style="color: #856404; display: block; margin-bottom: 5px;">
+                                                    <input type="checkbox" name="measure_throughput" value="true" checked style="margin-right: 5px;">
+                                                    Measure throughput and latency metrics
+                                                </label>
                                             </td>
                                         </tr>
                                     </table>
