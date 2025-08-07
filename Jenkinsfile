@@ -269,7 +269,7 @@ properties([
                             """
                         } else if (OPERATION == 'DELETE_TOPIC') {
 
-                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #dc3545; border-radius: 3px; background-color: #fff2f2;">'
+                            def topicOptions = '<select name="value" style="width: 300px; padding: 8px; border: 2px solid #f48fb1; border-radius: 5px; background: #fff5f8; font-size: 14px;">'
                             topicOptions += '<option value="">-- Select Topic to Delete --</option>'
                             getTopics().each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
@@ -277,19 +277,22 @@ properties([
                             topicOptions += '</select>'
 
                             return """
-                                <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
-                                    <h4 style="margin: 0 0 15px 0; color: #721c24;">⚠️ Delete Topic</h4>
-                                    <div style="background-color: #ffffff; padding: 10px; border-radius: 3px; margin-bottom: 15px; border: 1px solid #f5c6cb;">
-                                        <strong style="color: #721c24;">⚠️ WARNING:</strong> This action will permanently delete the topic and all its data. This cannot be undone!
+                                <div style="background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%); padding: 18px; border-radius: 8px; border-left: 5px solid #e91e63; box-shadow: 0 3px 10px rgba(233,30,99,0.15);">
+                                    <h4 style="margin: 0 0 18px 0; color: #ad1457; display: flex; align-items: center; font-size: 18px;">
+                                        <span style="margin-right: 10px; font-size: 24px;">⚠️</span>
+                                        Delete Topic
+                                    </h4>
+                                    <div style="background: linear-gradient(135deg, #ffffff 0%, #ffeef2 100%); padding: 12px; border-radius: 5px; margin-bottom: 15px; border: 2px solid #f8bbd9;">
+                                        <strong style="color: #ad1457;">⚠️ WARNING:</strong> This action will permanently delete the topic and all its data. This cannot be undone!
                                     </div>
                                     <table style="width: 100%;">
                                         <tr>
-                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                <label style="font-weight: bold; color: #721c24;">Select Topic to Delete *</label>
+                                            <td style="padding: 10px; vertical-align: top; width: 200px;">
+                                                <label style="font-weight: 600; color: #ad1457; font-size: 14px;">Select Topic to Delete *</label>
                                             </td>
-                                            <td style="padding: 8px;">
+                                            <td style="padding: 10px;">
                                                 ${topicOptions}
-                                                <div style="font-size: 12px; color: #721c24; margin-top: 3px;">⚠️ Carefully select the topic you want to permanently delete</div>
+                                                <div style="font-size: 12px; color: #c2185b; margin-top: 5px;">⚠️ Carefully select the topic you want to permanently delete</div>
                                             </td>
                                         </tr>
                                     </table>
