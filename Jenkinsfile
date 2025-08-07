@@ -25,6 +25,16 @@ pipeline {
     }
 
     stages {
+        stage('Create Client Configuration') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', usernameVariable: 'KAFKA_USERNAME', passwordVariable: 'KAFKA_PASSWORD')]) {
+                        createKafkaClientConfig(env.KAFKA_USERNAME, env.KAFKA_PASSWORD)
+                    }
+                }
+            }
+        }
+
         stage('Validate Parameters') {
             steps {
                 script {
@@ -57,28 +67,13 @@ pipeline {
             }
             steps {
                 script {
-                    echo "🔨 Creating test topic: ${params.TEST_TOPIC}"
+                    def topicName = params.TEST_TOPIC.trim()
+                    def partitions = params.TOPIC_PARTITIONS.toInteger()
+                    def replicationFactor = params.TOPIC_REPLICATION_FACTOR.toInteger()
                     
-                    try {
-                        sh """
-                            docker compose --project-directory '${params.COMPOSE_DIR}' \\
-                            -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
-                            exec -T broker bash -c '
-                                set -e
-                                unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
-                                kafka-topics --create \\
-                                    --if-not-exists \\
-                                    --topic "${params.TEST_TOPIC}" \\
-                                    --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
-                                    --command-config ${env.CLIENT_CONFIG_FILE} \\
-                                    --partitions ${params.TOPIC_PARTITIONS} \\
-                                    --replication-factor ${params.TOPIC_REPLICATION_FACTOR}
-                            '
-                        """
-                        echo "✅ Test topic created/verified successfully"
-                    } catch (Exception e) {
-                        echo "⚠️ Topic creation failed, continuing with existing topic: ${e.getMessage()}"
-                    }
+                    echo "🔨 Creating test topic: ${topicName} with partitions=${partitions} replicationFactor=${replicationFactor}"
+                    def result = createKafkaTopic(topicName, partitions, replicationFactor)
+                    echo result
                 }
             }
         }
@@ -205,6 +200,7 @@ pipeline {
         always {
             script {
                 echo "🧹 Cleaning up test environment..."
+                cleanupClientConfig()
             }
         }
         success {
@@ -260,6 +256,83 @@ ERROR: Test execution failed. Check Jenkins console output for details.
                 }
             }
         }
+    }
+}
+
+// Helper function to create Kafka topic
+def createKafkaTopic(topicName, partitions = 3, replicationFactor = 1) {
+    try {
+        def createOutput = sh(
+            script: """
+                docker compose --project-directory '${params.COMPOSE_DIR}' \\
+                -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
+                exec -T broker bash -c '
+                    set -e
+                    unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
+                    kafka-topics --create \\
+                        --if-not-exists \\
+                        --topic "${topicName}" \\
+                        --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                        --command-config ${env.CLIENT_CONFIG_FILE} \\
+                        --partitions ${partitions} \\
+                        --replication-factor ${replicationFactor}
+                '
+            """,
+            returnStdout: true
+        ).trim()
+
+        if (createOutput) {
+            return "✅ Topic '${topicName}' created.\n${createOutput}"
+        } else {
+            return "ℹ️ Topic '${topicName}' already exists."
+        }
+
+    } catch (Exception e) {
+        return "❌ ERROR: Failed to create topic '${topicName}' - ${e.getMessage()}"
+    }
+}
+
+// Helper function to create Kafka client configuration
+def createKafkaClientConfig(username, password) {
+    def securityConfig = ""
+    switch(params.SECURITY_PROTOCOL) {
+        case 'SASL_PLAINTEXT':
+        case 'SASL_SSL':
+            securityConfig = """
+security.protocol=${params.SECURITY_PROTOCOL}
+sasl.mechanism=PLAIN
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
+"""
+            break
+        default:
+            securityConfig = """
+security.protocol=SASL_PLAINTEXT
+sasl.mechanism=PLAIN
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
+"""
+            break
+    }
+    sh """
+        docker compose --project-directory '${params.COMPOSE_DIR}' \\
+        -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
+        exec -T broker bash -c 'cat > ${env.CLIENT_CONFIG_FILE} << "EOF"
+bootstrap.servers=${params.KAFKA_BOOTSTRAP_SERVER}
+${securityConfig}
+EOF'
+    """
+}
+
+// Helper function to cleanup client configuration
+def cleanupClientConfig() {
+    try {
+        sh """
+            docker compose --project-directory '${params.COMPOSE_DIR}' \\
+            -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
+            exec -T broker bash -c 'rm -f ${env.CLIENT_CONFIG_FILE}' 2>/dev/null || true
+        """
+    } catch (Exception e) {
+        // Ignore cleanup errors
+        echo "⚠️ Client config cleanup warning: ${e.getMessage()}"
     }
 }
 
