@@ -1,405 +1,318 @@
+//@Library('kafka-ops-shared-lib') _
+
 properties([
     parameters([
-        string(name: 'TOPIC_NAME', defaultValue: '', description: 'Kafka topic name (required)'),
-        choice(name: 'MESSAGE_FORMAT', choices: ['AVRO', 'JSON_SCHEMA', 'PROTOBUF'], description: 'Message format (defaults to AVRO)'),
-        string(name: 'CONSUMER_GROUP_ID', defaultValue: '', description: 'Consumer group ID (optional - auto-generated if empty)'),
-        string(name: 'MAX_MESSAGES', defaultValue: '10', description: 'Max messages to consume (defaults to 10)'),
-        choice(name: 'OFFSET_RESET', choices: ['latest', 'earliest'], description: 'Where to start consuming (defaults to latest)'),
-        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL', 'PLAINTEXT'], description: 'Security protocol (defaults to SASL_PLAINTEXT)'),
-        string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: '', description: 'Kafka bootstrap server (optional - defaults to broker:29093)'),
-        string(name: 'SCHEMA_REGISTRY_URL', defaultValue: '', description: 'Schema Registry URL (optional - defaults to http://schema-registry:8081)'),
-        string(name: 'COMPOSE_DIR', defaultValue: '', description: 'Docker compose directory (optional - defaults to /confluent/cp-mysetup/cp-all-in-one)'),
-        string(name: 'TIMEOUT_SECONDS', defaultValue: '30', description: 'Consumer timeout in seconds (defaults to 30)'),
-        string(name: 'SCHEMA_REGISTRY_CONTAINER', defaultValue: '', description: 'Schema Registry container name (optional - defaults to schema-registry)')
+        string(name: 'COMPOSE_DIR', defaultValue: '/confluent/cp-mysetup/cp-all-in-one', description: 'Docker Compose directory path'),
+        string(name: 'KAFKA_BOOTSTRAP_SERVER', defaultValue: 'broker:9092', description: 'Kafka bootstrap server (internal Docker network)'),
+        choice(name: 'SECURITY_PROTOCOL', choices: ['SASL_PLAINTEXT', 'SASL_SSL'], defaultValue: 'SASL_PLAINTEXT', description: 'Kafka security protocol'),
+        string(name: 'TEST_TOPIC', defaultValue: 'test-latency-topic', description: 'Topic name for latency testing'),
+        string(name: 'NUM_MESSAGES', defaultValue: '100', description: 'Number of messages to send'),
+        string(name: 'PRODUCER_THREADS', defaultValue: '1', description: 'Number of producer threads'),
+        string(name: 'MESSAGE_SIZE', defaultValue: '512', description: 'Message size in bytes'),
+        booleanParam(name: 'CREATE_TOPIC', defaultValue: true, description: 'Create test topic if it does not exist'),
+        string(name: 'TOPIC_PARTITIONS', defaultValue: '3', description: 'Number of partitions for test topic (if creating)'),
+        string(name: 'TOPIC_REPLICATION_FACTOR', defaultValue: '1', description: 'Replication factor for test topic (if creating)')
     ])
 ])
 
 pipeline {
     agent any
-    
+
     environment {
-        CLIENT_CONFIG_FILE = '/tmp/consumer.properties'
-        MESSAGES_FILE = 'consumed-messages.txt'
-        STATS_FILE = 'consumption-stats.json'
+        E2E_RESULTS_FILE = 'kafka-e2e-latency-results.txt'
+        CLIENT_CONFIG_FILE = '/etc/kafka/secrets/client.properties'
+        TEST_TIMESTAMP = "${new Date().format('yyyy-MM-dd_HH-mm-ss')}"
     }
 
     stages {
-        stage('Validate Input') {
+        stage('Validate Parameters') {
             steps {
                 script {
-                    // Set environment variables with smart defaults
-                    env.COMPOSE_DIR = params.COMPOSE_DIR?.trim() ?: '/confluent/cp-mysetup/cp-all-in-one'
-                    env.KAFKA_SERVER = params.KAFKA_BOOTSTRAP_SERVER?.trim() ?: 'broker:29093'
-                    env.SCHEMA_REGISTRY_URL = params.SCHEMA_REGISTRY_URL?.trim() ?: 'http://schema-registry:8081'
-                    env.TIMEOUT_SECONDS = params.TIMEOUT_SECONDS?.trim() ?: '30'
-                    env.SCHEMA_REGISTRY_CONTAINER = params.SCHEMA_REGISTRY_CONTAINER?.trim() ?: 'schema-registry'
-                    env.SECURITY_PROTOCOL = params.SECURITY_PROTOCOL?.trim() ?: 'SASL_PLAINTEXT'
-                    env.OFFSET_RESET = params.OFFSET_RESET?.trim() ?: 'latest'
-                    env.MESSAGE_FORMAT = params.MESSAGE_FORMAT?.trim() ?: 'AVRO'
-                    
-                    // Generate consumer group if not provided
-                    if (!params.CONSUMER_GROUP_ID?.trim()) {
-                        env.CONSUMER_GROUP_ID = "jenkins-consumer-${env.MESSAGE_FORMAT.toLowerCase()}-${System.currentTimeMillis()}"
-                        echo "🔄 Auto-generated Consumer Group: ${env.CONSUMER_GROUP_ID}"
-                    } else {
-                        env.CONSUMER_GROUP_ID = params.CONSUMER_GROUP_ID.trim()
+                    // Validate numeric parameters
+                    try {
+                        Integer.parseInt(params.NUM_MESSAGES)
+                        Integer.parseInt(params.PRODUCER_THREADS)
+                        Integer.parseInt(params.MESSAGE_SIZE)
+                        Integer.parseInt(params.TOPIC_PARTITIONS)
+                        Integer.parseInt(params.TOPIC_REPLICATION_FACTOR)
+                    } catch (NumberFormatException e) {
+                        error("❌ Invalid numeric parameter: ${e.getMessage()}")
                     }
-                    
-                    // Handle max messages - default to 10 if not specified
-                    if (!params.MAX_MESSAGES?.trim()) {
-                        env.MAX_MESSAGES = '10'
-                        echo "📝 Max Messages: ${env.MAX_MESSAGES} (default)"
-                    } else {
-                        env.MAX_MESSAGES = params.MAX_MESSAGES.trim()
-                        echo "📝 Max Messages: ${env.MAX_MESSAGES}"
-                    }
-                    
-                    if (!params.TOPIC_NAME?.trim()) {
-                        error("❌ TOPIC_NAME is required")
-                    }
-                    
-                    echo "✅ Topic: ${params.TOPIC_NAME}"
-                    echo "📋 Message Format: ${env.MESSAGE_FORMAT}"
-                    echo "📊 Consumer Group: ${env.CONSUMER_GROUP_ID}"
-                    echo "⏰ Timeout: ${env.TIMEOUT_SECONDS}s"
-                    echo "🔒 Security Protocol: ${env.SECURITY_PROTOCOL}"
-                    echo "📍 Offset Reset: ${env.OFFSET_RESET}"
-                    echo "🏠 Compose Dir: ${env.COMPOSE_DIR}"
-                    echo "🌐 Kafka Server: ${env.KAFKA_SERVER}"
-                    echo "🔗 Schema Registry: ${env.SCHEMA_REGISTRY_URL}"
+
+                    echo "✅ Parameter validation passed"
+                    echo "📊 Test Configuration:"
+                    echo "  - Topic: ${params.TEST_TOPIC}"
+                    echo "  - Messages: ${params.NUM_MESSAGES}"
+                    echo "  - Producer Threads: ${params.PRODUCER_THREADS}"
+                    echo "  - Message Size: ${params.MESSAGE_SIZE} bytes"
+                    echo "  - Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}"
+                    echo "  - Security Protocol: ${params.SECURITY_PROTOCOL}"
                 }
             }
         }
 
-        stage('Setup Client Config') {
+        stage('Create Test Topic') {
+            when {
+                expression { params.CREATE_TOPIC }
+            }
             steps {
                 script {
-                    if (env.SECURITY_PROTOCOL in ['SASL_PLAINTEXT', 'SASL_SSL']) {
-                        withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', 
-                                                       usernameVariable: 'KAFKA_USER', 
-                                                       passwordVariable: 'KAFKA_PASS')]) {
-                            createKafkaClientConfig(env.KAFKA_USER, env.KAFKA_PASS)
-                        }
-                    } else {
-                        // For PLAINTEXT, create config without credentials
-                        createKafkaClientConfig('', '')
+                    echo "🔨 Creating test topic: ${params.TEST_TOPIC}"
+                    
+                    try {
+                        sh """
+                            docker compose --project-directory ${params.COMPOSE_DIR} \\
+                            -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+                            exec -T broker bash -c "
+                                export KAFKA_OPTS=''
+                                export JMX_PORT=''
+                                export KAFKA_JMX_OPTS=''
+                                unset JMX_PORT
+                                unset KAFKA_JMX_OPTS
+                                unset KAFKA_OPTS
+                                kafka-topics --create \\
+                                    --topic ${params.TEST_TOPIC} \\
+                                    --partitions ${params.TOPIC_PARTITIONS} \\
+                                    --replication-factor ${params.TOPIC_REPLICATION_FACTOR} \\
+                                    --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                                    --command-config ${env.CLIENT_CONFIG_FILE} \\
+                                    --if-not-exists
+                            " 2>/dev/null
+                        """
+                        echo "✅ Test topic created/verified successfully"
+                    } catch (Exception e) {
+                        echo "⚠️ Topic creation failed, continuing with existing topic: ${e.getMessage()}"
                     }
                 }
             }
         }
 
-        stage('Consume Messages') {
+        stage('Verify Topic Exists') {
             steps {
                 script {
-                    def startTime = System.currentTimeMillis()
-                    def messages = consumeMessages()
-                    def endTime = System.currentTimeMillis()
-                    def duration = endTime - startTime
+                    echo "🔍 Verifying test topic exists: ${params.TEST_TOPIC}"
                     
-                    saveMessages(messages, duration)
+                    def topics = listKafkaTopics()
+                    if (!topics.contains(params.TEST_TOPIC)) {
+                        error("❌ Test topic '${params.TEST_TOPIC}' does not exist. Enable 'CREATE_TOPIC' or create the topic manually.")
+                    }
+                    
+                    echo "✅ Test topic verified: ${params.TEST_TOPIC}"
+                    
+                    // Describe the topic
+                    def description = describeKafkaTopic(params.TEST_TOPIC)
+                    echo "📋 Topic configuration:\n${description}"
+                }
+            }
+        }
+
+        stage('Run E2E Latency Test') {
+            steps {
+                script {
+                    echo "🚀 Starting Kafka E2E latency test..."
+                    echo "⏱️ Test started at: ${new Date()}"
+                    
+                    def testResults = sh(
+                        script: """
+                            docker compose --project-directory ${params.COMPOSE_DIR} \\
+                            -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+                            exec -T broker bash -c "
+                                export KAFKA_JMX_OPTS=''
+                                export JMX_PORT=''
+                                export KAFKA_OPTS=''
+                                unset JMX_PORT
+                                unset KAFKA_JMX_OPTS
+                                unset KAFKA_OPTS
+                                echo 'Starting E2E latency test...'
+                                kafka-e2e-latency \\
+                                    ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                                    ${params.TEST_TOPIC} \\
+                                    ${params.NUM_MESSAGES} \\
+                                    ${params.PRODUCER_THREADS} \\
+                                    ${params.MESSAGE_SIZE} \\
+                                    ${env.CLIENT_CONFIG_FILE}
+                            " 2>&1
+                        """,
+                        returnStdout: true
+                    ).trim()
+
+                    echo "📊 E2E Latency Test Results:"
+                    echo testResults
+
+                    // Parse and highlight key metrics
+                    def lines = testResults.split('\n')
+                    def avgLatency = lines.find { it.contains('Avg latency') || it.contains('Average latency') }
+                    def p99Latency = lines.find { it.contains('99th percentile') || it.contains('p99') }
+                    def throughput = lines.find { it.contains('throughput') || it.contains('Throughput') }
+
+                    if (avgLatency) echo "🎯 ${avgLatency}"
+                    if (p99Latency) echo "📈 ${p99Latency}"
+                    if (throughput) echo "🔄 ${throughput}"
+
+                    // Save detailed results
+                    saveTestResults(testResults)
+                }
+            }
+        }
+
+        stage('Analyze Results') {
+            steps {
+                script {
+                    echo "📈 Analyzing test results..."
+                    
+                    def resultsFile = readFile(env.E2E_RESULTS_FILE)
+                    def lines = resultsFile.split('\n')
+                    
+                    // Extract key metrics (this will depend on the actual output format)
+                    def avgLatencyLine = lines.find { it.toLowerCase().contains('avg') && it.toLowerCase().contains('latency') }
+                    def maxLatencyLine = lines.find { it.toLowerCase().contains('max') && it.toLowerCase().contains('latency') }
+                    
+                    if (avgLatencyLine || maxLatencyLine) {
+                        echo "✅ Test completed successfully!"
+                        echo "📋 Key Metrics Summary:"
+                        if (avgLatencyLine) echo "  - ${avgLatencyLine}"
+                        if (maxLatencyLine) echo "  - ${maxLatencyLine}"
+                    } else {
+                        echo "⚠️ Could not parse latency metrics from output"
+                    }
+                    
+                    echo "💾 Full results saved to artifact: ${env.E2E_RESULTS_FILE}"
                 }
             }
         }
     }
 
     post {
-        success {
-            archiveArtifacts artifacts: "${env.MESSAGES_FILE}, ${env.STATS_FILE}", allowEmptyArchive: true
-            echo "✅ ${env.MESSAGE_FORMAT} message consumption completed!"
-        }
-        failure {
-            echo "❌ ${env.MESSAGE_FORMAT} message consumption failed"
-        }
         always {
             script {
-                cleanupClientConfig()
+                echo "🧹 Cleaning up test environment..."
+            }
+        }
+        success {
+            script {
+                archiveArtifacts artifacts: "${env.E2E_RESULTS_FILE}", fingerprint: true, allowEmptyArchive: true
+                echo "📦 Test results archived successfully: ${env.E2E_RESULTS_FILE}"
+                echo "✅ E2E Latency Test completed successfully!"
+                
+                // Optional: Clean up test topic
+                if (params.CREATE_TOPIC && env.CLEANUP_TEST_TOPIC == 'true') {
+                    try {
+                        sh """
+                            docker compose --project-directory ${params.COMPOSE_DIR} \\
+                            -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+                            exec -T broker bash -c "
+                                kafka-topics --delete --topic ${params.TEST_TOPIC} \\
+                                --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                                --command-config ${env.CLIENT_CONFIG_FILE}
+                            "
+                        """
+                        echo "🗑️ Test topic cleaned up: ${params.TEST_TOPIC}"
+                    } catch (Exception e) {
+                        echo "⚠️ Failed to cleanup test topic: ${e.getMessage()}"
+                    }
+                }
+            }
+        }
+        failure {
+            script {
+                echo "❌ E2E Latency Test failed!"
+                echo "📋 Check the console output for detailed error information"
+                
+                // Try to save partial results if any
+                try {
+                    def errorInfo = """# Kafka E2E Latency Test - FAILED
+# Test failed at: ${new Date()}
+# Configuration:
+#   Topic: ${params.TEST_TOPIC}
+#   Messages: ${params.NUM_MESSAGES}
+#   Producer Threads: ${params.PRODUCER_THREADS}
+#   Message Size: ${params.MESSAGE_SIZE}
+#   Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
+
+ERROR: Test execution failed. Check Jenkins console output for details.
+"""
+                    writeFile file: env.E2E_RESULTS_FILE, text: errorInfo
+                    archiveArtifacts artifacts: "${env.E2E_RESULTS_FILE}", fingerprint: true, allowEmptyArchive: true
+                } catch (Exception e) {
+                    echo "Failed to create error artifact: ${e.getMessage()}"
+                }
             }
         }
     }
 }
 
-def consumeMessages() {
-    def maxMsgs = env.MAX_MESSAGES.toInteger()
-    def timeoutSeconds = env.TIMEOUT_SECONDS.toInteger()
-    def composeDir = env.COMPOSE_DIR
-    def kafkaServer = env.KAFKA_SERVER
-    def schemaRegistryUrl = env.SCHEMA_REGISTRY_URL
-    def schemaRegistryContainer = env.SCHEMA_REGISTRY_CONTAINER
-    def offsetFlag = env.OFFSET_RESET == 'earliest' ? '--from-beginning' : ''
-    def topicName = params.TOPIC_NAME
-    
-    if (env.SECURITY_PROTOCOL in ['SASL_PLAINTEXT', 'SASL_SSL']) {
-        withCredentials([usernamePassword(credentialsId: '2cc1527f-e57f-44d6-94e9-7ebc53af65a9', 
-                                         usernameVariable: 'KAFKA_USER', 
-                                         passwordVariable: 'KAFKA_PASS')]) {
-            
-            return executeConsumerWithTimeout(composeDir, schemaRegistryContainer, timeoutSeconds, 
-                                            kafkaServer, schemaRegistryUrl, offsetFlag, maxMsgs, 
-                                            topicName, env.KAFKA_USER, env.KAFKA_PASS)
-        }
-    } else {
-        return executeConsumerWithTimeout(composeDir, schemaRegistryContainer, timeoutSeconds, 
-                                        kafkaServer, schemaRegistryUrl, offsetFlag, maxMsgs, 
-                                        topicName, '', '')
-    }
-}
-
-def executeConsumerWithTimeout(composeDir, schemaRegistryContainer, timeoutSeconds, kafkaServer, 
-                              schemaRegistryUrl, offsetFlag, maxMsgs, topicName, username, password) {
-    
-    // Build security properties
-    def securityProps = buildSecurityProperties(username, password)
-    
-    // Choose the appropriate consumer based on message format
-    def consumerCommand = buildConsumerCommand(kafkaServer, topicName, maxMsgs, offsetFlag, 
-                                             schemaRegistryUrl, securityProps)
-    
-    def result = sh(
+// Helper function to list Kafka topics
+def listKafkaTopics() {
+    def topicsOutput = sh(
         script: """
-            set -e
-            echo "🚀 Starting ${env.MESSAGE_FORMAT} consumer for topic: ${topicName}"
-            echo "📊 Max messages: ${maxMsgs}, Timeout: ${timeoutSeconds}s"
-            
-            # Use timeout command to limit execution time
-            timeout ${timeoutSeconds}s docker exec ${schemaRegistryContainer} ${consumerCommand} \\
-                2>/dev/null | grep -E '^\\{|^\\[|^[^#🚀📊✅⚠️]' || echo "No messages found"
-            
-            echo "✅ Consumer finished"
+            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+            exec -T broker bash -c "
+                export KAFKA_OPTS=''
+                export JMX_PORT=''
+                export KAFKA_JMX_OPTS=''
+                unset JMX_PORT
+                unset KAFKA_JMX_OPTS
+                unset KAFKA_OPTS
+                kafka-topics --list --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} --command-config ${env.CLIENT_CONFIG_FILE}
+            " 2>/dev/null
         """,
         returnStdout: true
-    )
+    ).trim()
 
-    return result.trim()
+    def allTopics = topicsOutput.split('\n').findAll { it.trim() != '' && !it.startsWith('WARNING') && !it.contains('FATAL') }
+    return allTopics.findAll { !it.startsWith('_') } // Filter out internal topics
 }
 
-def buildConsumerCommand(kafkaServer, topicName, maxMsgs, offsetFlag, schemaRegistryUrl, securityProps) {
-    switch(env.MESSAGE_FORMAT) {
-        case 'AVRO':
-            return """kafka-avro-console-consumer \\
-                --bootstrap-server ${kafkaServer} \\
-                --topic ${topicName} \\
-                --max-messages ${maxMsgs} \\
-                ${offsetFlag} \\
-                --property schema.registry.url=${schemaRegistryUrl} \\
-                --group ${env.CONSUMER_GROUP_ID} \\
-                ${securityProps}"""
-                
-        case 'JSON_SCHEMA':
-            return """kafka-json-schema-console-consumer \\
-                --bootstrap-server ${kafkaServer} \\
-                --topic ${topicName} \\
-                --max-messages ${maxMsgs} \\
-                ${offsetFlag} \\
-                --property schema.registry.url=${schemaRegistryUrl} \\
-                --group ${env.CONSUMER_GROUP_ID} \\
-                ${securityProps}"""
-                
-        case 'PROTOBUF':
-            return """kafka-protobuf-console-consumer \\
-                --bootstrap-server ${kafkaServer} \\
-                --topic ${topicName} \\
-                --max-messages ${maxMsgs} \\
-                ${offsetFlag} \\
-                --property schema.registry.url=${schemaRegistryUrl} \\
-                --group ${env.CONSUMER_GROUP_ID} \\
-                ${securityProps}"""
-                
-        default:
-            echo "⚠️ Unknown message format: ${env.MESSAGE_FORMAT}, defaulting to AVRO"
-            return """kafka-avro-console-consumer \\
-                --bootstrap-server ${kafkaServer} \\
-                --topic ${topicName} \\
-                --max-messages ${maxMsgs} \\
-                ${offsetFlag} \\
-                --property schema.registry.url=${schemaRegistryUrl} \\
-                --group ${env.CONSUMER_GROUP_ID} \\
-                ${securityProps}"""
-    }
-}
-
-def buildSecurityProperties(username, password) {
-    switch(env.SECURITY_PROTOCOL) {
-        case 'SASL_PLAINTEXT':
-        case 'SASL_SSL':
-            if (username && password) {
-                return """--consumer-property security.protocol=${env.SECURITY_PROTOCOL} \\
-                            --consumer-property sasl.mechanism=PLAIN \\
-                            --consumer-property sasl.jaas.config='org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";'"""
-            } else {
-                echo "⚠️ SASL protocol selected but no credentials provided, using PLAINTEXT"
-                return "--consumer-property security.protocol=PLAINTEXT"
-            }
-        case 'PLAINTEXT':
-            return "--consumer-property security.protocol=PLAINTEXT"
-        default:
-            return "--consumer-property security.protocol=PLAINTEXT"
-    }
-}
-
-def cleanupClientConfig() {
+// Helper function to describe a Kafka topic
+def describeKafkaTopic(topicName) {
     try {
-        def composeDir = env.COMPOSE_DIR
-        def schemaRegistryContainer = env.SCHEMA_REGISTRY_CONTAINER
-        sh """
-            docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml \\
-            exec -T ${schemaRegistryContainer} bash -c "rm -f ${env.CLIENT_CONFIG_FILE}" 2>/dev/null || true
-        """
+        def describeOutput = sh(
+            script: """
+                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
+                exec -T broker bash -c "
+                    export KAFKA_OPTS=''
+                    export JMX_PORT=''
+                    export KAFKA_JMX_OPTS=''
+                    unset JMX_PORT
+                    unset KAFKA_JMX_OPTS
+                    unset KAFKA_OPTS
+                    kafka-topics --describe --topic ${topicName} --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} --command-config ${env.CLIENT_CONFIG_FILE}
+                " 2>/dev/null
+            """,
+            returnStdout: true
+        ).trim()
+
+        return describeOutput
     } catch (Exception e) {
-        // Ignore cleanup errors
-        echo "⚠️ Cleanup warning: ${e.message}"
+        return "ERROR: Failed to describe topic '${topicName}' - ${e.getMessage()}"
     }
 }
 
-def createKafkaClientConfig(username, password) {
-    def composeDir = env.COMPOSE_DIR
-    def kafkaServer = env.KAFKA_SERVER
-    def schemaRegistryContainer = env.SCHEMA_REGISTRY_CONTAINER
-    
-    def securityConfig = ""
-    switch(env.SECURITY_PROTOCOL) {
-        case 'SASL_PLAINTEXT':
-        case 'SASL_SSL':
-            if (username && password) {
-                securityConfig = """
-security.protocol=${env.SECURITY_PROTOCOL}
-sasl.mechanism=PLAIN
-sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${username}" password="${password}";
-"""
-            } else {
-                securityConfig = """
-security.protocol=PLAINTEXT
-"""
-            }
-            break
-        case 'PLAINTEXT':
-            securityConfig = """
-security.protocol=PLAINTEXT
-"""
-            break
-        default:
-            securityConfig = """
-security.protocol=PLAINTEXT
-"""
-            break
-    }
-    sh """
-        docker compose --project-directory ${composeDir} -f ${composeDir}/docker-compose.yml \\
-        exec -T ${schemaRegistryContainer} bash -c 'cat > ${env.CLIENT_CONFIG_FILE} << "EOF"
-bootstrap.servers=${kafkaServer}
-${securityConfig}
-EOF'
-    """
-}
-
-def saveMessages(messages, duration) {
+// Helper function to save test results
+def saveTestResults(testOutput) {
     def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
-    
-    // Filter out system messages and keep only actual message content
-    def messageLines = messages.split('\n')
-        .findAll { line -> 
-            def trimmed = line.trim()
-            return trimmed && 
-                   !trimmed.contains('Consumer finished') &&
-                   !trimmed.contains('WARN') &&
-                   !trimmed.contains('ERROR') &&
-                   !trimmed.contains('Starting') &&
-                   !trimmed.contains('consumer for topic') &&
-                   !trimmed.contains('Max messages:') &&
-                   !trimmed.contains('INFO') &&
-                   !trimmed.startsWith('#') &&
-                   !trimmed.startsWith('🚀') &&
-                   !trimmed.startsWith('📊') &&
-                   !trimmed.startsWith('✅') &&
-                   !trimmed.startsWith('⚠️') &&
-                   (trimmed.startsWith('{') || 
-                    trimmed.startsWith('[') || 
-                    trimmed.contains('|')) // JSON, arrays, or key-value separator
-        }
-    
-    def messageCount = messageLines.size()
-    
-    def content = """# ${env.MESSAGE_FORMAT} Kafka Consumer Report
+    def testConfig = """# Kafka E2E Latency Test Results
 # Generated: ${timestamp}
-# Topic: ${params.TOPIC_NAME}
-# Message Format: ${env.MESSAGE_FORMAT}
-# Consumer Group: ${env.CONSUMER_GROUP_ID}
-# Messages Retrieved: ${messageCount}
-# Max Messages Requested: ${env.MAX_MESSAGES}
-# Duration: ${duration}ms
-# Offset Reset: ${env.OFFSET_RESET}
-# Schema Registry: ${env.SCHEMA_REGISTRY_URL}
-# Timeout: ${env.TIMEOUT_SECONDS}s
+# Test ID: ${env.TEST_TIMESTAMP}
+# Configuration:
+#   Topic: ${params.TEST_TOPIC}
+#   Messages: ${params.NUM_MESSAGES}
+#   Producer Threads: ${params.PRODUCER_THREADS}
+#   Message Size: ${params.MESSAGE_SIZE} bytes
+#   Bootstrap Server: ${params.KAFKA_BOOTSTRAP_SERVER}
+#   Security Protocol: ${params.SECURITY_PROTOCOL}
+#   Topic Partitions: ${params.TOPIC_PARTITIONS}
+#   Replication Factor: ${params.TOPIC_REPLICATION_FACTOR}
 
+================================================================================
+E2E LATENCY TEST OUTPUT
+================================================================================
+${testOutput}
+
+================================================================================
+END OF RESULTS
+================================================================================
 """
 
-    if (messageCount == 0) {
-        content += """No ${env.MESSAGE_FORMAT} messages found.
-
-Possible reasons:
-- Topic is empty
-- No new messages since last consumption (if using 'latest' offset)
-- Messages already consumed by this consumer group
-- Consumer timeout reached before any messages arrived"""
-        
-        if (env.MESSAGE_FORMAT in ['AVRO', 'JSON_SCHEMA', 'PROTOBUF']) {
-            content += """
-- Schema Registry connection issues
-- Topic contains messages in different format than ${env.MESSAGE_FORMAT}
-- Schema not found or incompatible"""
-        }
-        
-        content += """
-
-Try using 'earliest' offset to read from the beginning of the topic.
-
-"""
-    } else {
-        content += """${'='*60}
-${env.MESSAGE_FORMAT} MESSAGES (${messageCount}/${env.MAX_MESSAGES})
-${'='*60}
-
-"""
-        messageLines.eachWithIndex { message, index ->
-            // Check if message has timestamp and key separator
-            if (message.contains(' | ')) {
-                def parts = message.split(' \\| ', 3)
-                if (parts.length >= 3) {
-                    content += """[${index + 1}] ${parts[0]}
-Key: ${parts[1] == 'null' ? '(no key)' : parts[1]}
-Value: ${parts[2]}
-
-"""
-                } else {
-                    content += "[${index + 1}] ${message}\n\n"
-                }
-            } else {
-                // Message without timestamp/key separator
-                content += "[${index + 1}] ${message}\n\n"
-            }
-        }
-        
-        if (messageCount == env.MAX_MESSAGES.toInteger()) {
-            content += "\n⚠️ Maximum message limit reached. There may be more messages available.\n"
-        }
-    }
-    
-    writeFile file: env.MESSAGES_FILE, text: content
-    echo "💾 Saved ${messageCount} ${env.MESSAGE_FORMAT} messages to ${env.MESSAGES_FILE}"
-    
-    // Create stats file
-    def stats = [
-        topic: params.TOPIC_NAME,
-        messageFormat: env.MESSAGE_FORMAT,
-        consumerGroup: env.CONSUMER_GROUP_ID,
-        messageCount: messageCount,
-        maxMessages: env.MAX_MESSAGES.toInteger(),
-        duration: duration,
-        timestamp: timestamp,
-        schemaRegistry: env.SCHEMA_REGISTRY_URL,
-        offsetReset: env.OFFSET_RESET,
-        timeoutSeconds: env.TIMEOUT_SECONDS.toInteger()
-    ]
-    
-    writeFile file: env.STATS_FILE, text: groovy.json.JsonOutput.toJson(stats)
-    echo "📊 Consumption stats: ${messageCount} ${env.MESSAGE_FORMAT} messages in ${duration}ms"
+    writeFile file: env.E2E_RESULTS_FILE, text: testConfig
 }
