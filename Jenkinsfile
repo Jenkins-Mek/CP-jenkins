@@ -436,12 +436,12 @@ properties([
                             """
                         } else if (OPERATION == 'DESCRIBE_SCHEMA') {
 
-                                def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #413b3bff; border-radius: 3px; background-color: #e2edecff;">'
-                                subjectOptions += '<option value="">-- Select Schema Subject to Describe --</option>'
-                                getSchemaSubjects().each { subject ->
-                                   subjectOptions += "<option value='${subject}'>${subject}</option>"
-                                }
-                                subjectOptions += '</select>'
+                            def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #413b3bff; border-radius: 3px; background-color: #e2edecff;">'
+                            subjectOptions += '<option value="">-- Select Schema Subject to Describe --</option>'
+                            getSchemaSubjects().each { subject ->
+                               subjectOptions += "<option value='${subject}'>${subject}</option>"
+                            }
+                            subjectOptions += '</select>'
 
                             return """
                               <div style="background-color: #f0f8ff; padding: 15px; border-radius: 5px; border-left: 4px solid #4169e1;">
@@ -502,9 +502,13 @@ properties([
                                     topicOptions += "<option value='${topic}'>${topic}</option>"
                                 }
                                 topicOptions += '</select>'
+
                                 return """
-                                    <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
-                                        <h4 style="margin: 0; color: #856404;">🔄🧪 End-to-End Test</h4>
+                                    <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #ffc107; margin: 10px 0; box-shadow: 0 4px 12px rgba(255,193,7,0.15);">
+                                        <h4 style="margin: 0 0 18px 0; color: #856404; display: flex; align-items: center; font-size: 18px;">
+                                            <span style="margin-right: 10px; font-size: 24px;">🔄🧪</span>
+                                            End-to-End Test
+                                        </h4>
                                         <p style="margin: 5px 0 15px 0; color: #856404;">This operation will perform a comprehensive end-to-end test including topic creation, message production, and consumption with configurable parameters.</p>
 
                                         <table style="width: 100%; border-collapse: collapse;">
