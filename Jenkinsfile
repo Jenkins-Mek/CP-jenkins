@@ -726,15 +726,7 @@ pipeline {
                             env.TOPIC_NAME = values[1]
                             env.SCHEMA_SUBJECT = values[2] ?: ''
                             env.MESSAGE_COUNT = values[3] ?: '1'
-                            def rawMessageData = values[4].trim().replaceAll(/,\s*$/, '')
-                            def lines = rawMessageData.split('\n').findAll { it.trim() }
-
-                            if (lines.size() > 1) {
-                                def jsonArray = '[' + lines.join(',') + ']'
-                                env.MESSAGE_DATA = jsonArray
-                            } else {
-                                env.MESSAGE_DATA = rawMessageData
-                            }
+                            env.MESSAGE_DATA = values[4]
                             if ('${env.PRODUCER_TYPE}' == 'standard'){
                                 echo """Producer configuration:
                                     Producer Type: ${env.PRODUCER_TYPE}
