@@ -29,7 +29,8 @@ properties([
                             "LIST_SCHEMA",
                             "REGISTER_SCHEMA",
                             "DESCRIBE_SCHEMA",
-                            "DELETE_SCHEMA"
+                            "DELETE_SCHEMA",
+                            "E2E_TEST"
                         ]
                     '''
                 ]
