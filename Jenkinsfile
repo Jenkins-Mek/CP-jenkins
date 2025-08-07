@@ -124,79 +124,11 @@ properties([
                         }else if (OPERATION == 'CREATE_TOPIC') {
                             return readHtmlFromFile('CREATE_TOPIC')
                         } else if (OPERATION == 'ALTER_TOPIC') {
-
-                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">'
-                            topicOptions += '<option value="">-- Select Topic --</option>'
-                            getTopics().each { topic ->
-                                topicOptions += "<option value='${topic}'>${topic}</option>"
-                            }
-                            topicOptions += '</select>'
-
-                            return """
-                                <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border: 1px solid #ffeeba;">
-                                    <h4 style="margin: 0 0 15px 0; color: #856404;">⚙️ Alter Topic Configuration</h4>
-                                    <table style="width: 100%; border-collapse: collapse;">
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                <label style="font-weight: bold; color: #856404;">Select Topic *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                ${topicOptions}
-                                                <div style="font-size: 12px; color: #856404; margin-top: 3px;">Select the topic to modify from the dropdown</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #856404;">Retention Days</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <input name='value' type='number' value='7' min='1' style="width: 150px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #856404; margin-top: 3px;">How many days messages are retained in the topic</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #856404;">Cleanup Policy</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">
-                                                    <option value='delete' selected>delete</option>
-                                                    <option value='compact'>compact</option>
-                                                    <option value='delete|compact'>delete,compact</option>
-                                                </select>
-                                                <div style="font-size: 12px; color: #856404; margin-top: 3px;">Topic cleanup policy</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #856404;">Segment Bytes</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <input name='value' type='number' value='1073741824' placeholder="e.g. 1073741824" style="width: 200px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #856404; margin-top: 3px;">Segment size in bytes (default: 1GB)</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #856404;">Min In-Sync Replicas</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <input name='value' type='number' value='1' min='1' style="width: 150px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #856404; margin-top: 3px;">Minimum in-sync replicas required</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #856404;">Max Message Bytes</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <input name='value' type='number' value='1000000' placeholder="e.g. 1000000" style="width: 200px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #856404; margin-top: 3px;">Maximum message size in bytes (default: 1MB)</div>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </div>
-                            """
+                            def htmlTemplate = readHtmlFromFile('ALTER_TOPIC')
+                            def topicOptions = getTopics().collect { topic ->
+                                "<option value='${topic}'>${topic}</option>"
+                            }.join('')
+                            return htmlTemplate.replace('{{TOPICS}}', topicOptions)
                         } else if (OPERATION == 'DESCRIBE_TOPIC') {
                             def htmlTemplate = readHtmlFromFile('DESCRIBE_TOPIC')
                             def topicOptions = getTopics().collect { topic ->
