@@ -61,28 +61,10 @@ pipeline {
             }
         }
 
-        stage('Create Test Topic') {
-            when {
-                expression { params.CREATE_TOPIC }
-            }
-            steps {
-                script {
-                    def topicName = params.TEST_TOPIC.trim()
-                    def partitions = params.TOPIC_PARTITIONS.toInteger()
-                    def replicationFactor = params.TOPIC_REPLICATION_FACTOR.toInteger()
-                    
-                    echo "🔨 Creating test topic: ${topicName} with partitions=${partitions} replicationFactor=${replicationFactor}"
-                    def result = createKafkaTopic(topicName, partitions, replicationFactor)
-                    echo result
-                }
-            }
-        }
-
         stage('Verify Topic Exists') {
             steps {
                 script {
                     echo "🔍 Verifying test topic exists: ${params.TEST_TOPIC}"
-                    
                     def topics = sh(
                         script: """
                             docker compose --project-directory '${params.COMPOSE_DIR}' \\
@@ -100,26 +82,6 @@ pipeline {
                     if (!topics.contains(params.TEST_TOPIC)) {
                         error("❌ Test topic '${params.TEST_TOPIC}' does not exist. Enable 'CREATE_TOPIC' or create the topic manually.")
                     }
-                    
-                    echo "✅ Test topic verified: ${params.TEST_TOPIC}"
-                    
-                    // Describe the topic
-                    def description = sh(
-                        script: """
-                            docker compose --project-directory '${params.COMPOSE_DIR}' \\
-                            -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
-                            exec -T broker bash -c '
-                                set -e
-                                unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
-                                kafka-topics --describe \\
-                                    --topic "${params.TEST_TOPIC}" \\
-                                    --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
-                                    --command-config ${env.CLIENT_CONFIG_FILE}
-                            ' 2>/dev/null
-                        """,
-                        returnStdout: true
-                    ).trim()
-                    echo "📋 Topic configuration:\n${description}"
                 }
             }
         }
@@ -129,7 +91,7 @@ pipeline {
                 script {
                     echo "🚀 Starting Kafka E2E latency test..."
                     echo "⏱️ Test started at: ${new Date()}"
-                    
+
                     def testResults = sh(
                         script: """
                             docker compose --project-directory '${params.COMPOSE_DIR}' \\
@@ -153,7 +115,6 @@ pipeline {
                     echo "📊 E2E Latency Test Results:"
                     echo testResults
 
-                    // Parse and highlight key metrics
                     def lines = testResults.split('\n')
                     def avgLatency = lines.find { it.contains('Avg latency') || it.contains('Average latency') }
                     def p99Latency = lines.find { it.contains('99th percentile') || it.contains('p99') }
@@ -163,7 +124,7 @@ pipeline {
                     if (p99Latency) echo "📈 ${p99Latency}"
                     if (throughput) echo "🔄 ${throughput}"
 
-                    // Save detailed results
+
                     saveTestResults(testResults)
                 }
             }
@@ -173,14 +134,14 @@ pipeline {
             steps {
                 script {
                     echo "📈 Analyzing test results..."
-                    
+
                     def resultsFile = readFile(env.E2E_RESULTS_FILE)
                     def lines = resultsFile.split('\n')
-                    
+
                     // Extract key metrics (this will depend on the actual output format)
                     def avgLatencyLine = lines.find { it.toLowerCase().contains('avg') && it.toLowerCase().contains('latency') }
                     def maxLatencyLine = lines.find { it.toLowerCase().contains('max') && it.toLowerCase().contains('latency') }
-                    
+
                     if (avgLatencyLine || maxLatencyLine) {
                         echo "✅ Test completed successfully!"
                         echo "📋 Key Metrics Summary:"
@@ -189,7 +150,7 @@ pipeline {
                     } else {
                         echo "⚠️ Could not parse latency metrics from output"
                     }
-                    
+
                     echo "💾 Full results saved to artifact: ${env.E2E_RESULTS_FILE}"
                 }
             }
@@ -208,8 +169,7 @@ pipeline {
                 archiveArtifacts artifacts: "${env.E2E_RESULTS_FILE}", fingerprint: true, allowEmptyArchive: true
                 echo "📦 Test results archived successfully: ${env.E2E_RESULTS_FILE}"
                 echo "✅ E2E Latency Test completed successfully!"
-                
-                // Optional: Clean up test topic
+
                 if (params.CREATE_TOPIC && env.CLEANUP_TEST_TOPIC == 'true') {
                     try {
                         sh """
@@ -235,8 +195,7 @@ pipeline {
             script {
                 echo "❌ E2E Latency Test failed!"
                 echo "📋 Check the console output for detailed error information"
-                
-                // Try to save partial results if any
+
                 try {
                     def errorInfo = """# Kafka E2E Latency Test - FAILED
 # Test failed at: ${new Date()}
@@ -259,40 +218,7 @@ ERROR: Test execution failed. Check Jenkins console output for details.
     }
 }
 
-// Helper function to create Kafka topic
-def createKafkaTopic(topicName, partitions = 3, replicationFactor = 1) {
-    try {
-        def createOutput = sh(
-            script: """
-                docker compose --project-directory '${params.COMPOSE_DIR}' \\
-                -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
-                exec -T broker bash -c '
-                    set -e
-                    unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
-                    kafka-topics --create \\
-                        --if-not-exists \\
-                        --topic "${topicName}" \\
-                        --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
-                        --command-config ${env.CLIENT_CONFIG_FILE} \\
-                        --partitions ${partitions} \\
-                        --replication-factor ${replicationFactor}
-                '
-            """,
-            returnStdout: true
-        ).trim()
 
-        if (createOutput) {
-            return "✅ Topic '${topicName}' created.\n${createOutput}"
-        } else {
-            return "ℹ️ Topic '${topicName}' already exists."
-        }
-
-    } catch (Exception e) {
-        return "❌ ERROR: Failed to create topic '${topicName}' - ${e.getMessage()}"
-    }
-}
-
-// Helper function to create Kafka client configuration
 def createKafkaClientConfig(username, password) {
     def securityConfig = ""
     switch(params.SECURITY_PROTOCOL) {
@@ -322,7 +248,6 @@ EOF'
     """
 }
 
-// Helper function to cleanup client configuration
 def cleanupClientConfig() {
     try {
         sh """
@@ -336,7 +261,6 @@ def cleanupClientConfig() {
     }
 }
 
-// Helper function to list Kafka topics
 def listKafkaTopics() {
     def topicsOutput = sh(
         script: """
@@ -357,7 +281,6 @@ def listKafkaTopics() {
     return allTopics.findAll { !it.startsWith('_') } // Filter out internal topics
 }
 
-// Helper function to describe a Kafka topic
 def describeKafkaTopic(topicName) {
     try {
         def describeOutput = sh(
@@ -382,7 +305,6 @@ def describeKafkaTopic(topicName) {
     }
 }
 
-// Helper function to save test results
 def saveTestResults(testOutput) {
     def timestamp = new Date().format('yyyy-MM-dd HH:mm:ss')
     def testConfig = """# Kafka E2E Latency Test Results
