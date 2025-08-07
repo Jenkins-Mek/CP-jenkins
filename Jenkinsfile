@@ -298,14 +298,14 @@ properties([
                         }else if (OPERATION == 'PRODUCER') {
 
                             def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 2px solid #c3e6cb; border-radius: 3px; background-color: #ecf6eeff;">'
-                            topicOptions += '<option value="">-- Select Topic to Delete --</option>'
+                            topicOptions += '<option value="">-- Select Topic to Produce --</option>'
                             getTopics().each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
                             }
                             topicOptions += '</select>'
 
                             def subjectOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px; background-color: #ecf6eeff">'
-                            subjectOptions += '<option value="">-- Select Schema Subject to Delete --</option>'
+                            subjectOptions += '<option value="">-- Select Schema Subject to Produce --</option>'
                             getSchemaSubjects().each { subject ->
                                subjectOptions += "<option value='${subject}'>${subject}</option>"
                             }
