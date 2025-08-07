@@ -11,7 +11,7 @@ properties([
         string(name: 'MESSAGE_COUNT', defaultValue: '1', description: 'Number of messages to produce'),
         booleanParam(name: 'USE_FILE_INPUT', defaultValue: false, description: 'Use file input instead of parameter data'),
         string(name: 'INPUT_FILE_PATH', defaultValue: '/tmp/input-messages.txt', description: 'Path to input file (only used when USE_FILE_INPUT is true)'),
-        booleanParam(name: 'ADD_TIMESTAMP', defaultValue: true, description: 'Add timestamp to each message'),
+        booleanParam(name: 'ADD_TIMESTAMP', defaultValue: false, description: 'Add timestamp to each message'),
         booleanParam(name: 'ADD_MESSAGE_INDEX', defaultValue: false, description: 'Add message index/counter to each message'),
         string(name: 'MESSAGE_KEY', defaultValue: '', description: 'Optional message key (leave empty for null key)')
     ])
