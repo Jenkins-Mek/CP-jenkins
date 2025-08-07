@@ -750,7 +750,7 @@ ${env.MESSAGE_DATA}
                             """
                             break
                         case 'E2E_TEST':
-                            echo " ${value}"
+                            echo "${params.TOPIC_OPTIONS}"
                             break
                     }
                 }
