@@ -546,11 +546,11 @@ properties([
                                             <td style="padding: 8px;">
                                                 <div style="display: flex; flex-direction: column; gap: 10px;">
                                                     <div style="display: flex; align-items: center;">
-                                                        <label style="width: 160px; color: #856404; margin-right: 10px;">Topic Partitions</label>
+                                                        <label style="width: 180px; color: #856404; margin-right: 10px; text-align: right;">Topic Partitions</label>
                                                         <input type="number" name="topic_partitions" value="3" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                     <div style="display: flex; align-items: center;">
-                                                        <label style="width: 160px; color: #856404; margin-right: 10px;">Replication Factor</label>
+                                                        <label style="width: 180px; color: #856404; margin-right: 10px; text-align: right;">Replication Factor</label>
                                                         <input type="number" name="topic_replication_factor" value="1" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                 </div>
@@ -564,20 +564,21 @@ properties([
                                             <td style="padding: 8px;">
                                                 <div style="display: flex; flex-direction: column; gap: 10px;">
                                                     <div style="display: flex; align-items: center;">
-                                                        <label style="width: 160px; color: #856404; margin-right: 10px;">Number of Messages</label>
+                                                        <label style="width: 180px; color: #856404; margin-right: 10px; text-align: right;">Number of Messages</label>
                                                         <input type="number" name="num_messages" value="1000" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                     <div style="display: flex; align-items: center;">
-                                                        <label style="width: 160px; color: #856404; margin-right: 10px;">Producer Threads</label>
+                                                        <label style="width: 180px; color: #856404; margin-right: 10px; text-align: right;">Producer Threads</label>
                                                         <input type="number" name="producer_threads" value="1" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                     <div style="display: flex; align-items: center;">
-                                                        <label style="width: 160px; color: #856404; margin-right: 10px;">Message Size (bytes)</label>
+                                                        <label style="width: 180px; color: #856404; margin-right: 10px; text-align: right;">Message Size (bytes)</label>
                                                         <input type="number" name="message_size" value="1024" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                 </div>
                                             </td>
                                         </tr>
+
 
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
