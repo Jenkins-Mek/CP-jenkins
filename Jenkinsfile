@@ -727,14 +727,22 @@ pipeline {
                             env.SCHEMA_SUBJECT = values[2] ?: ''
                             env.MESSAGE_COUNT = values[3] ?: '1'
                             env.MESSAGE_DATA = values[4].trim().replaceAll(/,\s*$/, '')
-
-                            echo """Producer configuration:
-                                Producer Type: ${env.PRODUCER_TYPE}
-                                Topic: ${env.TOPIC_NAME}
-                                Schema Subject: ${env.SCHEMA_SUBJECT}
-                                Message Count: ${env.MESSAGE_COUNT}
-                                Message Data: ${env.MESSAGE_DATA}
-                            """
+                            if ('${env.PRODUCER_TYPE}' == 'standard'){
+                                echo """Producer configuration:
+                                    Producer Type: ${env.PRODUCER_TYPE}
+                                    Topic: ${env.TOPIC_NAME}
+                                    Message Count: ${env.MESSAGE_COUNT}
+                                    Message Data: ${env.MESSAGE_DATA}
+                                """
+                            } else {
+                                echo """Producer configuration:
+                                    Producer Type: ${env.PRODUCER_TYPE}
+                                    Topic: ${env.TOPIC_NAME}
+                                    Schema Subject: ${env.SCHEMA_SUBJECT}
+                                    Message Count: ${env.MESSAGE_COUNT}
+                                    Message Data: ${env.MESSAGE_DATA}
+                                """
+                            }
                             break
                         case 'LIST_SCHEMA':
                             env.SHOW_VERSIONS = values.contains('true') ? 'true' : 'false'
@@ -918,20 +926,34 @@ pipeline {
                             break
 
                         case 'PRODUCER':
-                            echo "==== Calling Producer job ===="
-                            build job: 'org-cp-tools/CP-jenkins/producer',
-                                parameters: [
-                                    string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
-                                    string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
-                                    string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
-                                    string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
-                                    string(name: 'SCHEMA_REGISTRY_URL', value: "${env.SCHEMA_REGISTRY_URL}"),
-                                    string(name: 'MESSAGE_COUNT', value: "${env.MESSAGE_COUNT}"),
-                                    text(name: 'MESSAGE_DATA', value: "${env.MESSAGE_DATA}"),
-
-                                ],
-                                propagate: false,
-                                wait: true
+                            if ("${env.PRODUCER_TYPE}" == "standard" ) {
+                                echo "==== Calling Producer job ===="
+                                build job: 'org-cp-tools/CP-jenkins/producer',
+                                    parameters: [
+                                        string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
+                                        string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                        string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
+                                        string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
+                                        string(name: 'MESSAGE_COUNT', value: "${env.MESSAGE_COUNT}"),
+                                        text(name: 'MESSAGE_DATA', value: "${env.MESSAGE_DATA}"),
+                                    ],
+                                    propagate: false,
+                                    wait: true
+                            } else {
+                                echo "==== Calling Producer with Schemajob ===="
+                                build job: 'org-cp-tools/CP-jenkins/producer-schema',
+                                    parameters: [
+                                        string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
+                                        string(name: 'COMPOSE_DIR', value: "${env.COMPOSE_DIR}"),
+                                        string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
+                                        string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
+                                        string(name: 'SCHEMA_REGISTRY_URL', value: "${env.SCHEMA_REGISTRY_URL}"),
+                                        string(name: 'MESSAGE_COUNT', value: "${env.MESSAGE_COUNT}"),
+                                        text(name: 'MESSAGE_DATA', value: "${env.MESSAGE_DATA}"),
+                                    ],
+                                    propagate: false,
+                                    wait: true
+                            }
                             break
 
                         case 'CONSUMER':
@@ -954,9 +976,9 @@ pipeline {
                                     buildNumber: "${ConsumerJob.number}",
                                     filter: 'consumed-messages.txt',
                                     target: '.'
-                                break
+
                             } else {
-                                echo "==== Calling Consumer job ===="
+                                echo "==== Calling Consumer with Schema job ===="
                                 def ConsumerScheJob = build job: 'org-cp-tools/CP-jenkins/consumer-schema',
                                     parameters: [
                                         string(name: 'TOPIC_NAME', value: "${env.TOPIC_NAME}"),
@@ -975,8 +997,8 @@ pipeline {
                                     buildNumber: "${ConsumerScheJob.number}",
                                     filter: 'consumed-messages.txt',
                                     target: '.'
-                                break
                             }
+                            break
 
                         case 'REGISTER_SCHEMA':
                             echo "==== Calling Register Schema job ===="
