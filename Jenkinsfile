@@ -367,7 +367,7 @@ properties([
                                                 <label style="font-weight: bold; color: #455724;">Messages to produce *</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <textarea name='value' type='text' value='' style="width: 1200px; height: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;"></textarea>
+                                                <textarea name='value' type='text' value='' style="width: 800px; height: 160px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;"></textarea>
                                                 <div style="font-size: 12px; color: #155724; margin-top: 3px;">Message</div>
                                             </td>
                                         </tr>
