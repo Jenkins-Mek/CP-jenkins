@@ -495,7 +495,7 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'E2E_TEST') {
-                            def topicOptions = '<select name="existing_topic" id="existing_topic_select" style="width: 300px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;" disabled>'
+                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">'
                             topicOptions += '<option value="">-- Select Existing Topic --</option>'
                             getTopics().each { topic ->
                                 topicOptions += "<option value='${topic}'>${topic}</option>"
@@ -534,7 +534,6 @@ properties([
                                             </td>
                                         </tr>
 
-                                        <!-- Topic Configuration -->
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #856404;">Topic Configuration</label>
@@ -555,7 +554,6 @@ properties([
                                             </td>
                                         </tr>
 
-                                        <!-- Test Parameters -->
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #856404;">Test Parameters</label>
@@ -581,7 +579,6 @@ properties([
                                             </td>
                                         </tr>
 
-                                        <!-- Test Options -->
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #856404;">Test Options</label>
