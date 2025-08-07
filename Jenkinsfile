@@ -513,24 +513,29 @@ properties([
                                     </p>
 
                                     <table style="width: 100%; border-collapse: collapse;">
-                                        <!-- Topic Selection -->
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top; width: 200px;">
                                                 <label style="font-weight: bold; color: #856404;">Topic Selection</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <label style="color: #856404; display: block; margin-bottom: 5px;">
-                                                    <input type="radio" name="topic_mode" value="existing" style="margin-right: 5px;" onchange="toggleTopicInputs()">
-                                                    Use Existing Topic
-                                                </label>
-                                                ${topicOptions}
-                                                <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Topic name for registered</div>
+                                                <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-start;">
+                                                    <label style="color: #856404; display: flex; align-items: center;">
+                                                        <input type="radio" name="value" value="existing" style="margin-right: 8px;" onchange="toggleTopicInputs()">
+                                                        Use Existing Topic
+                                                    </label>
+                                                    <div style="margin-left: 24px;">
+                                                        ${topicOptions}
+                                                        <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Topic name for registered</div>
+                                                    </div>
 
-                                                <label style="color: #856404; display: block; margin: 15px 0 5px 0;">
-                                                    <input type="radio" name="topic_mode" value="create_new" checked style="margin-right: 5px;" onchange="toggleTopicInputs()">
-                                                    Create New Topic
-                                                </label>
-                                                <input type="text" name="new_topic_name" id="new_topic_input" placeholder="Enter topic name..." style="width: 300px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
+                                                    <label style="color: #856404; display: flex; align-items: center; margin-top: 10px;">
+                                                        <input type="radio" name="value" value="create_new" checked style="margin-right: 8px;" onchange="toggleTopicInputs()">
+                                                        Create New Topic
+                                                    </label>
+                                                    <div style="margin-left: 24px;">
+                                                        <input type="text" name="value" id="new_topic_input" placeholder="Enter topic name..." style="width: 300px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
+                                                    </div>
+                                                </div>
                                             </td>
                                         </tr>
 
@@ -539,16 +544,14 @@ properties([
                                                 <label style="font-weight: bold; color: #856404;">Topic Configuration</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                                    <div>
-                                                        <label style="color: #856404; display: block; margin-bottom: 5px;">Topic Partitions</label>
-                                                        <input type="number" name="topic_partitions" value="3" min="1" max="100" style="width: 100px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
-                                                        <small style="color: #6c757d; display: block;">Number of partitions (1-100)</small>
+                                                <div style="display: flex; gap: 40px; align-items: flex-start;">
+                                                    <div style="display: flex; flex-direction: column;">
+                                                        <label style="color: #856404; margin-bottom: 5px;">Topic Partitions</label>
+                                                        <input type="number" name="value" value="3" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
-                                                    <div>
-                                                        <label style="color: #856404; display: block; margin-bottom: 5px;">Replication Factor</label>
-                                                        <input type="number" name="topic_replication_factor" value="1" min="1" max="5" style="width: 100px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
-                                                        <small style="color: #6c757d; display: block;">Replication factor (1-5)</small>
+                                                    <div style="display: flex; flex-direction: column;">
+                                                        <label style="color: #856404; margin-bottom: 5px;">Replication Factor</label>
+                                                        <input type="number" name="value" value="1" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                 </div>
                                             </td>
@@ -559,21 +562,18 @@ properties([
                                                 <label style="font-weight: bold; color: #856404;">Test Parameters</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
-                                                    <div>
-                                                        <label style="color: #856404; display: block; margin-bottom: 5px;">Number of Messages</label>
-                                                        <input type="number" name="num_messages" value="1000" min="1" max="1000000" style="width: 120px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
-                                                        <small style="color: #6c757d; display: block;">Messages to send</small>
+                                                <div style="display: flex; gap: 40px; align-items: flex-start;">
+                                                    <div style="display: flex; flex-direction: column;">
+                                                        <label style="color: #856404; margin-bottom: 5px;">Number of Messages</label>
+                                                        <input type="number" name="value" value="1000" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
-                                                    <div>
-                                                        <label style="color: #856404; display: block; margin-bottom: 5px;">Producer Threads</label>
-                                                        <input type="number" name="producer_threads" value="1" min="1" max="10" style="width: 100px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
-                                                        <small style="color: #6c757d; display: block;">Concurrent producers</small>
+                                                    <div style="display: flex; flex-direction: column;">
+                                                        <label style="color: #856404; margin-bottom: 5px;">Producer Threads</label>
+                                                        <input type="number" name="value" value="1" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
-                                                    <div>
-                                                        <label style="color: #856404; display: block; margin-bottom: 5px;">Message Size (bytes)</label>
-                                                        <input type="number" name="message_size" value="1024" min="1" max="10485760" style="width: 120px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
-                                                        <small style="color: #6c757d; display: block;">Size per message</small>
+                                                    <div style="display: flex; flex-direction: column;">
+                                                        <label style="color: #856404; margin-bottom: 5px;">Message Size (bytes)</label>
+                                                        <input type="number" name="value" value="1024" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                 </div>
                                             </td>
@@ -587,14 +587,6 @@ properties([
                                                 <label style="color: #856404; display: block; margin-bottom: 5px;">
                                                     <input type="checkbox" name="cleanup_after_test" value="true" style="margin-right: 5px;">
                                                     Clean up topic after test completion
-                                                </label>
-                                                <label style="color: #856404; display: block; margin-bottom: 5px;">
-                                                    <input type="checkbox" name="verify_message_order" value="true" checked style="margin-right: 5px;">
-                                                    Verify message ordering within partitions
-                                                </label>
-                                                <label style="color: #856404; display: block; margin-bottom: 5px;">
-                                                    <input type="checkbox" name="measure_throughput" value="true" checked style="margin-right: 5px;">
-                                                    Measure throughput and latency metrics
                                                 </label>
                                             </td>
                                         </tr>
