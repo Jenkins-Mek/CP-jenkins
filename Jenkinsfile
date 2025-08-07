@@ -525,7 +525,6 @@ properties([
                                                     </label>
                                                     <div style="margin-left: 24px;">
                                                         ${topicOptions}
-                                                        <div style="font-size: 12px; color: #4b0082; margin-top: 3px;">Topic name for registered</div>
                                                     </div>
 
                                                     <label style="color: #856404; display: flex; align-items: center; margin-top: 10px;">
@@ -738,7 +737,6 @@ ${env.MESSAGE_DATA}
                             echo "Describe schema ${env.SUBJECT_NAME} (Show versions: ${env.SHOW_VERSIONS})"
                             break
                         case 'REGISTER_SCHEMA':
-                            echo "${params.TOPIC_OPTIONS}"
                             values = option.split(',', 5).collect { it.trim() }
                             env.TOPIC_NAME = values[0]
                             env.SCHEMA_FOR = values[1]
@@ -750,8 +748,17 @@ ${env.MESSAGE_DATA}
                             """
                             break
                         case 'E2E_TEST':
-                            echo "${params.TOPIC_OPTIONS}"
-                            break
+                            env.TOPIC_SELECTION = values[0]
+                            if ('${env.TOPIC_SELECTION}' == 'existing')
+                                env.TOPIC_NAME = values[1]
+                            else{
+                                env.CREATE_TOPIC = true
+                                env.TOPIC_NAME = values[2]
+                            }
+
+                            ,create_new,test-latency,3,1,1000,1,1024,true,
+                            existing,Test-create,,3,1,1000,1,1024,false,
+                            Test-create,create_new,test-topic,3,1,1000,1,1024,true,
                     }
                 }
             }
