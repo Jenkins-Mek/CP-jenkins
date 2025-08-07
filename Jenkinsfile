@@ -320,21 +320,22 @@ properties([
                                         <span style="margin-right: 10px; font-size: 24px;">📤</span>
                                         Kafka Producer
                                     </h4>
+                                    <!-- Producer Type Selection -->
+                                    <div style="margin-bottom: 20px;">
+                                        <label style="font-weight: bold; color: #155724; display: block; margin-bottom: 10px;">Producer Type *</label>
+                                        <input type="radio" id="standard-producer" name="producer-type" value="standard" checked style="margin-right: 5px;">
+                                        <label for="standard-producer" style="margin-right: 20px; color: #155724;">Standard Producer</label>
+                                        <input type="radio" id="schema-producer" name="producer-type" value="schema" style="margin-right: 5px;">
+                                        <label for="schema-producer" style="color: #155724;">Schema-based Producer</label>
+                                        <div style="font-size: 12px; color: #155724; margin-top: 3px;">Choose producer type</div>
+                                    </div>
+                                    <style>
+                                        #schema-producer:checked ~ table .schema-row { display: table-row !important; }
+                                        #standard-producer:checked ~ table .schema-row { display: none !important; }
+                                    </style>
                                     <table style="width: 100%;">
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                <label style="font-weight: bold; color: #155724;">Producer Type *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <select name="value" style="width: 200px; padding: 5px; border: 1px solid #c3e6cb; border-radius: 3px;" onchange="toggleProducerFields(this.value)">
-                                                    <option value="standard" selected>Standard Producer</option>
-                                                    <option value="schema">Schema-based Producer</option>
-                                                </select>
-                                                <div style="font-size: 12px; color: #155724; margin-top: 3px;">Choose producer type</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #155724;">Topic Name *</label>
                                             </td>
                                             <td style="padding: 8px;">
@@ -342,7 +343,7 @@ properties([
                                                 <div style="font-size: 12px; color: #155724; margin-top: 3px;">Select topic to produce to</div>
                                             </td>
                                         </tr>
-                                        <tr class="schema-fields" style="display: none;">
+                                        <tr class="schema-row" style="display: none;">
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #155724;">Schema Subject *</label>
                                             </td>
