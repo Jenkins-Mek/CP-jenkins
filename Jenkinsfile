@@ -198,30 +198,11 @@ properties([
                                 </div>
                             """
                         } else if (OPERATION == 'DESCRIBE_TOPIC') {
-
-                            def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #ffeaa7; border-radius: 3px;">'
-                            topicOptions += '<option value="">-- Select Topic --</option>'
-                            getTopics().each { topic ->
-                                topicOptions += "<option value='${topic}'>${topic}</option>"
-                            }
-                            topicOptions += '</select>'
-
-                            return """
-                                <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
-                                    <h4 style="margin: 0 0 15px 0; color: #856404;">🔍 Describe Topic</h4>
-                                    <table style="width: 100%;">
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                <label style="font-weight: bold; color: #856404;">Select Topic *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                ${topicOptions}
-                                                <div style="font-size: 12px; color: #856404; margin-top: 3px;">Select an existing topic to get its details</div>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </div>
-                            """
+                            def htmlTemplate = readHtmlFromFile('DESCRIBE_TOPIC')
+                            def topicOptions = getTopics().collect { topic ->
+                                "<option value='${topic}'>${topic}</option>"
+                            }.join('')
+                            return htmlTemplate.replace('{{TOPICS}}', topicOptions)
                         } else if (OPERATION == 'DELETE_TOPIC') {
 
                             def topicOptions = '<select name="value" style="width: 300px; padding: 8px; border: 2px solid #f48fb1; border-radius: 5px; background: #fff5f8; font-size: 14px;">'
