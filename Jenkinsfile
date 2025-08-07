@@ -726,14 +726,14 @@ pipeline {
                             env.TOPIC_NAME = values[1]
                             env.SCHEMA_SUBJECT = values[2] ?: ''
                             env.MESSAGE_COUNT = values[3] ?: '1'
-                            env.MESSAGE_DATA = values[4] ?: ''
+                            env.MESSAGE_DATA = values[4].trim().replaceAll(/,\s*$/, '')
 
                             echo """Producer configuration:
                                 Producer Type: ${env.PRODUCER_TYPE}
                                 Topic: ${env.TOPIC_NAME}
                                 Schema Subject: ${env.SCHEMA_SUBJECT}
                                 Message Count: ${env.MESSAGE_COUNT}
-                                Message DATA: ${env.MESSAGE_DATA}
+                                Message Data: ${env.MESSAGE_DATA}
                             """
                             break
                         case 'LIST_SCHEMA':
@@ -926,8 +926,8 @@ pipeline {
                                     string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
                                     string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
                                     string(name: 'SCHEMA_REGISTRY_URL', value: "${env.SCHEMA_REGISTRY_URL}"),
-                                    text(name: 'MESSAGE_COUNT ', value: "${env.MESSAGE_COUNT }"),
-                                    text(name: 'MESSAGE_DATA ', value: "${env.MESSAGE_DATA }"),
+                                    text(name: 'MESSAGE_COUNT ', value: "${env.MESSAGE_COUNT}"),
+                                    text(name: 'MESSAGE_DATA ', value: "${env.MESSAGE_DATA}"),
 
                                 ],
                                 propagate: false,
