@@ -55,24 +55,21 @@ properties([
                     sandbox: true,
                     script:
                         '''
-                        def readHtmlRaw(String operation) {
+                        def readHtmlFromFile(String operation) {
                             def htmlFile = new File('/var/lib/jenkins/workspace/html-store.txt')
                             def lines = htmlFile.readLines()
-                            def htmlContent = new StringBuilder()
+                            def htmlContent = ""
                             def isInSection = false
                             lines.each { line ->
-                                def trimmed = line.trim()
-                                if (trimmed.startsWith("${operation} =")) {
+                                if (line.trim().startsWith(operation + " =")) {
                                     isInSection = true
-                                } else if (trimmed.contains(" =") && isInSection) {
+                                } else if (line.trim().contains(" =") && isInSection) {
                                     isInSection = false
                                 } else if (isInSection) {
-                                    htmlContent.append(line).append("\n")
+                                    htmlContent += line + "\\n"
                                 }
                             }
-
-                            def escaped = escapeHtml(htmlContent.toString().trim())
-                            return [ "<pre>${escaped}</pre>" ]
+                            return htmlContent.trim() ?: " "
                         }
 
                         def getTopics() {
@@ -123,52 +120,9 @@ properties([
                         }
 
                         if (OPERATION == 'LIST_TOPICS'){
-                            return readHtmlRaw('LIST_TOPICS')
+                            return readHtmlFromFile('LIST_TOPICS')
                         }else if (OPERATION == 'CREATE_TOPIC') {
-                            return """
-                                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
-                                    <h4 style="margin: 0 0 15px 0; color: #495057;">🚀 Create New Topic</h4>
-                                    <table style="width: 100%; border-collapse: collapse;">
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top; width: 200px;">
-                                                <label style="font-weight: bold; color: #495057;">Topic Name *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <input name='value' type='text' value='user-events' style="width: 300px; padding: 5px; border: 1px solid #ced4da; border-radius: 3px;">
-                                                <div style="font-size: 12px; color: #6c757d; margin-top: 3px;">Use alphanumeric characters, dots, underscores, and hyphens</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #495057;">Partitions *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #ced4da; border-radius: 3px;">
-                                                    <option value='1' selected>1 (Development)</option>
-                                                    <option value='3'>3 (Small workload)</option>
-                                                    <option value='6'>6 (Medium workload)</option>
-                                                    <option value='12'>12 (High workload)</option>
-                                                    <option value='24'>24 (Very high workload)</option>
-                                                </select>
-                                                <div style="font-size: 12px; color: #6c757d; margin-top: 3px;">More partitions = better parallelism but more overhead</div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="padding: 8px; vertical-align: top;">
-                                                <label style="font-weight: bold; color: #495057;">Replication Factor *</label>
-                                            </td>
-                                            <td style="padding: 8px;">
-                                                <select name='value' style="width: 200px; padding: 5px; border: 1px solid #ced4da; border-radius: 3px;">
-                                                    <option value='1' selected>1 (Development - No redundancy)</option>
-                                                    <option value='2'>2 (Staging - Basic redundancy)</option>
-                                                    <option value='3'>3 (Production - High availability)</option>
-                                                </select>
-                                                <div style="font-size: 12px; color: #6c757d; margin-top: 3px;">Production should use 3 for fault tolerance</div>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </div>
-                            """
+                            return readHtmlFromFile('CREATE_TOPIC')
                         } else if (OPERATION == 'ALTER_TOPIC') {
 
                             def topicOptions = '<select name="value" style="width: 300px; padding: 5px; border: 1px solid #ffe8a1; border-radius: 3px;">'
