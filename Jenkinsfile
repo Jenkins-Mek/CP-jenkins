@@ -520,7 +520,7 @@ properties([
                                             <td style="padding: 8px;">
                                                 <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-start;">
                                                     <label style="color: #856404; display: flex; align-items: center;">
-                                                        <input type="radio" name="value" value="existing" style="margin-right: 8px;" onchange="toggleTopicInputs()">
+                                                        <input type="radio" name="value" value="existing" style="margin-right: 8px;">
                                                         Use Existing Topic
                                                     </label>
                                                     <div style="margin-left: 24px;">
@@ -529,11 +529,11 @@ properties([
                                                     </div>
 
                                                     <label style="color: #856404; display: flex; align-items: center; margin-top: 10px;">
-                                                        <input type="radio" name="value" value="create_new" checked style="margin-right: 8px;" onchange="toggleTopicInputs()">
+                                                        <input type="radio" name="value" value="create_new" checked style="margin-right: 8px;">
                                                         Create New Topic
                                                     </label>
                                                     <div style="margin-left: 24px;">
-                                                        <input type="text" name="value" id="new_topic_input" placeholder="Enter topic name..." style="width: 300px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
+                                                        <input type="text" name="value" placeholder="Enter topic name..." style="width: 300px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                 </div>
                                             </td>
@@ -547,11 +547,11 @@ properties([
                                                 <div style="display: flex; flex-direction: column; gap: 12px;">
                                                     <div style="display: flex; align-items: center;">
                                                         <label style="width: 180px; color: #856404; margin-right: 15px; text-align: left; font-weight: 500;">Topic Partitions:</label>
-                                                        <input type="number" name="value" value="3" style="width: 150px; padding: 8px 12px; border: 1px solid #ffc107; border-radius: 4px; font-size: 14px;">
+                                                        <input type="number" name="value" value="3" min="1" max="50" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                     <div style="display: flex; align-items: center;">
                                                         <label style="width: 180px; color: #856404; margin-right: 15px; text-align: left; font-weight: 500;">Replication Factor:</label>
-                                                        <input type="number" name="value" value="1" style="width: 150px; padding: 8px 12px; border: 1px solid #ffc107; border-radius: 4px; font-size: 14px;">
+                                                        <input type="number" name="value" value="1" min="1" max="3" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                 </div>
                                             </td>
@@ -565,15 +565,15 @@ properties([
                                                 <div style="display: flex; flex-direction: column; gap: 12px;">
                                                     <div style="display: flex; align-items: center;">
                                                         <label style="width: 180px; color: #856404; margin-right: 15px; text-align: left; font-weight: 500;">Number of Messages:</label>
-                                                        <input type="number" name="value" value="1000" style="width: 150px; padding: 8px 12px; border: 1px solid #ffc107; border-radius: 4px; font-size: 14px;">
+                                                        <input type="number" name="value" value="1000" min="1" max="1000000" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                     <div style="display: flex; align-items: center;">
                                                         <label style="width: 180px; color: #856404; margin-right: 15px; text-align: left; font-weight: 500;">Producer Threads:</label>
-                                                        <input type="number" name="value" value="1" style="width: 150px; padding: 8px 12px; border: 1px solid #ffc107; border-radius: 4px; font-size: 14px;">
+                                                        <input type="number" name="value" value="1" min="1" max="10" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                     <div style="display: flex; align-items: center;">
                                                         <label style="width: 180px; color: #856404; margin-right: 15px; text-align: left; font-weight: 500;">Message Size (bytes):</label>
-                                                        <input type="number" name="value" value="1024" style="width: 150px; padding: 8px 12px; border: 1px solid #ffc107; border-radius: 4px; font-size: 14px;">
+                                                        <input type="number" name="value" value="1024" min="1" max="10485760" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                 </div>
                                             </td>
