@@ -61,23 +61,19 @@ pipeline {
                     
                     try {
                         sh """
-                            docker compose --project-directory ${params.COMPOSE_DIR} \\
-                            -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-                            exec -T broker bash -c "
-                                export KAFKA_OPTS=''
-                                export JMX_PORT=''
-                                export KAFKA_JMX_OPTS=''
-                                unset JMX_PORT
-                                unset KAFKA_JMX_OPTS
-                                unset KAFKA_OPTS
+                            docker compose --project-directory '${params.COMPOSE_DIR}' \\
+                            -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
+                            exec -T broker bash -c '
+                                set -e
+                                unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
                                 kafka-topics --create \\
-                                    --topic ${params.TEST_TOPIC} \\
-                                    --partitions ${params.TOPIC_PARTITIONS} \\
-                                    --replication-factor ${params.TOPIC_REPLICATION_FACTOR} \\
+                                    --if-not-exists \\
+                                    --topic "${params.TEST_TOPIC}" \\
                                     --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
                                     --command-config ${env.CLIENT_CONFIG_FILE} \\
-                                    --if-not-exists
-                            " 2>/dev/null
+                                    --partitions ${params.TOPIC_PARTITIONS} \\
+                                    --replication-factor ${params.TOPIC_REPLICATION_FACTOR}
+                            '
                         """
                         echo "✅ Test topic created/verified successfully"
                     } catch (Exception e) {
@@ -92,7 +88,20 @@ pipeline {
                 script {
                     echo "🔍 Verifying test topic exists: ${params.TEST_TOPIC}"
                     
-                    def topics = listKafkaTopics()
+                    def topics = sh(
+                        script: """
+                            docker compose --project-directory '${params.COMPOSE_DIR}' \\
+                            -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
+                            exec -T broker bash -c '
+                                set -e
+                                unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
+                                kafka-topics --list \\
+                                    --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                                    --command-config ${env.CLIENT_CONFIG_FILE}
+                            ' 2>/dev/null
+                        """,
+                        returnStdout: true
+                    ).trim().split('\n').findAll { it.trim() != '' && !it.startsWith('WARNING') && !it.contains('FATAL') }
                     if (!topics.contains(params.TEST_TOPIC)) {
                         error("❌ Test topic '${params.TEST_TOPIC}' does not exist. Enable 'CREATE_TOPIC' or create the topic manually.")
                     }
@@ -100,7 +109,21 @@ pipeline {
                     echo "✅ Test topic verified: ${params.TEST_TOPIC}"
                     
                     // Describe the topic
-                    def description = describeKafkaTopic(params.TEST_TOPIC)
+                    def description = sh(
+                        script: """
+                            docker compose --project-directory '${params.COMPOSE_DIR}' \\
+                            -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
+                            exec -T broker bash -c '
+                                set -e
+                                unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
+                                kafka-topics --describe \\
+                                    --topic "${params.TEST_TOPIC}" \\
+                                    --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                                    --command-config ${env.CLIENT_CONFIG_FILE}
+                            ' 2>/dev/null
+                        """,
+                        returnStdout: true
+                    ).trim()
                     echo "📋 Topic configuration:\n${description}"
                 }
             }
@@ -114,24 +137,20 @@ pipeline {
                     
                     def testResults = sh(
                         script: """
-                            docker compose --project-directory ${params.COMPOSE_DIR} \\
-                            -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-                            exec -T broker bash -c "
-                                export KAFKA_JMX_OPTS=''
-                                export JMX_PORT=''
-                                export KAFKA_OPTS=''
-                                unset JMX_PORT
-                                unset KAFKA_JMX_OPTS
-                                unset KAFKA_OPTS
-                                echo 'Starting E2E latency test...'
+                            docker compose --project-directory '${params.COMPOSE_DIR}' \\
+                            -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
+                            exec -T broker bash -c '
+                                set -e
+                                unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
+                                echo "Starting E2E latency test..."
                                 kafka-e2e-latency \\
                                     ${params.KAFKA_BOOTSTRAP_SERVER} \\
-                                    ${params.TEST_TOPIC} \\
+                                    "${params.TEST_TOPIC}" \\
                                     ${params.NUM_MESSAGES} \\
                                     ${params.PRODUCER_THREADS} \\
                                     ${params.MESSAGE_SIZE} \\
                                     ${env.CLIENT_CONFIG_FILE}
-                            " 2>&1
+                            ' 2>&1
                         """,
                         returnStdout: true
                     ).trim()
@@ -198,13 +217,16 @@ pipeline {
                 if (params.CREATE_TOPIC && env.CLEANUP_TEST_TOPIC == 'true') {
                     try {
                         sh """
-                            docker compose --project-directory ${params.COMPOSE_DIR} \\
-                            -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-                            exec -T broker bash -c "
-                                kafka-topics --delete --topic ${params.TEST_TOPIC} \\
-                                --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
-                                --command-config ${env.CLIENT_CONFIG_FILE}
-                            "
+                            docker compose --project-directory '${params.COMPOSE_DIR}' \\
+                            -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
+                            exec -T broker bash -c '
+                                set -e
+                                unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
+                                kafka-topics --delete \\
+                                    --topic "${params.TEST_TOPIC}" \\
+                                    --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                                    --command-config ${env.CLIENT_CONFIG_FILE}
+                            '
                         """
                         echo "🗑️ Test topic cleaned up: ${params.TEST_TOPIC}"
                     } catch (Exception e) {
@@ -245,16 +267,15 @@ ERROR: Test execution failed. Check Jenkins console output for details.
 def listKafkaTopics() {
     def topicsOutput = sh(
         script: """
-            docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-            exec -T broker bash -c "
-                export KAFKA_OPTS=''
-                export JMX_PORT=''
-                export KAFKA_JMX_OPTS=''
-                unset JMX_PORT
-                unset KAFKA_JMX_OPTS
-                unset KAFKA_OPTS
-                kafka-topics --list --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} --command-config ${env.CLIENT_CONFIG_FILE}
-            " 2>/dev/null
+            docker compose --project-directory '${params.COMPOSE_DIR}' \\
+            -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
+            exec -T broker bash -c '
+                set -e
+                unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
+                kafka-topics --list \\
+                    --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                    --command-config ${env.CLIENT_CONFIG_FILE}
+            ' 2>/dev/null
         """,
         returnStdout: true
     ).trim()
@@ -268,16 +289,16 @@ def describeKafkaTopic(topicName) {
     try {
         def describeOutput = sh(
             script: """
-                docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
-                exec -T broker bash -c "
-                    export KAFKA_OPTS=''
-                    export JMX_PORT=''
-                    export KAFKA_JMX_OPTS=''
-                    unset JMX_PORT
-                    unset KAFKA_JMX_OPTS
-                    unset KAFKA_OPTS
-                    kafka-topics --describe --topic ${topicName} --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} --command-config ${env.CLIENT_CONFIG_FILE}
-                " 2>/dev/null
+                docker compose --project-directory '${params.COMPOSE_DIR}' \\
+                -f '${params.COMPOSE_DIR}/docker-compose.yml' \\
+                exec -T broker bash -c '
+                    set -e
+                    unset JMX_PORT KAFKA_JMX_OPTS KAFKA_OPTS
+                    kafka-topics --describe \\
+                        --topic "${topicName}" \\
+                        --bootstrap-server ${params.KAFKA_BOOTSTRAP_SERVER} \\
+                        --command-config ${env.CLIENT_CONFIG_FILE}
+                ' 2>/dev/null
             """,
             returnStdout: true
         ).trim()
