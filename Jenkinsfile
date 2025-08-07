@@ -585,7 +585,7 @@ properties([
                                             </td>
                                             <td style="padding: 8px;">
                                                 <label style="color: #856404; display: block; margin-bottom: 5px;">
-                                                    <input type="checkbox" name="cleanup_after_test" value="true" style="margin-right: 5px;">
+                                                    <input type="checkbox" name="value" value="true" style="margin-right: 5px;">
                                                     Clean up topic after test completion
                                                 </label>
                                             </td>
