@@ -544,20 +544,14 @@ properties([
                                                 <label style="font-weight: bold; color: #856404;">Topic Configuration</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <div style="display: flex; flex-direction: row; gap: 40px;">
+                                                <div style="display: flex; flex-direction: column; gap: 12px;">
                                                     <div style="display: flex; align-items: center;">
-                                                        <label for="partitions" style="width: 180px; color: #856404; margin-right: 15px; text-align: left; font-weight: 500;">
-                                                            Topic Partitions :
-                                                        </label>
-                                                        <input id="partitions" type="number" name="partitions" value="3"
-                                                            style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
+                                                        <label style="width: 180px; color: #856404; margin-right: 15px; text-align: left; font-weight: 500;">Topic Partitions : </label>
+                                                        <input type="number" name="value" value="3" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                     <div style="display: flex; align-items: center;">
-                                                        <label for="replication" style="width: 180px; color: #856404; margin-right: 15px; text-align: left; font-weight: 500;">
-                                                            Replication Factor :
-                                                        </label>
-                                                        <input id="replication" type="number" name="replication" value="1"
-                                                            style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
+                                                        <label style="width: 180px; color: #856404; margin-right: 15px; text-align: left; font-weight: 500;">Replication Factor : </label>
+                                                        <input type="number" name="value" value="1" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
                                                     </div>
                                                 </div>
                                             </td>
@@ -754,6 +748,9 @@ ${env.MESSAGE_DATA}
                             Register schema ${SCHEMA_FOR} in ${SCHEMA_TYPE} to topic : ${env.TOPIC_NAME}
                             With content ${SCHEMA_CONTENT}
                             """
+                            break
+                        case 'E2E_TEST':
+                            echo " ${value}"
                             break
                     }
                 }
