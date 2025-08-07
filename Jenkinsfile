@@ -926,8 +926,8 @@ pipeline {
                                     string(name: 'KAFKA_BOOTSTRAP_SERVER', value: "${env.KAFKA_BOOTSTRAP_SERVER}"),
                                     string(name: 'SECURITY_PROTOCOL', value: "${env.SECURITY_PROTOCOL}"),
                                     string(name: 'SCHEMA_REGISTRY_URL', value: "${env.SCHEMA_REGISTRY_URL}"),
-                                    text(name: 'MESSAGE_COUNT ', value: "${env.MESSAGE_COUNT}"),
-                                    text(name: 'MESSAGE_DATA ', value: "${env.MESSAGE_DATA}"),
+                                    string(name: 'MESSAGE_COUNT', value: "${env.MESSAGE_COUNT}"),
+                                    text(name: 'MESSAGE_DATA', value: "${env.MESSAGE_DATA}"),
 
                                 ],
                                 propagate: false,
