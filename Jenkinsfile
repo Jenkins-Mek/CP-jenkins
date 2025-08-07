@@ -1,4 +1,3 @@
-
 properties([
     parameters([
         [$class: 'ChoiceParameter',
@@ -709,11 +708,18 @@ pipeline {
                             break
                         case 'CONSUMER':
                             env.TOPIC_NAME = values[0]
-                            env.CONSUMER_GROUP_ID = values[1] ?: ''
-                            env.OFFSET_RESET = values[2] ?: 'latest'
-                            env.MAX_MESSAGES = values[3] ?: '10'
-                            env.TIMEOUT_SECONDS = values[4] ?: '30'
-                            env.MESSAGE_FORMAT = values[5] ?: 'JSON'
+                            if (values[2] != 'earliest' && values[2] != 'latest'){
+                                env.OFFSET_RESET = values[1] ?: '1'
+                                env.MAX_MESSAGES = values[2] ?: '10'
+                                env.TIMEOUT_SECONDS = values[3] ?: '30'
+                                env.MESSAGE_FORMAT = values[4] ?: 'JSON'
+                            } else {
+                                env.CONSUMER_GROUP_ID = values[1]
+                                env.OFFSET_RESET = values[2] ?: 'latest'
+                                env.MAX_MESSAGES = values[3] ?: '10'
+                                env.TIMEOUT_SECONDS = values[4] ?: '30'
+                                env.MESSAGE_FORMAT = values[5] ?: 'JSON'
+                            }
                             echo """Consumer configuration:
                                 Topic: ${env.TOPIC_NAME}"
                                 Consumer Group: ${env.CONSUMER_GROUP_ID}"
