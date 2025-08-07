@@ -242,16 +242,16 @@ def prepareMessageDataFromFile() {
 def prepareMessageDataFromParameter() {
     def messageCount = params.MESSAGE_COUNT.toInteger()
     def baseMessage = params.MESSAGE_DATA.trim()
-    
+
     sh """
         docker compose --project-directory ${params.COMPOSE_DIR} -f ${params.COMPOSE_DIR}/docker-compose.yml \\
         exec -T broker bash -c '
             echo "Preparing ${messageCount} messages..."
             rm -f "${env.MESSAGE_DATA_FILE}"
-            
+
             for i in \$(seq 1 ${messageCount}); do
                 MESSAGE="${baseMessage}"
-                
+
                 # Add message index if requested
                 if [ "${params.ADD_MESSAGE_INDEX}" = "true" ]; then
                     if [ "${params.MESSAGE_FORMAT}" = "JSON" ]; then
@@ -262,7 +262,7 @@ def prepareMessageDataFromParameter() {
                         MESSAGE="[\$i] ${baseMessage}"
                     fi
                 fi
-                
+
                 # Add timestamp if requested
                 if [ "${params.ADD_TIMESTAMP}" = "true" ]; then
                     TIMESTAMP=\$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
@@ -274,7 +274,7 @@ def prepareMessageDataFromParameter() {
                         MESSAGE="\$MESSAGE [timestamp: \$TIMESTAMP]"
                     fi
                 fi
-                
+
                 # Add message key if specified
                 if [ -n "${params.MESSAGE_KEY}" ]; then
                     echo "${params.MESSAGE_KEY}:\$MESSAGE" >> "${env.MESSAGE_DATA_FILE}"
@@ -282,7 +282,7 @@ def prepareMessageDataFromParameter() {
                     echo "\$MESSAGE" >> "${env.MESSAGE_DATA_FILE}"
                 fi
             done
-            
+
             echo "✅ Message data file prepared with ${messageCount} messages"
             echo "Sample content:"
             head -3 "${env.MESSAGE_DATA_FILE}"
