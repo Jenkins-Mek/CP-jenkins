@@ -544,14 +544,14 @@ properties([
                                                 <label style="font-weight: bold; color: #856404;">Topic Configuration</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <div style="display: flex; flex-direction: column; gap: 10px;">
+                                                <div style="display: flex; flex-direction: column; gap: 12px;">
                                                     <div style="display: flex; align-items: center;">
-                                                        <label style="width: 180px; color: #856404; margin-right: 10px; text-align: right;">Topic Partitions</label>
-                                                        <input type="number" name="topic_partitions" value="3" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
+                                                        <label style="width: 180px; color: #856404; margin-right: 15px; text-align: left; font-weight: 500;">Topic Partitions:</label>
+                                                        <input type="number" name="value" value="3" style="width: 150px; padding: 8px 12px; border: 1px solid #ffc107; border-radius: 4px; font-size: 14px;">
                                                     </div>
                                                     <div style="display: flex; align-items: center;">
-                                                        <label style="width: 180px; color: #856404; margin-right: 10px; text-align: right;">Replication Factor</label>
-                                                        <input type="number" name="topic_replication_factor" value="1" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
+                                                        <label style="width: 180px; color: #856404; margin-right: 15px; text-align: left; font-weight: 500;">Replication Factor:</label>
+                                                        <input type="number" name="value" value="1" style="width: 150px; padding: 8px 12px; border: 1px solid #ffc107; border-radius: 4px; font-size: 14px;">
                                                     </div>
                                                 </div>
                                             </td>
@@ -562,31 +562,30 @@ properties([
                                                 <label style="font-weight: bold; color: #856404;">Test Parameters</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <div style="display: flex; flex-direction: column; gap: 10px;">
+                                                <div style="display: flex; flex-direction: column; gap: 12px;">
                                                     <div style="display: flex; align-items: center;">
-                                                        <label style="width: 180px; color: #856404; margin-right: 10px; text-align: right;">Number of Messages</label>
-                                                        <input type="number" name="num_messages" value="1000" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
+                                                        <label style="width: 180px; color: #856404; margin-right: 15px; text-align: left; font-weight: 500;">Number of Messages:</label>
+                                                        <input type="number" name="value" value="1000" style="width: 150px; padding: 8px 12px; border: 1px solid #ffc107; border-radius: 4px; font-size: 14px;">
                                                     </div>
                                                     <div style="display: flex; align-items: center;">
-                                                        <label style="width: 180px; color: #856404; margin-right: 10px; text-align: right;">Producer Threads</label>
-                                                        <input type="number" name="producer_threads" value="1" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
+                                                        <label style="width: 180px; color: #856404; margin-right: 15px; text-align: left; font-weight: 500;">Producer Threads:</label>
+                                                        <input type="number" name="value" value="1" style="width: 150px; padding: 8px 12px; border: 1px solid #ffc107; border-radius: 4px; font-size: 14px;">
                                                     </div>
                                                     <div style="display: flex; align-items: center;">
-                                                        <label style="width: 180px; color: #856404; margin-right: 10px; text-align: right;">Message Size (bytes)</label>
-                                                        <input type="number" name="message_size" value="1024" style="width: 150px; padding: 5px; border: 1px solid #ffc107; border-radius: 3px;">
+                                                        <label style="width: 180px; color: #856404; margin-right: 15px; text-align: left; font-weight: 500;">Message Size (bytes):</label>
+                                                        <input type="number" name="value" value="1024" style="width: 150px; padding: 8px 12px; border: 1px solid #ffc107; border-radius: 4px; font-size: 14px;">
                                                     </div>
                                                 </div>
                                             </td>
                                         </tr>
-
 
                                         <tr>
                                             <td style="padding: 8px; vertical-align: top;">
                                                 <label style="font-weight: bold; color: #856404;">Test Options</label>
                                             </td>
                                             <td style="padding: 8px;">
-                                                <label style="color: #856404; display: block; margin-bottom: 5px;">
-                                                    <input type="checkbox" name="value" value="true" style="margin-right: 5px;">
+                                                <label style="color: #856404; display: block; margin-bottom: 5px; cursor: pointer;">
+                                                    <input type="checkbox" name="value" value="true" style="margin-right: 8px;">
                                                     Clean up topic after test completion
                                                 </label>
                                             </td>
