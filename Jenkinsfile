@@ -55,21 +55,24 @@ properties([
                     sandbox: true,
                     script:
                         '''
-                        def readHtmlFromFile(String operation) {
+                        def readHtmlRaw(String operation) {
                             def htmlFile = new File('/var/lib/jenkins/workspace/html-store.txt')
                             def lines = htmlFile.readLines()
-                            def htmlContent = ""
+                            def htmlContent = new StringBuilder()
                             def isInSection = false
                             lines.each { line ->
-                                if (line.trim().startsWith(operation + " =")) {
+                                def trimmed = line.trim()
+                                if (trimmed.startsWith("${operation} =")) {
                                     isInSection = true
-                                } else if (line.trim().contains(" =") && isInSection) {
+                                } else if (trimmed.contains(" =") && isInSection) {
                                     isInSection = false
                                 } else if (isInSection) {
-                                    htmlContent += line + "\\n"
+                                    htmlContent.append(line).append("\n")
                                 }
                             }
-                            return htmlContent.trim() ?: " "
+
+                            def escaped = escapeHtml(htmlContent.toString().trim())
+                            return [ "<pre>${escaped}</pre>" ]
                         }
 
                         def getTopics() {
@@ -119,9 +122,8 @@ properties([
                                 return subjects
                         }
 
-                        // Main logic
                         if (OPERATION == 'LIST_TOPICS'){
-                            return readHtmlFromFile('LIST_TOPICS')
+                            return readHtmlRaw('LIST_TOPICS')
                         }else if (OPERATION == 'CREATE_TOPIC') {
                             return """
                                 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
