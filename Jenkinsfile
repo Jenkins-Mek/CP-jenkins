@@ -726,7 +726,7 @@ pipeline {
                             env.TOPIC_NAME = values[1]
                             env.SCHEMA_SUBJECT = values[2] ?: ''
                             env.MESSAGE_COUNT = values[3] ?: '1'
-                            env.MESSAGE_DATA = values[4]
+                            env.MESSAGE_DATA = values[4].trim().replaceAll('\\\\', '').replaceAll(/,\s*$/, '')
                             if ('${env.PRODUCER_TYPE}' == 'standard'){
                                 echo """Producer configuration:
                                     Producer Type: ${env.PRODUCER_TYPE}
