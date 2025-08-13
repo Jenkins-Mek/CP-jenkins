@@ -780,8 +780,6 @@ Test Parameters:
 
 Test Options:
   Clean up topic after test completion: ${env.CLEANUP_AFTER_TEST}
-
-Schema Content: ${SCHEMA_CONTENT}
 """
                             break
                     }
