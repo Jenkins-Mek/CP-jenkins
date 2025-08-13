@@ -749,16 +749,41 @@ ${env.MESSAGE_DATA}
                             break
                         case 'E2E_TEST':
                             env.TOPIC_SELECTION = values[0]
-                            if ('${env.TOPIC_SELECTION}' == 'existing')
+
+                            if (env.TOPIC_SELECTION == 'existing') {
                                 env.TOPIC_NAME = values[1]
-                            else{
+                                env.CREATE_TOPIC = false
+                            } else if (env.TOPIC_SELECTION == 'create_new') {
                                 env.CREATE_TOPIC = true
                                 env.TOPIC_NAME = values[2]
                             }
+                            env.TOPIC_PARTITIONS = values[3]
+                            env.REPLICATION_FACTOR = values[4]
+                            env.NUMBER_OF_MESSAGES = values[5]
+                            env.PRODUCER_THREADS = values[6]
+                            env.MESSAGE_SIZE_BYTES = values[7]
+                            env.CLEANUP_AFTER_TEST = values[8]
+                            echo """
+=== E2E Test Configuration ===
+End to End latency testing to Topic : ${env.TOPIC_NAME}
 
-                            ,create_new,test-latency,3,1,1000,1,1024,true,
-                            existing,Test-create,,3,1,1000,1,1024,false,
-                            Test-create,create_new,test-topic,3,1,1000,1,1024,true,
+Topic Configuration:
+  Topic Selection: ${env.TOPIC_SELECTION}
+  Create Topic: ${env.CREATE_TOPIC}
+  Topic Partitions: ${env.TOPIC_PARTITIONS}
+  Replication Factor: ${env.REPLICATION_FACTOR}
+
+Test Parameters:
+  Number of Messages: ${env.NUMBER_OF_MESSAGES}
+  Producer Threads: ${env.PRODUCER_THREADS}
+  Message Size (bytes): ${env.MESSAGE_SIZE_BYTES}
+
+Test Options:
+  Clean up topic after test completion: ${env.CLEANUP_AFTER_TEST}
+
+Schema Content: ${SCHEMA_CONTENT}
+"""
+                            break
                     }
                 }
             }
