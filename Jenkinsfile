@@ -758,10 +758,10 @@ ${env.MESSAGE_DATA}
                                 env.TOPIC_NAME = values[2]
                             }
                             env.TOPIC_PARTITIONS = values[3]
-                            env.REPLICATION_FACTOR = values[4]
-                            env.NUMBER_OF_MESSAGES = values[5]
+                            env.TOPIC_REPLICATION_FACTOR = values[4]
+                            env.NUM_MESSAGES = values[5]
                             env.PRODUCER_THREADS = values[6]
-                            env.MESSAGE_SIZE_BYTES = values[7]
+                            env.MESSAGE_SIZE = values[7]
                             env.CLEANUP_AFTER_TEST = values[8]
                             echo """
 === E2E Test Configuration ===
@@ -771,12 +771,12 @@ Topic Configuration:
   Topic Selection: ${env.TOPIC_SELECTION}
   Create Topic: ${env.CREATE_TOPIC}
   Topic Partitions: ${env.TOPIC_PARTITIONS}
-  Replication Factor: ${env.REPLICATION_FACTOR}
+  Replication Factor: ${env.TOPIC_REPLICATION_FACTOR}
 
 Test Parameters:
-  Number of Messages: ${env.NUMBER_OF_MESSAGES}
+  Number of Messages: ${env.NUM_MESSAGES}
   Producer Threads: ${env.PRODUCER_THREADS}
-  Message Size (bytes): ${env.MESSAGE_SIZE_BYTES}
+  Message Size (bytes): ${env.MESSAGE_SIZE}
 
 Test Options:
   Clean up topic after test completion: ${env.CLEANUP_AFTER_TEST}
